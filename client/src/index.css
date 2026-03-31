@@ -1,0 +1,278 @@
+@import "tailwindcss";
+
+/* =========================================================
+   1. DESIGN TOKENS (FOUNDATION)
+========================================================= */
+:root {
+  /* Colors — Base */
+  --color-bg-primary: #050816;
+  --color-bg-surface: #0b0f2a;
+  --color-bg-elevated: #0f172a;
+
+  /* Colors — Brand */
+  --color-blue-400: #60a5fa;
+  --color-blue-500: #3b82f6;
+  --color-blue-600: #2563eb;
+  --color-blue-700: #1d4ed8;
+
+  --color-violet: #6366f1;
+  --color-cyan: #22d3ee;
+
+  /* Text */
+  --color-text-primary: #ffffff;
+  --color-text-secondary: #94a3b8;
+  --color-text-muted: #64748b;
+
+  /* Borders */
+  --border-subtle: rgba(255, 255, 255, 0.06);
+  --border-strong: rgba(255, 255, 255, 0.12);
+
+  /* Effects */
+  --glow-primary: rgba(59, 130, 246, 0.35);
+}
+
+/* =========================================================
+   2. RESET & BASE
+========================================================= */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background-color: var(--color-bg-primary);
+  color: var(--color-text-primary);
+  font-family: 'Inter', system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  overflow-x: hidden;
+}
+
+/* =========================================================
+   3. TYPOGRAPHY
+========================================================= */
+h1,
+h2,
+h3,
+h4 {
+  font-family: 'Space Grotesk', sans-serif;
+  letter-spacing: -0.02em;
+  font-weight: 700;
+}
+
+p {
+  color: var(--color-text-secondary);
+  line-height: 1.6;
+}
+
+/* =========================================================
+   4. LAYOUT SYSTEM
+========================================================= */
+.container-max {
+  width: 100%;
+  max-width: 1400px;
+  margin-inline: auto;
+  padding-inline: clamp(20px, 5vw, 64px);
+}
+
+.section {
+  padding-block: clamp(80px, 10vh, 140px);
+}
+
+/* =========================================================
+   5. VISUAL SYSTEM (BACKGROUND & TEXTURES)
+========================================================= */
+
+.pixel-grid {
+  background-image:
+    linear-gradient(to right, rgba(255, 255, 255, 0.04) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(255, 255, 255, 0.04) 1px, transparent 1px);
+  background-size: 32px 32px;
+}
+
+.noise-overlay {
+  position: absolute;
+  inset: 0;
+  background-image: url("https://www.transparenttextures.com/patterns/asfalt-light.png");
+  opacity: 0.03;
+  pointer-events: none;
+}
+
+.glow-bg {
+  position: absolute;
+  width: 800px;
+  height: 800px;
+  background: radial-gradient(circle, rgba(59, 130, 246, 0.15), transparent 70%);
+  filter: blur(140px);
+}
+
+/* =========================================================
+   6. GLASSMORPHISM SYSTEM (REFINED)
+========================================================= */
+.glass {
+  background: rgba(255, 255, 255, 0.03);
+  backdrop-filter: blur(30px) saturate(180%);
+  -webkit-backdrop-filter: blur(30px) saturate(180%);
+  border: 1px solid var(--border-subtle);
+}
+
+.glass-strong {
+  background: rgba(255, 255, 255, 0.06);
+  backdrop-filter: blur(50px) saturate(220%);
+  border: 1px solid var(--border-strong);
+}
+
+.glass-liquid {
+  background: rgba(255, 255, 255, 0.02);
+  backdrop-filter: blur(40px) saturate(200%) brightness(1.2);
+  -webkit-backdrop-filter: blur(40px) saturate(200%) brightness(1.2);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: 
+    inset 0 0 20px rgba(255, 255, 255, 0.02),
+    0 20px 60px rgba(0, 0, 0, 0.3);
+}
+
+.glass-pill {
+  background: rgba(255, 255, 255, 0.03);
+  backdrop-filter: blur(25px) saturate(160%);
+  -webkit-backdrop-filter: blur(25px) saturate(160%);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  border-radius: 9999px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+}
+
+.glass-card {
+  background: rgba(255, 255, 255, 0.03);
+  backdrop-filter: blur(40px) saturate(200%);
+  -webkit-backdrop-filter: blur(40px) saturate(200%);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 32px;
+  padding: 40px;
+  transition: all 0.6s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.glass-card:hover {
+  background: rgba(255, 255, 255, 0.05);
+  border-color: rgba(255, 255, 255, 0.15);
+  transform: translateY(-8px) scale(1.01);
+  box-shadow: 0 40px 120px rgba(0, 0, 0, 0.6);
+}
+
+/* =========================================================
+   7. DEPTH & SHADOW SYSTEM
+========================================================= */
+.depth-sm { box-shadow: 0 8px 20px rgba(0, 0, 0, 0.2); }
+.depth-md { box-shadow: 0 16px 40px rgba(0, 0, 0, 0.4); }
+.depth-lg { box-shadow: 0 32px 80px rgba(0, 0, 0, 0.6); }
+.depth-glow { box-shadow: 0 0 80px rgba(37, 99, 235, 0.2); }
+
+/* =========================================================
+   8. MOTION SYSTEM
+========================================================= */
+@keyframes glow-pulse {
+  0%, 100% { opacity: 0.3; transform: translate(-50%, -50%) scale(1); }
+  50% { opacity: 0.6; transform: translate(-50%, -50%) scale(1.1); }
+}
+
+@keyframes buoyancy {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-20px); }
+}
+
+.animate-glow-pulse { animation: glow-pulse 10s ease-in-out infinite; }
+.animate-buoyancy { animation: buoyancy 8s ease-in-out infinite; }
+
+/* =========================================================
+   9. COMPONENT SYSTEM
+========================================================= */
+
+/* Buttons */
+.btn-primary {
+  background: linear-gradient(135deg, var(--color-blue-600), var(--color-blue-500));
+  border: none;
+  color: white;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.2em;
+  transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+  box-shadow: 0 10px 40px rgba(37, 99, 235, 0.3);
+}
+
+.btn-primary:hover {
+  transform: translateY(-4px) scale(1.02);
+  box-shadow: 0 20px 80px rgba(37, 99, 235, 0.5);
+  background: linear-gradient(135deg, var(--color-blue-500), var(--color-blue-400));
+}
+
+.btn-secondary {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  color: white;
+  transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.btn-secondary:hover {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.2);
+}
+
+/* Inputs */
+.input-premium {
+  width: 100%;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 16px;
+  padding: 16px 24px;
+  color: white;
+  font-weight: 600;
+  outline: none;
+  transition: all 0.4s ease;
+}
+
+.input-premium:focus {
+  background: rgba(255, 255, 255, 0.05);
+  border-color: var(--color-blue-500);
+  box-shadow: 0 0 20px rgba(37, 99, 235, 0.1);
+}
+
+/* Logo */
+.logo-container-elite {
+  width: 64px;
+  height: 64px;
+  background: var(--color-blue-600);
+  border-radius: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 12px 40px rgba(37, 99, 235, 0.4);
+  margin: 0 auto 24px;
+  transition: all 0.5s ease;
+}
+
+/* =========================================================
+   10. UTILITIES
+========================================================= */
+
+.no-scrollbar::-webkit-scrollbar { display: none; }
+.no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
+/* Custom Textures */
+.mesh-gradient {
+  background-image: 
+    radial-gradient(at 0% 0%, rgba(37, 99, 235, 0.1) 0, transparent 50%), 
+    radial-gradient(at 50% 0%, rgba(99, 102, 241, 0.05) 0, transparent 50%), 
+    radial-gradient(at 100% 0%, rgba(34, 211, 238, 0.1) 0, transparent 50%);
+}
+
+/* =========================================================
+   11. SCROLLBAR (POLISHED)
+========================================================= */
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 10px;
+  border: 2px solid var(--color-bg-primary);
+}
+::-webkit-scrollbar-thumb:hover { background: rgba(255, 255, 255, 0.2); }

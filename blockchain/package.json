@@ -1,0 +1,22 @@
+{
+  "name": "blockchain",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "type": "module",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "ganache": "^7.9.2"
+  },
+  "devDependencies": {
+    "@nomicfoundation/hardhat-ethers": "^4.0.6",
+    "@nomicfoundation/hardhat-toolbox": "^6.1.2",
+    "ethers": "^6.16.0",
+    "hardhat": "^3.2.0"
+  }
+}

@@ -1,0 +1,33 @@
+import crypto from 'crypto';
+
+/**
+ * Deterministically stringifies an object by sorting all keys recursively.
+ * This ensures the same JSON input always produces the same SHA-256 hash.
+ */
+export function getDeterministicJSON(obj) {
+  if (obj === null || typeof obj !== 'object') {
+    return JSON.stringify(obj);
+  }
+
+  if (Array.isArray(obj)) {
+    return '[' + obj.map(getDeterministicJSON).join(',') + ']';
+  }
+
+  const sortedKeys = Object.keys(obj).sort();
+  const result = {};
+  sortedKeys.forEach(key => {
+    result[key] = obj[key];
+  });
+
+  return '{' + sortedKeys.map(key => {
+    return `"${key}":${getDeterministicJSON(obj[key])}`;
+  }).join(',') + '}';
+}
+
+/**
+ * Generates a SHA-256 hash from a deterministic JSON string.
+ */
+export function generateHash(data) {
+  const json = getDeterministicJSON(data);
+  return crypto.createHash('sha256').update(json).digest('hex');
+}
