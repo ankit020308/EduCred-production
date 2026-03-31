@@ -1,3 +1,6 @@
+blockchain/ganache_db/
+blockchain/cache/
+blockchain/artifacts/build-info/
 node_modules/
 .env
 dist/
