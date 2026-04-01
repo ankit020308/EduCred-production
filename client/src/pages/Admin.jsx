@@ -46,9 +46,7 @@ export default function Admin() {
 
   const [formData, setFormData] = useState({
     studentName: '',
-    regNo: '',
-    degreeName: 'B.Tech',
-    graduationYear: new Date().getFullYear(),
+    course: '',
     file: null
   });
 
@@ -101,9 +99,7 @@ export default function Admin() {
     try {
       const data = new FormData();
       data.append('studentName', formData.studentName);
-      data.append('regNo', formData.regNo);
-      data.append('degreeName', formData.degreeName);
-      data.append('graduationYear', formData.graduationYear);
+      data.append('course', formData.course);
       data.append('file', formData.file);
 
       const res = await api.post('/api/certificates/issue', data, {
@@ -113,9 +109,9 @@ export default function Admin() {
       });
       
       setShowIssueModal(false);
-      setFormData({ studentName: '', regNo: '', degreeName: 'B.Tech', graduationYear: 2024, file: null });
+      setFormData({ studentName: '', course: '', file: null });
       fetchLocalCerts();
-      alert('Certificate anchored to blockchain successfully!');
+      alert('Identity anchored to blockchain successfully!');
     } catch (err) {
       alert(err.response?.data?.error || 'Issuance failed');
     } finally {
@@ -125,7 +121,7 @@ export default function Admin() {
 
   const filtered = certs.filter(c => 
     c.studentName.toLowerCase().includes(search.toLowerCase()) || 
-    c.regNo.toLowerCase().includes(search.toLowerCase())
+    c.course.toLowerCase().includes(search.toLowerCase())
   );
 
   if (loading) return (
@@ -247,10 +243,10 @@ export default function Admin() {
               <table className="w-full text-left border-collapse">
                 <thead>
                   <tr className="bg-white/5 border-b border-white/5">
-                    <th className="px-10 py-8 text-[11px] font-black uppercase tracking-[0.3em] text-slate-500">Subject</th>
-                    <th className="px-10 py-8 text-[11px] font-black uppercase tracking-[0.3em] text-slate-500">Credential Proof</th>
-                    <th className="px-10 py-8 text-[11px] font-black uppercase tracking-[0.3em] text-slate-500">Blockchain Hash</th>
-                    <th className="px-10 py-8 text-[11px] font-black uppercase tracking-[0.3em] text-slate-500">Sync Date</th>
+                    <th className="px-10 py-8 text-[11px] font-black uppercase tracking-[0.3em] text-slate-500">Student Name</th>
+                    <th className="px-10 py-8 text-[11px] font-black uppercase tracking-[0.3em] text-slate-500">Course / Program</th>
+                    <th className="px-10 py-8 text-[11px] font-black uppercase tracking-[0.3em] text-slate-500">Digital Anchor (Hash)</th>
+                    <th className="px-10 py-8 text-[11px] font-black uppercase tracking-[0.3em] text-slate-500">Issuance Date</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-white/5">
@@ -273,12 +269,11 @@ export default function Admin() {
                             </div>
                             <div>
                                 <p className="text-white font-black text-sm uppercase italic tracking-tight">{cert.studentName}</p>
-                                <p className="text-slate-500 text-[10px] font-black uppercase tracking-widest mt-1">{cert.regNo}</p>
                             </div>
                           </div>
                         </td>
                         <td className="px-10 py-8">
-                          <p className="text-white text-xs font-black uppercase tracking-widest">{cert.degreeName}</p>
+                          <p className="text-white text-xs font-black uppercase tracking-widest">{cert.course}</p>
                           <p className="text-slate-500 text-[10px] font-bold uppercase tracking-wider">Sync ID: {cert._id.slice(-6)}</p>
                         </td>
                         <td className="px-10 py-8">
@@ -328,7 +323,7 @@ export default function Admin() {
                 </div>
 
                 <form onSubmit={handleIssue} className="p-8 space-y-6">
-                    <div className="grid grid-cols-2 gap-6">
+                    <div className="grid grid-cols-1 gap-6">
                         <div className="space-y-2">
                             <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Student Name</label>
                             <input 
@@ -339,36 +334,17 @@ export default function Admin() {
                                 placeholder="ALEX R"
                             />
                         </div>
-                        <div className="space-y-2">
-                            <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Registration ID</label>
-                            <input 
-                                required
-                                value={formData.regNo}
-                                onChange={(e) => setFormData({...formData, regNo: e.target.value})}
-                                className="w-full bg-white/5 border border-white/10 rounded-xl px-5 py-4 text-white text-sm focus:border-blue-500 outline-none transition-all placeholder:opacity-20" 
-                                placeholder="REG-2024-OX"
-                            />
-                        </div>
                     </div>
 
-                    <div className="grid grid-cols-2 gap-6">
+                    <div className="grid grid-cols-1 gap-6">
                         <div className="space-y-2">
-                            <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Degree Program</label>
+                            <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Course / Program</label>
                             <input 
                                 required
-                                value={formData.degreeName}
-                                onChange={(e) => setFormData({...formData, degreeName: e.target.value})}
-                                className="w-full bg-white/5 border border-white/10 rounded-xl px-5 py-4 text-white text-sm focus:border-blue-500 outline-none transition-all" 
-                            />
-                        </div>
-                        <div className="space-y-2">
-                            <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Graduation Year</label>
-                            <input 
-                                required
-                                type="number"
-                                value={formData.graduationYear}
-                                onChange={(e) => setFormData({...formData, graduationYear: e.target.value})}
-                                className="w-full bg-white/5 border border-white/10 rounded-xl px-5 py-4 text-white text-sm focus:border-blue-500 outline-none transition-all" 
+                                value={formData.course}
+                                onChange={(e) => setFormData({...formData, course: e.target.value})}
+                                className="w-full bg-white/5 border border-white/10 rounded-xl px-5 py-4 text-white text-sm focus:border-blue-500 outline-none transition-all placeholder:opacity-20" 
+                                placeholder="B.SCIENCE IN ARTIFICIAL INTELLIGENCE"
                             />
                         </div>
                     </div>

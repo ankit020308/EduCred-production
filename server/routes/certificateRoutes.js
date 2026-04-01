@@ -9,13 +9,30 @@ import {
 import { protect, requireRole } from '../middleware/authMiddleware.js';
 import { requireApprovedUniversity } from '../middleware/universityMiddleware.js';
 
+import path from 'path';
+import fs from 'fs';
+
 const router = express.Router();
 
 /**
- * Configure Multter for file uploads (Memory Storage)
- * We hash the buffer directly, so no need to save to disk.
+ * Configure Multer for LOCAL File Storage (Section 2.5)
+ * Files are stored in the server's 'uploads' directory.
  */
-const storage = multer.memoryStorage();
+const storage = multer.diskStorage({
+    destination: (req, file, cb) => {
+        const uploadPath = 'uploads/';
+        if (!fs.existsSync(uploadPath)) {
+            fs.mkdirSync(uploadPath, { recursive: true });
+        }
+        cb(null, uploadPath);
+    },
+    filename: (req, file, cb) => {
+        // Unique filename: timestamp + original extension
+        const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+        cb(null, file.fieldname + '-' + uniqueSuffix + path.extname(file.originalname));
+    }
+});
+
 const upload = multer({ 
     storage,
     limits: { fileSize: 10 * 1024 * 1024 } // 10MB

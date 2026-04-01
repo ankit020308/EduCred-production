@@ -1,29 +1,20 @@
-import Certificate from '../models/Certificate.js';
-import University from '../models/University.js';
-import {
-    storeHashOnChain,
-    verifyHashOnChain
-} from '../utils/blockchain.js';
 import { generateBinaryHash } from '../utils/hashing.js';
+import fs from 'fs';
 
 /**
- * ARCHITECTURE PIVOT: Issuance (Home University Admin)
- * 1. Authenticate University
- * 2. Validate "APPROVED" Status
- * 3. Hash Binary File (PDF/Image)
- * 4. Anchor Hash to Blockchain
- * 5. Store Metadata in DB
+ * ─── Anti-Gravity: Issuance Flow (Section 2.6) ───
+ * Authenticate -> Upload -> Hash -> Store (Blockchain + DB)
  */
 export const issueCertificate = async (req, res) => {
     try {
-        const { studentName, regNo, degreeName, graduationYear } = req.body;
+        const { studentName, course } = req.body;
         const file = req.file;
 
         if (!file) {
             return res.status(400).json({ error: 'Certificate file (PDF/Image) is required.' });
         }
 
-        // 1. Verify University Status (Backend Enforcement)
+        // 1. Verify University Status (Manual Trust Gate)
         const university = await University.findOne({ userId: req.user._id });
         if (!university || university.status !== 'APPROVED') {
             return res.status(403).json({
@@ -32,46 +23,43 @@ export const issueCertificate = async (req, res) => {
             });
         }
 
-        // 2. Generate Binary Hash
-        const hash = generateBinaryHash(file.buffer);
+        // 2. Read File from Disk and Generate Hash (Section 2.3)
+        const fileBuffer = fs.readFileSync(file.path);
+        const hash = generateBinaryHash(fileBuffer);
 
-        // 3. Anchor Hash to Blockchain
+        // 3. Anchor Hash to Blockchain Ledger (Section 2.4)
         const receipt = await storeHashOnChain(hash);
 
-        // 4. Save Metadata to DB
+        // 4. Save AUTHORITATIVE RECORD to DB (7 Fields + Internal IDs)
         const cert = await Certificate.create({
             studentName,
-            regNo,
-            universityName: university.name,
-            universityId: university._id,
-            degreeName,
-            graduationYear,
+            course,
+            issuer: university.name,
+            fileUrl: file.path, 
             certificateHash: hash,
-            transactionHash: receipt.hash,
+            blockchainTxHash: receipt.hash,
+            issuedAt: new Date(),
+            // Relations (needed for the app logic)
             issuedBy: req.user._id,
-            status: 'MINED',
-            // Note: studentId could be linked if the student already exists, 
-            // but for this flow, we focus on the authoritative issuance.
-            studentId: req.user._id // Placeholder for demonstration
+            universityId: university._id
         });
 
         res.status(201).json({
-            message: 'Credential issued and anchored to blockchain successfully.',
+            message: 'Identity Anchored Successfully.',
             certificateId: cert._id,
             hash: hash,
             transactionHash: receipt.hash
         });
 
     } catch (err) {
-        console.error('🚀 Issuance Error:', err);
-        res.status(500).json({ error: 'Detailed issuance failed.', details: err.message });
+        console.error('🚀 Issuance Failure:', err);
+        res.status(500).json({ error: 'Authoritative issuance failed.', details: err.message });
     }
 };
 
 /**
- * ARCHITECTURE PIVOT: Verification (Public Portal)
- * 1. Upload File OR Enter Certificate ID
- * 2. Re-hash/Fetch and Compare with Blockchain
+ * ─── Anti-Gravity: Verification Flow (Section 2.6) ───
+ * Option 1: File OR Option 2: Certificate ID
  */
 export const verifyCertificate = async (req, res) => {
     try {
@@ -79,44 +67,52 @@ export const verifyCertificate = async (req, res) => {
         const file = req.file;
 
         let hashToVerify = '';
+        let metadata = null;
 
         if (file) {
-            // Option A: Verify by File Upload
-            hashToVerify = generateBinaryHash(file.buffer);
+            // Option 1: File Verification (Section 2.6 Option 2)
+            const fileBuffer = fs.readFileSync(file.path);
+            hashToVerify = generateBinaryHash(fileBuffer);
+            // Check if we have additional metadata in our registry
+            metadata = await Certificate.findOne({ certificateHash: hashToVerify });
         } else if (certificateId) {
-            // Option B: Verify by Certificate ID
+            // Option 2: ID Verification (Section 2.6 Option 1)
             const cert = await Certificate.findById(certificateId);
             if (!cert) {
-                return res.status(404).json({ valid: false, message: 'Certificate ID not found in database.' });
+                return res.status(404).json({ valid: false, message: 'ID not found on registry.' });
             }
             hashToVerify = cert.certificateHash;
+            metadata = cert;
         } else {
-            return res.status(400).json({ error: 'Please provide either a file or a Certificate ID.' });
+            return res.status(400).json({ error: 'Input Required: Provide File or ID.' });
         }
 
-        // Query Blockchain Ledger
-        const isValid = await verifyHashOnChain(hashToVerify);
+        // Blockchain Query (The Absolute Truth)
+        const isOnLedger = await verifyHashOnChain(hashToVerify);
 
-        if (!isValid) {
+        if (!isOnLedger) {
             return res.status(404).json({
                 valid: false,
-                message: '❌ FAKE / TAMPERED: No matching record found on the blockchain ledger.'
+                message: '❌ FAKE / TAMPERED: No matching anchor found on the blockchain ledger.'
             });
         }
 
-        // Fetch metadata for display (if available)
-        const metadata = await Certificate.findOne({ certificateHash: hashToVerify });
-
         res.json({
             valid: true,
-            message: '✅ VALID: Authentic credential verified against the decentralized ledger.',
+            message: '✅ AUTHENTIC: Identity verified against the decentralized ledger.',
             hash: hashToVerify,
-            metadata: metadata || { message: 'Metadata not available in local DB but hash exists on blockchain.' }
+            metadata: metadata ? {
+                studentName: metadata.studentName,
+                course: metadata.course,
+                issuer: metadata.issuer,
+                issuedAt: metadata.issuedAt,
+                fileUrl: metadata.fileUrl
+            } : { message: 'Anchor exists on blockchain, but identity record is not in this node.' }
         });
 
     } catch (err) {
-        console.error('🚀 Verification Error:', err);
-        res.status(500).json({ error: 'Verification process failed.' });
+        console.error('🚀 Verification Failure:', err);
+        res.status(500).json({ error: 'Verification vector failure.' });
     }
 };
 

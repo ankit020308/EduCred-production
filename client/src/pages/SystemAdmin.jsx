@@ -166,6 +166,7 @@ export default function SystemAdmin() {
                 <tr className="bg-white/5 border-b border-white/5">
                   <th className="px-10 py-8 text-[11px] font-black uppercase tracking-[0.3em] text-slate-500">Institution Identity</th>
                   <th className="px-10 py-8 text-[11px] font-black uppercase tracking-[0.3em] text-slate-500">Auth Status</th>
+                  <th className="px-10 py-8 text-[11px] font-black uppercase tracking-[0.3em] text-slate-500">Application Context</th>
                   <th className="px-10 py-8 text-[11px] font-black uppercase tracking-[0.3em] text-slate-500">Registration Date</th>
                   <th className="px-10 py-8 text-[11px] font-black uppercase tracking-[0.3em] text-slate-500">Execute Control</th>
                 </tr>
@@ -192,12 +193,19 @@ export default function SystemAdmin() {
                             {uni.name.charAt(0)}
                           </div>
                           <div>
-                              <p className="text-white font-black text-sm uppercase italic tracking-tight">{uni.name}</p>
+                              <p className="text-white font-black text-sm uppercase italic tracking-tight flex items-center gap-2">
+                                {uni.name}
+                                {uni.isFlagged && (
+                                  <span className="text-rose-500 animate-pulse" title="Security Warning: Non-Institutional Domain">
+                                    <ShieldAlert size={14} />
+                                  </span>
+                                )}
+                              </p>
                               <p className="text-slate-500 text-[10px] font-black uppercase tracking-widest mt-1 flex items-center gap-2">
                                 {uni.email}
-                                {!uni.email.endsWith('.edu') && !uni.email.endsWith('.ac.in') && (
-                                  <span className="text-rose-500 flex items-center gap-1 font-black underline italic">
-                                    <ShieldAlert size={10} /> External Domain
+                                {uni.isFlagged && (
+                                  <span className="text-rose-500/50 flex items-center gap-1 font-black italic">
+                                     EXTERNAL IDENTITY
                                   </span>
                                 )}
                               </p>
@@ -215,7 +223,26 @@ export default function SystemAdmin() {
                         </div>
                       </td>
                       <td className="px-10 py-8">
-                         <p className="text-slate-400 text-[11px] font-black uppercase tracking-widest opacity-50">{new Date(uni.createdAt).toLocaleDateString()}</p>
+                        <div className="max-w-xs space-y-2">
+                          <p className="text-slate-400 text-[10px] font-bold line-clamp-2 uppercase leading-relaxed tracking-wider italic">
+                             {uni.description || 'No context provided by issuer.'}
+                          </p>
+                          {uni.documents?.length > 0 && (
+                            <div className="flex flex-wrap gap-2">
+                              {uni.documents.map((doc, idx) => (
+                                <a 
+                                  key={idx} 
+                                  href={doc.startsWith('http') ? doc : '#'} 
+                                  target="_blank" 
+                                  rel="noreferrer"
+                                  className="text-blue-400 hover:text-blue-300 text-[9px] font-black uppercase tracking-widest flex items-center gap-1 border-b border-blue-400/30"
+                                >
+                                  <ExternalLink size={10} /> Proof-{idx + 1}
+                                </a>
+                              ))}
+                            </div>
+                          )}
+                        </div>
                       </td>
                       <td className="px-10 py-8">
                          <div className="flex items-center gap-3">

@@ -267,26 +267,25 @@ export default function Verifier() {
 
                   {result.valid && result.metadata && (
                     <div className="mt-12 grid grid-cols-1 md:grid-cols-2 gap-8 border-t border-white/10 pt-12 relative z-10">
-                      <div className="space-y-6">
-                        <div className="flex items-center gap-3 text-blue-400">
-                          <UserIcon size={20} />
-                          <span className="text-[10px] font-black uppercase tracking-widest">Subject Information</span>
-                        </div>
-                        <div className="glass-liquid p-6 rounded-2xl border border-white/5 space-y-1">
-                          <p className="text-white font-black text-xl uppercase italic tracking-tighter">{result.metadata.studentName}</p>
-                          <p className="text-slate-500 text-[10px] font-black uppercase tracking-widest font-mono">{result.metadata.regNo}</p>
-                        </div>
+                      <div className="p-6 bg-white/5 rounded-2xl border border-white/5 space-y-4">
+                       <div className="flex items-center gap-3 text-blue-400">
+                         <UserIcon size={16} />
+                         <span className="text-[10px] font-black uppercase tracking-widest">Authorized Subject</span>
+                       </div>
+                       <div>
+                         <p className="text-white font-black text-lg uppercase italic tracking-tight">{result.metadata.studentName}</p>
+                         <p className="text-slate-500 text-[10px] font-bold uppercase tracking-widest mt-1">Identity Verified</p>
+                       </div>
                       </div>
-                      
-                      <div className="space-y-6">
-                        <div className="flex items-center gap-3 text-emerald-400">
-                          <GraduationCap size={20} />
-                          <span className="text-[10px] font-black uppercase tracking-widest">Institution Authority</span>
-                        </div>
-                        <div className="glass-liquid p-6 rounded-2xl border border-white/5 space-y-1">
-                          <p className="text-white font-black text-xl uppercase italic tracking-tighter">{result.metadata.universityName}</p>
-                          <p className="text-slate-500 text-[10px] font-black uppercase tracking-widest">{result.metadata.degreeName} ({result.metadata.graduationYear})</p>
-                        </div>
+                      <div className="p-6 bg-white/5 rounded-2xl border border-white/5 space-y-4">
+                       <div className="flex items-center gap-3 text-emerald-400">
+                         <GraduationCap size={16} />
+                         <span className="text-[10px] font-black uppercase tracking-widest">Issuing Authority</span>
+                       </div>
+                       <div>
+                         <p className="text-white font-black text-lg uppercase italic tracking-tight">{result.metadata.issuer}</p>
+                         <p className="text-slate-500 text-[10px] font-black uppercase tracking-widest mt-1">{result.metadata.course}</p>
+                       </div>
                       </div>
 
                       <div className="md:col-span-2 space-y-4 pt-4">

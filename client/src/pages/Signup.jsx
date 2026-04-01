@@ -13,7 +13,9 @@ export default function Signup() {
     email: '',
     password: '',
     role: 'student',
-    universityName: ''
+    universityName: '',
+    description: '',
+    documents: '' // Will be sent as string, backend handles as array if needed
   });
 
   const [loading, setLoading] = useState(false);
@@ -123,18 +125,43 @@ export default function Signup() {
 
             {/* UNIVERSITY */}
             {form.role === 'university' && (
-              <input
-                placeholder="University Name"
-                required
-                value={form.universityName}
-                onChange={(e) =>
-                  setForm({ ...form, universityName: e.target.value })
-                }
-                className="w-full bg-white/5 border border-white/10 
-                rounded-2xl py-4 px-5 text-white 
-                outline-none transition-all duration-300 
-                focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20"
-              />
+              <>
+                <input
+                  placeholder="University Name"
+                  required
+                  value={form.universityName}
+                  onChange={(e) =>
+                    setForm({ ...form, universityName: e.target.value })
+                  }
+                  className="w-full bg-white/5 border border-white/10 
+                  rounded-2xl py-4 px-5 text-white 
+                  outline-none transition-all duration-300 
+                  focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20"
+                />
+                
+                <textarea
+                  placeholder="Institutional Description (Accreditation info, Govt refs...)"
+                  rows="3"
+                  required
+                  value={form.description}
+                  onChange={(e) => setForm({ ...form, description: e.target.value })}
+                  className="w-full bg-white/5 border border-white/10 
+                  rounded-2xl py-4 px-5 text-white text-xs
+                  outline-none transition-all duration-300 
+                  focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 resize-none"
+                />
+
+                <textarea
+                  placeholder="Accreditation Proof (Link to Govt portal / PDF links)"
+                  rows="2"
+                  value={form.documents}
+                  onChange={(e) => setForm({ ...form, documents: e.target.value })}
+                  className="w-full bg-white/5 border border-white/10 
+                  rounded-2xl py-4 px-5 text-white text-xs
+                  outline-none transition-all duration-300 
+                  focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 resize-none"
+                />
+              </>
             )}
 
             {/* EMAIL */}
