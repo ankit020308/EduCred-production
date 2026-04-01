@@ -31,3 +31,12 @@ export function generateHash(data) {
   const json = getDeterministicJSON(data);
   return crypto.createHash('sha256').update(json).digest('hex');
 }
+
+/**
+ * Generates a SHA-256 hash from binary content (e.g., PDF/Image).
+ * @param {Buffer} buffer The binary content
+ * @returns {string} Hex string hash
+ */
+export function generateBinaryHash(buffer) {
+  return crypto.createHash('sha256').update(buffer).digest('hex');
+}

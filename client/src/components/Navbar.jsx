@@ -44,10 +44,10 @@ export default function Navbar() {
             </div>
             <div className="flex flex-col">
               <span className="text-3xl font-black tracking-tighter leading-none text-white italic transition-all group-hover:tracking-tight">
-                Edu<span className="text-blue-500">Cred</span>
+                Anti-<span className="text-blue-500">Gravity</span>
               </span>
               <div className="flex items-center gap-2 mt-1.5 overflow-hidden">
-                <span className="text-[10px] uppercase font-black tracking-[0.4em] text-slate-500 whitespace-nowrap">Institutional Node</span>
+                <span className="text-[10px] uppercase font-black tracking-[0.4em] text-slate-500 whitespace-nowrap">Authoritative Ledger</span>
                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
               </div>
             </div>

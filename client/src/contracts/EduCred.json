@@ -1,5 +1,4 @@
 {
-  "contractAddress": "0x5FbDB2315678afecb367f032d93F642f64180aa3",
   "abi": [
     {
       "inputs": [],
@@ -11,97 +10,19 @@
       "inputs": [
         {
           "indexed": true,
-          "internalType": "uint256",
-          "name": "id",
-          "type": "uint256"
-        },
-        {
-          "indexed": false,
-          "internalType": "uint8",
-          "name": "status",
-          "type": "uint8"
-        }
-      ],
-      "name": "ApplicationStatusUpdated",
-      "type": "event"
-    },
-    {
-      "anonymous": false,
-      "inputs": [
-        {
-          "indexed": true,
           "internalType": "bytes32",
           "name": "certificateHash",
           "type": "bytes32"
-        }
-      ],
-      "name": "CertificateIssued",
-      "type": "event"
-    },
-    {
-      "inputs": [
-        {
-          "internalType": "uint256",
-          "name": "",
-          "type": "uint256"
-        }
-      ],
-      "name": "applications",
-      "outputs": [
-        {
-          "internalType": "uint256",
-          "name": "id",
-          "type": "uint256"
         },
         {
-          "internalType": "bytes32",
-          "name": "studentHash",
-          "type": "bytes32"
-        },
-        {
-          "internalType": "address",
-          "name": "targetUniversity",
-          "type": "address"
-        },
-        {
-          "internalType": "uint8",
-          "name": "status",
-          "type": "uint8"
-        },
-        {
+          "indexed": false,
           "internalType": "uint256",
           "name": "timestamp",
           "type": "uint256"
         }
       ],
-      "stateMutability": "view",
-      "type": "function"
-    },
-    {
-      "inputs": [],
-      "name": "getApplicationsCount",
-      "outputs": [
-        {
-          "internalType": "uint256",
-          "name": "",
-          "type": "uint256"
-        }
-      ],
-      "stateMutability": "view",
-      "type": "function"
-    },
-    {
-      "inputs": [
-        {
-          "internalType": "bytes32",
-          "name": "_hash",
-          "type": "bytes32"
-        }
-      ],
-      "name": "issueCertificate",
-      "outputs": [],
-      "stateMutability": "nonpayable",
-      "type": "function"
+      "name": "HashStored",
+      "type": "event"
     },
     {
       "inputs": [],
@@ -120,29 +41,11 @@
       "inputs": [
         {
           "internalType": "bytes32",
-          "name": "_studentHash",
+          "name": "_hash",
           "type": "bytes32"
         }
       ],
-      "name": "submitApplication",
-      "outputs": [],
-      "stateMutability": "nonpayable",
-      "type": "function"
-    },
-    {
-      "inputs": [
-        {
-          "internalType": "uint256",
-          "name": "_id",
-          "type": "uint256"
-        },
-        {
-          "internalType": "uint8",
-          "name": "_status",
-          "type": "uint8"
-        }
-      ],
-      "name": "updateApplicationStatus",
+      "name": "storeHash",
       "outputs": [],
       "stateMutability": "nonpayable",
       "type": "function"
@@ -174,7 +77,7 @@
           "type": "bytes32"
         }
       ],
-      "name": "verifyCertificate",
+      "name": "verifyHash",
       "outputs": [
         {
           "internalType": "bool",
@@ -185,5 +88,6 @@
       "stateMutability": "view",
       "type": "function"
     }
-  ]
+  ],
+  "contractAddress": "0x5FbDB2315678afecb367f032d93F642f64180aa3"
 }

@@ -36,8 +36,21 @@ export const register = async (req, res) => {
       universityName: role === 'university' ? universityName : undefined 
     });
 
+    let university = null;
     if (role === 'university') {
-      await University.create({ name: universityName, email, userId: user._id });
+      const { documents, description } = req.body;
+      
+      // Domain-based trust flagging 
+      const isInstitutional = email.endsWith('.edu') || email.endsWith('.ac.in');
+      
+      university = await University.create({ 
+        name: universityName, 
+        email, 
+        userId: user._id,
+        documents: documents || [],
+        description: description || '',
+        isFlagged: !isInstitutional // Flag if non-institutional domain for manual review
+      });
     } else {
       await Student.create({ name, userId: user._id }); // Create empty student profile
     }
@@ -46,7 +59,15 @@ export const register = async (req, res) => {
 
     res.status(201).json({
       token,
-      user: { id: user._id, name: user.name, email: user.email, role: user.role, universityName: user.universityName },
+      user: { 
+        id: user._id, 
+        name: user.name, 
+        email: user.email, 
+        role: user.role, 
+        universityName: user.universityName,
+        universityStatus: university ? university.status : null,
+        isVerified: university ? university.isVerified : false
+      },
     });
   } catch (err) {
     console.error('Register error:', err);
@@ -66,10 +87,20 @@ export const login = async (req, res) => {
       return res.status(401).json({ error: 'Invalid email or password.' });
     }
 
+    const university = user.role === 'university' ? await University.findOne({ userId: user._id }) : null;
+
     const token = signToken(user._id);
     res.json({
       token,
-      user: { id: user._id, name: user.name, email: user.email, role: user.role, universityName: user.universityName },
+      user: { 
+        id: user._id, 
+        name: user.name, 
+        email: user.email, 
+        role: user.role, 
+        universityName: user.universityName,
+        universityStatus: university ? university.status : null,
+        isVerified: university ? university.isVerified : false
+      },
     });
   } catch (err) {
     console.error('Login error:', err);
@@ -77,7 +108,17 @@ export const login = async (req, res) => {
   }
 };
 
-export const getMe = (req, res) => {
+export const getMe = async (req, res) => {
   const u = req.user;
-  res.json({ id: u._id, name: u.name, email: u.email, role: u.role, universityName: u.universityName });
+  const university = u.role === 'university' ? await University.findOne({ userId: u._id }) : null;
+
+  res.json({ 
+    id: u._id, 
+    name: u.name, 
+    email: u.email, 
+    role: u.role, 
+    universityName: u.universityName,
+    universityStatus: university ? university.status : null,
+    isVerified: university ? university.isVerified : false
+  });
 };

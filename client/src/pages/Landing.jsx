@@ -110,7 +110,7 @@ export default function Landing() {
                 bg-gradient-to-b from-blue-400 to-blue-700 
                 drop-shadow-[0_0_60px_rgba(37,99,235,0.25)]">
 
-                  Credentials
+                  Anti-Gravity
 
                 </span>
               </h1>
@@ -118,8 +118,8 @@ export default function Landing() {
               <p className="text-slate-400 text-xl md:text-2xl 
               max-w-3xl mx-auto font-medium leading-relaxed opacity-80 italic">
 
-                EduCred eliminates academic fraud by anchoring achievements to an immutable blockchain ledger.
-                Verify with absolute cryptographic certainty.
+                Anti-Gravity eliminates academic fraud by anchoring institutional hashes to an immutable ledger. 
+                Only verified universities can issue. Anyone can verify.
 
               </p>
 
@@ -488,10 +488,10 @@ export default function Landing() {
 
             <div>
               <p className="text-2xl font-black text-white italic tracking-tight">
-                Edu<span className="text-blue-500">Cred</span>
+                Anti-<span className="text-blue-500">Gravity</span>
               </p>
               <p className="text-[9px] uppercase tracking-[0.4em] text-slate-600">
-                Decentralized Protocol
+                Authoritative Protocol
               </p>
             </div>
 

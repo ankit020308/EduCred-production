@@ -1,6 +1,6 @@
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { AnimatePresence } from 'framer-motion';
-import { AuthProvider } from './context/AuthContext';
+import { AuthProvider, useAuth } from './context/AuthContext';
 import { BlockchainProvider } from './context/BlockchainContext';
 
 import ProtectedRoute from './components/ProtectedRoute';
@@ -9,7 +9,6 @@ import Navbar from './components/Navbar';
 import Landing from './pages/Landing';
 import Login from './pages/Login';
 import Signup from './pages/Signup';
-import Dashboard from './pages/Dashboard';
 import Verifier from './pages/Verifier';
 import Ledger from './pages/Ledger';
 import Student from './pages/Student';
@@ -17,7 +16,26 @@ import Privacy from './pages/Privacy';
 import Terms from './pages/Terms';
 import Contact from './pages/Contact';
 
+// New/Updated Dashboards
+import Admin from './pages/Admin'; // This will be the University Dashboard
+import SystemAdmin from './pages/SystemAdmin'; // Global Admin Approval Panel
+
 import PixelGridBackground from './components/PixelGridBackground';
+
+/**
+ * Role-Based Navigation Component
+ * Redirects users to their specific dashboard based on their role.
+ */
+function DashboardRedirect() {
+  const { user } = useAuth();
+  
+  if (!user) return <Navigate to="/login" />;
+  
+  if (user.role === 'admin') return <Navigate to="/sys-admin" />;
+  if (user.role === 'university') return <Navigate to="/university-node" />;
+  
+  return <Navigate to="/student-portal" />;
+}
 
 function App() {
   return (
@@ -49,11 +67,32 @@ function App() {
                   <Route path="/terms" element={<Terms />} />
                   <Route path="/contact" element={<Contact />} />
   
+                  {/* Role-Based Routes */}
+                  <Route path="/dashboard" element={<DashboardRedirect />} />
+                  
                   <Route
-                    path="/dashboard"
+                    path="/sys-admin"
                     element={
-                      <ProtectedRoute>
-                        <Dashboard />
+                      <ProtectedRoute roles={['admin']}>
+                        <SystemAdmin />
+                      </ProtectedRoute>
+                    }
+                  />
+                  
+                  <Route
+                    path="/university-node"
+                    element={
+                      <ProtectedRoute roles={['university']}>
+                        <Admin /> 
+                      </ProtectedRoute>
+                    }
+                  />
+
+                  <Route
+                    path="/student-portal"
+                    element={
+                      <ProtectedRoute roles={['student']}>
+                        <Student />
                       </ProtectedRoute>
                     }
                   />
