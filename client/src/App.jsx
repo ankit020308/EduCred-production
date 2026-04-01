@@ -19,6 +19,7 @@ import Contact from './pages/Contact';
 // New/Updated Dashboards
 import Admin from './pages/Admin'; // This will be the University Dashboard
 import SystemAdmin from './pages/SystemAdmin'; // Global Admin Approval Panel
+import Onboarding from './pages/Onboarding';
 
 import PixelGridBackground from './components/PixelGridBackground';
 
@@ -33,6 +34,7 @@ function DashboardRedirect() {
   
   if (user.role === 'admin') return <Navigate to="/sys-admin" />;
   if (user.role === 'university') return <Navigate to="/university-node" />;
+  if (user.role === 'pending') return <Navigate to="/onboarding" />;
   
   return <Navigate to="/student-portal" />;
 }
@@ -66,6 +68,12 @@ function App() {
                   <Route path="/privacy" element={<Privacy />} />
                   <Route path="/terms" element={<Terms />} />
                   <Route path="/contact" element={<Contact />} />
+  
+                  <Route path="/onboarding" element={
+                    <ProtectedRoute roles={['pending']}>
+                      <Onboarding />
+                    </ProtectedRoute>
+                  } />
   
                   {/* Role-Based Routes */}
                   <Route path="/dashboard" element={<DashboardRedirect />} />

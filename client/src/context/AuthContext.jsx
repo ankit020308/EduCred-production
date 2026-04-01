@@ -63,6 +63,41 @@ export function AuthProvider({ children }) {
     }
   };
 
+  // 🔹 GOOGLE LOGIN
+  const googleLogin = async (idToken, role = 'student') => {
+    try {
+      const res = await axios.post(`${API}/auth/google-login`, { idToken, role });
+
+      const { accessToken, refreshToken, user: u } = res.data;
+
+      localStorage.setItem('token', accessToken);
+      localStorage.setItem('refreshToken', refreshToken);
+      localStorage.setItem('user', JSON.stringify(u));
+
+      axios.defaults.headers.common['Authorization'] = `Bearer ${accessToken}`;
+
+      setUser(u);
+      return { user: u, isNewUser };
+    } catch (err) {
+      console.error('Google Auth Error:', err);
+      throw err.response?.data?.error || 'Google login failed';
+    }
+  };
+
+  // 🔹 COMPLETE ONBOARDING
+  const completeOnboarding = async (data) => {
+    try {
+      const res = await axios.post(`${API}/auth/complete-onboarding`, data);
+      const { user: u } = res.data;
+      
+      localStorage.setItem('user', JSON.stringify(u));
+      setUser(u);
+      return u;
+    } catch (err) {
+      throw err.response?.data?.error || 'Onboarding failed';
+    }
+  };
+
   // 🔹 LOGOUT
   const logout = () => {
     localStorage.removeItem('token');
@@ -85,6 +120,8 @@ export function AuthProvider({ children }) {
         user,
         login,
         register,
+        googleLogin,
+        completeOnboarding,
         logout,
         updateUser,
         loading

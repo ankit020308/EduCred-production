@@ -2,7 +2,7 @@
 pragma solidity ^0.8.20;
 
 /**
- * @title Anti-Gravity - Authoritative Academic Ledger
+ * @title EduCred - Authoritative Academic Ledger
  * @dev Single source of truth for certificate authenticity via hashes.
  */
 contract EduCred {

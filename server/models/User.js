@@ -19,8 +19,8 @@ const UserSchema = new mongoose.Schema({
   },
   role: {
     type: String,
-    enum: ['student', 'university', 'admin'],
-    required: true,
+    enum: ['student', 'university', 'admin', 'super_admin', 'verifier', 'pending'],
+    default: 'pending'
   },
   universityName: {
     type: String,
@@ -45,6 +45,42 @@ const UserSchema = new mongoose.Schema({
   },
   avatar: {
     type: String,
+  },
+  otp: {
+    type: String, // Hashed OTP
+    select: false,
+  },
+  otpExpires: {
+    type: Date,
+    select: false,
+  },
+  otpAttempts: {
+    type: Number,
+    default: 0,
+    select: false,
+  },
+  lastOtpResend: {
+    type: Date,
+    select: false,
+  },
+  googleId: {
+    type: String,
+    unique: true,
+    sparse: true,
+    select: false,
+  },
+  isGoogleUser: {
+    type: Boolean,
+    default: false,
+  },
+  loginAttempts: {
+    type: Number,
+    default: 0,
+    select: false,
+  },
+  lockUntil: {
+    type: Date,
+    select: false,
   }
 }, { timestamps: true });
 

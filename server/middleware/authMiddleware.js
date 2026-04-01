@@ -5,7 +5,7 @@ export const protect = async (req, res, next) => {
   try {
     const authHeader = req.headers.authorization;
     if (!authHeader?.startsWith('Bearer ')) {
-      return res.status(401).json({ error: 'Not authenticated. No token provided.' });
+      return res.status(401).json({ error: 'Identity proof required. No token provided.' });
     }
 
     const token = authHeader.split(' ')[1];
@@ -13,13 +13,20 @@ export const protect = async (req, res, next) => {
 
     const user = await User.findById(decoded.id).select('-passwordHash');
     if (!user) {
-      return res.status(401).json({ error: 'User no longer exists.' });
+      return res.status(401).json({ error: 'Identity node no longer exists.' });
+    }
+
+    if (!user.isEmailVerified) {
+      return res.status(403).json({ error: 'Identity node inactive. Verification required.' });
     }
 
     req.user = user;
     next();
   } catch (err) {
-    return res.status(401).json({ error: 'Invalid or expired token.' });
+    if (err.name === 'TokenExpiredError') {
+      return res.status(401).json({ error: 'Security token expired. Refresh required.', code: 'TOKEN_EXPIRED' });
+    }
+    return res.status(401).json({ error: 'Invalid security token.' });
   }
 };
 

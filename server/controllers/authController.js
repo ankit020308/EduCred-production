@@ -1,97 +1,114 @@
-import jwt from 'jsonwebtoken';
-import User from '../models/User.js';
-import University from '../models/University.js';
-import Student from '../models/Student.js';
+import { sendOTP } from '../utils/emailService.js';
+import { sendPhoneOTP } from '../utils/smsService.js';
+import { logAudit } from '../utils/logger.js';
+import { OAuth2Client } from 'google-auth-library';
+import crypto from 'crypto';
+import bcrypt from 'bcryptjs';
+
+const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
 const JWT_SECRET = process.env.JWT_SECRET || 'educred_dev_secret_2026';
-const JWT_EXPIRES = '7d';
+const REFRESH_SECRET = process.env.REFRESH_SECRET || 'educred_refresh_secret_2026';
+const JWT_EXPIRES = '1h'; // Short-lived access token
+const REFRESH_EXPIRES = '7d'; // Long-lived refresh token
 
 const signToken = (id) => jwt.sign({ id }, JWT_SECRET, { expiresIn: JWT_EXPIRES });
+const signRefreshToken = (id) => jwt.sign({ id }, REFRESH_SECRET, { expiresIn: REFRESH_EXPIRES });
+const generateOTP = () => Math.floor(100000 + Math.random() * 900000).toString();
+const hashOTP = (otp) => crypto.createHash('sha256').update(otp).digest('hex');
 
 export const register = async (req, res) => {
   try {
+    const { error } = registerSchema.validate(req.body);
+    if (error) return res.status(400).json({ error: error.details[0].message });
+
     const { name, email, password, role, universityName } = req.body;
-
-    if (!name || !email || !password || !role) {
-      return res.status(400).json({ error: 'All primary fields are required.' });
-    }
-    if (!['student', 'university'].includes(role)) {
-      return res.status(400).json({ error: 'Role must be student or university.' });
-    }
-
-    if (role === 'university' && !universityName) {
-      return res.status(400).json({ error: 'University name is required for university accounts.' });
-    }
 
     const existing = await User.findOne({ email });
     if (existing) {
       return res.status(400).json({ error: 'An account with this email already exists.' });
     }
 
+    const otp = generateOTP();
+    const hashedOtp = hashOTP(otp);
+
     const user = await User.create({ 
       name, 
       email, 
       passwordHash: password, 
       role, 
-      universityName: role === 'university' ? universityName : undefined 
+      universityName: role === 'university' ? universityName : undefined,
+      otp: hashedOtp,
+      otpExpires: Date.now() + 10 * 60 * 1000, // 10 minutes
+      otpAttempts: 0,
+      lastOtpResend: new Date()
     });
 
-    let university = null;
     if (role === 'university') {
       const { documents, description } = req.body;
-      
-      // Domain-based trust flagging 
       const isInstitutional = email.endsWith('.edu') || email.endsWith('.ac.in');
-      
-      university = await University.create({ 
+      await University.create({ 
         name: universityName, 
         email, 
         userId: user._id,
         documents: documents || [],
         description: description || '',
-        isFlagged: !isInstitutional // Flag if non-institutional domain for manual review
+        isFlagged: !isInstitutional 
       });
     } else {
-      await Student.create({ name, userId: user._id }); // Create empty student profile
+      await Student.create({ name, userId: user._id });
     }
 
-    const token = signToken(user._id);
+    // Attempt to send OTP (Failure doesn't block creation but should notify)
+    try {
+      await sendOTP(email, otp);
+    } catch (err) {
+      console.error('Failed to send registration OTP:', err);
+    }
+
+    await logAudit(req, 'NODE_REGISTRATION', 'SUCCESS', 'New identity node provisioned.', { userId: user._id, role: user.role });
 
     res.status(201).json({
-      token,
-      user: { 
-        id: user._id, 
-        name: user.name, 
-        email: user.email, 
-        role: user.role, 
-        universityName: user.universityName,
-        universityStatus: university ? university.status : null,
-        isVerified: university ? university.isVerified : false
-      },
+      message: 'Initial identity node created. Verify your email to activate.',
+      email: user.email,
+      requiresVerification: true
     });
   } catch (err) {
     console.error('Register error:', err);
+    await logAudit(req, 'NODE_REGISTRATION', 'FAILURE', 'Identity node provisioning failed.', { email: req.body.email, error: err.message });
     res.status(500).json({ error: 'Registration failed.', details: err.message });
   }
 };
 
 export const login = async (req, res) => {
   try {
+    const { error } = loginSchema.validate(req.body);
+    if (error) return res.status(400).json({ error: error.details[0].message });
+
     const { email, password } = req.body;
-    if (!email || !password) {
-      return res.status(400).json({ error: 'Email and password are required.' });
+    const user = await User.findOne({ email }).select('+passwordHash +isEmailVerified +loginAttempts +lockUntil');
+    
+    if (!user || !(await user.comparePassword(password))) {
+      return res.status(401).json({ error: 'Invalid credentials.' });
     }
 
-    const user = await User.findOne({ email });
-    if (!user || !(await user.comparePassword(password))) {
-      return res.status(401).json({ error: 'Invalid email or password.' });
+    if (!user.isEmailVerified) {
+      return res.status(403).json({ 
+        error: 'Identity node inactive. Please verify your email.',
+        requiresVerification: true 
+      });
     }
 
     const university = user.role === 'university' ? await University.findOne({ userId: user._id }) : null;
 
-    const token = signToken(user._id);
+    const accessToken = signToken(user._id);
+    const refreshToken = signRefreshToken(user._id);
+
+    await logAudit(req, 'NODE_LOGIN', 'SUCCESS', 'Identity session established.', { userId: user._id });
+
     res.json({
-      token,
+      accessToken,
+      refreshToken,
       user: { 
         id: user._id, 
         name: user.name, 
@@ -104,8 +121,279 @@ export const login = async (req, res) => {
     });
   } catch (err) {
     console.error('Login error:', err);
+    await logAudit(req, 'NODE_LOGIN', 'FAILURE', 'Identity session failed.', { email: req.body.email });
     res.status(500).json({ error: 'Login failed.', details: err.message });
   }
+};
+
+/**
+ * 🔑 OTP Verification
+ * Validates the cryptographic hash and activates the user account.
+ */
+export const verifyOTP = async (req, res) => {
+  try {
+    const { error } = otpSchema.validate(req.body);
+    if (error) return res.status(400).json({ error: error.details[0].message });
+
+    const { email, otp } = req.body;
+    // Always include otpAttempts in search to prevent race conditions or missed resets
+    const user = await User.findOne({ email }).select('+otp +otpExpires +otpAttempts');
+
+    if (!user) {
+      return res.status(404).json({ error: 'Identity node not found.' });
+    }
+
+    // 1. Check if blocked due to excessive attempts
+    if (user.otpAttempts >= 3) {
+      return res.status(403).json({ error: 'Security key blocked. Please request a new one.' });
+    }
+
+    // 2. Compare hashed OTP
+    if (user.otp !== hashOTP(otp)) {
+      user.otpAttempts += 1;
+      await user.save();
+      const remaining = 3 - user.otpAttempts;
+      await logAudit(req, 'OTP_VERIFICATION', 'FAILURE', `Invalid security key. Attempts: ${user.otpAttempts}`, { email, attempts: user.otpAttempts });
+      return res.status(400).json({ 
+        error: `Invalid security key. ${remaining} attempts remaining.`,
+        attemptsRemaining: remaining
+      });
+    }
+
+    // 3. Check for expiration
+    if (user.otpExpires < Date.now()) {
+      return res.status(400).json({ error: 'Security key expired. Request a new one.' });
+    }
+
+    // 4. Activate node
+    user.isEmailVerified = true;
+    user.otp = undefined;
+    user.otpExpires = undefined;
+    user.otpAttempts = 0;
+    await user.save();
+
+    await logAudit(req, 'OTP_VERIFICATION', 'SUCCESS', 'Identity node activated via security key.', { userId: user._id });
+
+    const accessToken = signToken(user._id);
+    const refreshToken = signRefreshToken(user._id);
+    
+    res.status(200).json({
+      message: 'Identity node activated successfully.',
+      accessToken,
+      refreshToken,
+      user: {
+        id: user._id,
+        name: user.name,
+        email: user.email,
+        role: user.role
+      }
+    });
+
+  } catch (err) {
+    console.error('OTP Verification error:', err);
+    res.status(500).json({ error: 'Verification failed.' });
+  }
+};
+
+/**
+ * 🔄 Resend OTP
+ * Re-generates and sends a new cryptographic key.
+ */
+export const resendOTP = async (req, res) => {
+  try {
+    const { email } = req.body;
+    if (!email) return res.status(400).json({ error: 'Email is required.' });
+
+    const user = await User.findOne({ email }).select('+lastOtpResend');
+    if (!user) return res.status(404).json({ error: 'User not found.' });
+
+    // 1. Check cooldown (60s)
+    const now = new Date();
+    if (user.lastOtpResend && (now - user.lastOtpResend) < 60 * 1000) {
+      const waitTime = Math.ceil((60 * 1000 - (now - user.lastOtpResend)) / 1000);
+      return res.status(429).json({ error: `Cooldown active. Wait ${waitTime}s before re-syncing.` });
+    }
+
+    const otp = generateOTP();
+    user.otp = hashOTP(otp);
+    user.otpExpires = Date.now() + 10 * 60 * 1000;
+    user.otpAttempts = 0; // Reset attempts on resend
+    user.lastOtpResend = now;
+    await user.save();
+
+    await sendOTP(email, otp);
+    await logAudit(req, 'OTP_RESEND', 'SUCCESS', 'New security key dispatched.', { email });
+
+    res.status(200).json({ message: 'Security key re-synchronized and dispatched.' });
+
+  } catch (err) {
+    console.error('Resend OTP error:', err);
+    await logAudit(req, 'OTP_RESEND', 'FAILURE', 'Failed to resend security key.', { email: req.body.email, error: err.message });
+    res.status(500).json({ error: 'Failed to resend security key.' });
+  }
+};
+
+/**
+ * 🔄 Token Refresh
+ * Issues a new access token using a valid refresh token.
+ */
+export const refreshToken = async (req, res) => {
+  try {
+    const { token } = req.body;
+    if (!token) return res.status(401).json({ error: 'Refresh proof required.' });
+
+    const decoded = jwt.verify(token, REFRESH_SECRET);
+    const user = await User.findById(decoded.id);
+
+    if (!user) return res.status(401).json({ error: 'Identity node no longer exists.' });
+
+    const accessToken = signToken(user._id);
+    res.status(200).json({ accessToken });
+
+  } catch (err) {
+    res.status(401).json({ error: 'Invalid or expired refresh token.' });
+  }
+};
+
+/**
+ * 🌐 Google Social Login
+ * Verifies Google ID tokens and provisions identity nodes.
+ */
+export const googleLogin = async (req, res) => {
+  try {
+    const { idToken, role } = req.body;
+    if (!idToken) return res.status(400).json({ error: 'Google identity proof required.' });
+
+    const ticket = await googleClient.verifyIdToken({
+      idToken,
+      audience: process.env.GOOGLE_CLIENT_ID,
+    });
+
+    const { name, email, picture, sub: googleId } = ticket.getPayload();
+    
+    let user = await User.findOne({ email });
+
+    if (!user) {
+      // Auto-provision new node if it doesn't exist
+      user = await User.create({
+        name,
+        email,
+        passwordHash: crypto.randomBytes(16).toString('hex'), // Randomized password for social-only nodes
+        role: 'pending', // Post-auth onboarding required
+        isEmailVerified: true, // Google emails are pre-verified
+        isGoogleUser: true,
+        avatar: picture,
+        googleId
+      });
+    } else {
+      // If user exists, link account securely
+      let updated = false;
+      if (!user.googleId) {
+        user.googleId = googleId;
+        updated = true;
+      }
+      if (!user.isGoogleUser) {
+        user.isGoogleUser = true;
+        updated = true;
+      }
+      if (!user.isEmailVerified) {
+        user.isEmailVerified = true;
+        updated = true;
+      }
+      if (!user.avatar && picture) {
+        user.avatar = picture;
+        updated = true;
+      }
+      if (updated) await user.save();
+    }
+
+    const accessToken = signToken(user._id);
+    const refreshToken = signRefreshToken(user._id);
+
+    res.status(200).json({
+      accessToken,
+      refreshToken,
+      isNewUser: user.role === 'pending',
+      user: {
+        id: user._id,
+        name: user.name,
+        email: user.email,
+        role: user.role
+      }
+    });
+
+  } catch (err) {
+    console.error('Google Login error:', err);
+    res.status(401).json({ error: 'Google identity verification failed.' });
+  }
+};
+
+/**
+ * 📱 Mobile OTP Dispatch
+ * Dispatches a cryptographic identity key to the user's mobile device.
+ */
+export const sendPhoneVerification = async (req, res) => {
+  try {
+    const { phoneNumber } = req.body;
+    if (!phoneNumber) return res.status(400).json({ error: 'Mobile number required.' });
+
+    const user = await User.findById(req.user.id);
+    const otp = generateOTP();
+    
+    user.phoneNumber = phoneNumber;
+    user.otp = hashOTP(otp);
+    user.otpExpires = Date.now() + 5 * 60 * 1000;
+    await user.save();
+
+    await sendPhoneOTP(phoneNumber, otp);
+    res.status(200).json({ message: 'Security key dispatched to your mobile device.' });
+
+  } catch (err) {
+    console.error('Phone OTP send error:', err);
+    res.status(500).json({ error: 'Failed to dispatch mobile security key.' });
+  }
+};
+
+/**
+ * 📱 Mobile OTP Verification
+ * Validates the mobile cryptographic key and activates the phoneVerified flag.
+ */
+export const verifyPhoneOTP = async (req, res) => {
+  try {
+    const { otp } = req.body;
+    if (!otp) return res.status(400).json({ error: 'Security key required.' });
+
+    const user = await User.findById(req.user.id).select('+otp +otpExpires');
+
+    if (user.otp !== hashOTP(otp)) {
+      return res.status(400).json({ error: 'Invalid mobile security key.' });
+    }
+
+    if (user.otpExpires < Date.now()) {
+      return res.status(400).json({ error: 'Mobile security key expired.' });
+    }
+
+    user.isPhoneVerified = true;
+    user.otp = undefined;
+    user.otpExpires = undefined;
+    await user.save();
+
+    res.status(200).json({ message: 'Mobile identity verified successfully.' });
+
+  } catch (err) {
+    console.error('Phone OTP verify error:', err);
+    res.status(500).json({ error: 'Mobile verification failed.' });
+  }
+};
+
+/**
+ * 🚪 Logout
+ * Revokes the session context. In a production state, this would involve token blacklisting.
+ */
+export const logout = async (req, res) => {
+  // Client should delete tokens on their end. 
+  // Future implementation: Add token to blacklist in Redis.
+  res.status(200).json({ message: 'Identity node session terminated.' });
 };
 
 export const getMe = async (req, res) => {
@@ -121,4 +409,99 @@ export const getMe = async (req, res) => {
     universityStatus: university ? university.status : null,
     isVerified: university ? university.isVerified : false
   });
+};
+
+/**
+ * 🔐 Internal Route: Administrative Provisioning
+ * Restricted to existing administrators via RBAC middleware.
+ */
+export const createAdmin = async (req, res) => {
+  try {
+    const { name, email, password, role } = req.body;
+
+    if (!name || !email || !password || !role) {
+      return res.status(400).json({ error: 'All fields (name, email, password, role) are required.' });
+    }
+
+    if (!['admin', 'super_admin', 'verifier'].includes(role)) {
+      return res.status(400).json({ error: 'Invalid administrative role.' });
+    }
+
+    const existing = await User.findOne({ email });
+    if (existing) {
+      return res.status(400).json({ error: 'Account already exists.' });
+    }
+
+    const admin = await User.create({
+      name,
+      email,
+      passwordHash: password,
+      role
+    });
+
+    res.status(201).json({
+      message: 'Administrative node provisioned successfully.',
+      admin: {
+        id: admin._id,
+        name: admin.name,
+        email: admin.email,
+        role: admin.role
+      }
+    });
+  } catch (err) {
+    console.error('Admin creation error:', err);
+    res.status(500).json({ error: 'Failed to provision administrative node.' });
+  }
+};
+
+/**
+ * 🎓 Complete Onboarding
+ * Securely assigns selected role to Google-authenticated identity 'pending' nodes.
+ */
+export const completeOnboarding = async (req, res) => {
+  try {
+    const { role, universityName, description, documents } = req.body;
+    const user = req.user;
+
+    if (user.role !== 'pending') {
+      return res.status(400).json({ error: 'Identity protocol already established.' });
+    }
+
+    if (!['student', 'university'].includes(role)) {
+      return res.status(400).json({ error: 'Invalid identity role selected.' });
+    }
+
+    user.role = role;
+    if (role === 'university') {
+      user.universityName = universityName;
+      
+      const isInstitutional = user.email.endsWith('.edu') || user.email.endsWith('.ac.in');
+      await University.create({
+        name: universityName,
+        email: user.email,
+        userId: user._id,
+        documents: documents || [],
+        description: description || '',
+        isFlagged: !isInstitutional
+      });
+    } else {
+      await Student.create({ name: user.name, userId: user._id });
+    }
+
+    await user.save();
+    await logAudit(req, 'PROTOCOL_ONBOARDING', 'SUCCESS', `Identity node configured as ${role}.`, { userId: user._id, role });
+
+    res.status(200).json({
+      message: 'Identity protocol successfully established.',
+      user: {
+        id: user._id,
+        name: user.name,
+        email: user.email,
+        role: user.role
+      }
+    });
+  } catch (err) {
+    console.error('Onboarding complete error:', err);
+    res.status(500).json({ error: 'Onboarding failed.' });
+  }
 };

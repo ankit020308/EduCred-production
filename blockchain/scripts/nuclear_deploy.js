@@ -29,6 +29,7 @@ async function main() {
 
     // Save to client EduCred.json
     const clientPath = path.join(__dirname, "../../client/src/EduCred.json");
+    const clientContractPath = path.join(__dirname, "../../client/src/contracts/EduCred.json");
     const serverPath = path.join(__dirname, "../../server/utils/EduCred.json");
     
     const config = {
@@ -37,9 +38,10 @@ async function main() {
     };
 
     fs.writeFileSync(clientPath, JSON.stringify(config, null, 2));
+    fs.writeFileSync(clientContractPath, JSON.stringify(config, null, 2));
     fs.writeFileSync(serverPath, JSON.stringify(config, null, 2));
     
-    console.log("Updated client configuration at:", clientPath);
+    console.log("Updated client configurations at:", clientPath, "and", clientContractPath);
     console.log("Updated server configuration at:", serverPath);
 }
 

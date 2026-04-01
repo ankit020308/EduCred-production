@@ -1,8 +1,0 @@
-OFFICIAL ENROLLMENT CERTIFICATE
---------------------------------
-Student: Test Student
-ID: REG-001
-Status: Authentic
-Blockchain Anchored: SHA-256
---------------------------------
-Copyright EduCred 2026

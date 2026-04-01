@@ -1,8 +1,10 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { motion } from 'framer-motion';
-import { ShieldCheck, Mail, Lock, Loader2 } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { ShieldCheck, Mail, Lock, Loader2, ArrowRight } from 'lucide-react';
+import { GoogleLogin } from '@react-oauth/google';
 import { useAuth } from '../context/AuthContext';
+import BlockchainBackground from '../components/BlockchainBackground';
 
 export default function Login() {
   const { login } = useAuth();
@@ -32,134 +34,167 @@ export default function Login() {
     }
   };
 
-  return (
-    <div className="min-h-screen flex flex-col items-center justify-center px-6 py-32 relative z-10">
+  const handleGoogleSuccess = async (credentialResponse) => {
+    setLoading(true);
+    setError('');
+    try {
+      const { isNewUser } = await googleLogin(credentialResponse.credential);
+      if (isNewUser) {
+        navigate('/onboarding');
+      } else {
+        navigate('/dashboard');
+      }
+    } catch (err) {
+      console.error('Google Login Failure:', err);
+      setError(err || 'Google identity verification failed.');
+    } finally {
+      setLoading(false);
+    }
+  };
 
-      {/* 🔥 DEPTH GLOW (FIXES “FLOATING CARD ISSUE”) */}
-      <div className="absolute inset-0 pointer-events-none">
-        <div className="absolute w-[600px] h-[600px] bg-blue-600/10 blur-[140px] 
-        top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2" />
+  const handleGoogleError = () => {
+    setError('Google identity verification failed.');
+  };
+
+  return (
+    <div className="relative min-h-screen flex flex-col items-center justify-center px-6 overflow-hidden bg-[#010409]">
+      
+      {/* 🌌 INTERACTIVE BACKGROUND: Neural-Link Mesh */}
+      <BlockchainBackground />
+
+      {/* AMBIENT GLOWS */}
+      <div className="absolute inset-0 z-0 pointer-events-none">
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-indigo-600/10 blur-[140px] rounded-full animate-pulse" />
       </div>
 
       <motion.div
-        initial={{ opacity: 0, scale: 0.96, y: 40 }}
+        initial={{ opacity: 0, scale: 0.98, y: 20 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}
-        transition={{ duration: 0.6 }}
-        className="relative w-full max-w-[440px]"
+        transition={{ duration: 0.8, ease: [0.22, 1, 0.36, 1] }}
+        className="relative w-full max-w-[440px] z-10"
       >
-
-        <div className="bg-[#0b0f2a]/80 backdrop-blur-2xl border border-white/10 
-        p-10 rounded-[2.5rem] shadow-[0_40px_100px_rgba(0,0,0,0.6)] 
-        overflow-hidden group">
-
-          {/* subtle glow */}
-          <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition duration-700">
-            <div className="absolute w-[300px] h-[300px] bg-blue-600/10 blur-[100px] 
-            top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2" />
-          </div>
+        <div className="glass-card p-10 md:p-12 border border-white/10 group">
+          
+          {/* Orbital Orb behind login */}
+          <div className="absolute -top-10 -right-10 w-24 h-24 bg-indigo-600/10 blur-3xl animate-orbit pointer-events-none" />
 
           {/* HEADER */}
-          <div className="text-center mb-10 space-y-4">
-
-            <div className="w-16 h-16 bg-blue-600/10 rounded-2xl 
-            flex items-center justify-center mx-auto border border-blue-500/20">
-              <ShieldCheck size={28} className="text-blue-500" />
+          <div className="text-center mb-10 space-y-4 relative z-10">
+            <div className="w-16 h-16 bg-indigo-600/10 rounded-2xl flex items-center justify-center mx-auto border border-white/5 shadow-xl shadow-indigo-500/10 animate-levitate">
+              <ShieldCheck size={28} className="text-indigo-500" />
             </div>
 
-            <h1 className="text-3xl font-black text-white uppercase italic tracking-tight">
-              Welcome <span className="text-blue-500">Back</span>
+            <h1 className="text-3xl font-bold text-white tracking-tight">
+              Access <span className="text-indigo-500">Node</span>
             </h1>
 
-            <p className="text-slate-500 text-[10px] font-black uppercase tracking-[0.3em] opacity-60">
-              Identity Node Authentication
+            <p className="text-slate-500 text-[10px] font-bold uppercase tracking-[0.4em] opacity-60">
+              Identity Protocol Authentication
             </p>
-
           </div>
 
-          {/* ERROR */}
-          {error && (
-            <div className="bg-rose-500/10 border border-rose-500/20 rounded-2xl p-4 mb-6 text-rose-400 text-xs font-bold uppercase tracking-widest text-center">
-              {error}
-            </div>
-          )}
+          {/* ERROR ALERT */}
+          <AnimatePresence>
+            {error && (
+              <motion.div 
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: 'auto' }}
+                exit={{ opacity: 0, height: 0 }}
+                className="bg-rose-500/10 border border-rose-500/20 rounded-2xl p-4 mb-8 text-rose-400 text-[10px] font-bold uppercase tracking-widest text-center"
+              >
+                {error}
+              </motion.div>
+            )}
+          </AnimatePresence>
 
-          {/* FORM */}
-          <form onSubmit={handleSubmit} className="space-y-6">
-
-            {/* EMAIL */}
+          {/* LOGIN FORM */}
+          <form onSubmit={handleSubmit} className="space-y-6 relative z-10">
             <div className="space-y-2">
-              <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">
-                Institutional Identity
+              <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest ml-1">
+                Institutional ID
               </label>
-
               <div className="relative group/input">
-                <Mail className="absolute left-5 top-1/2 -translate-y-1/2 text-slate-600 group-focus-within/input:text-blue-500 transition" size={18} />
-
+                <Mail className="absolute left-5 top-1/2 -translate-y-1/2 text-slate-600 group-focus-within/input:text-indigo-500 transition-colors" size={18} />
                 <input
                   type="email"
                   required
                   value={form.email}
                   onChange={e => setForm({ ...form, email: e.target.value })}
-                  placeholder="you@university.edu"
-                  className="w-full bg-white/5 border border-white/10 
-                  rounded-2xl py-4 pl-14 pr-6 text-white 
-                  outline-none transition-all duration-300 
-                  focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20"
+                  placeholder="admin@educred.com"
+                  className="w-full bg-white/[0.02] border border-white/10 rounded-2xl py-4 pl-14 pr-6 text-white outline-none transition-all duration-300 focus:border-indigo-500/50 placeholder:text-slate-700"
                 />
               </div>
             </div>
 
-            {/* PASSWORD */}
             <div className="space-y-2">
-              <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">
+              <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest ml-1">
                 Security Key
               </label>
-
               <div className="relative group/input">
-                <Lock className="absolute left-5 top-1/2 -translate-y-1/2 text-slate-600 group-focus-within/input:text-blue-500 transition" size={18} />
-
+                <Lock className="absolute left-5 top-1/2 -translate-y-1/2 text-slate-600 group-focus-within/input:text-indigo-500 transition-colors" size={18} />
                 <input
                   type="password"
                   required
                   value={form.password}
                   onChange={e => setForm({ ...form, password: e.target.value })}
                   placeholder="••••••••"
-                  className="w-full bg-white/5 border border-white/10 
-                  rounded-2xl py-4 pl-14 pr-6 text-white 
-                  outline-none transition-all duration-300 
-                  focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20"
+                  className="w-full bg-white/[0.02] border border-white/10 rounded-2xl py-4 pl-14 pr-6 text-white outline-none transition-all duration-300 focus:border-indigo-500/50 placeholder:text-slate-700"
                 />
               </div>
             </div>
 
-            {/* BUTTON */}
             <button
               type="submit"
               disabled={loading}
-              className="w-full bg-blue-600 hover:bg-blue-500 
-              text-white py-5 rounded-3xl text-xs font-black uppercase tracking-widest 
-              flex items-center justify-center gap-3 
-              transition-all duration-300 
-              active:scale-95 hover:scale-[1.02] disabled:opacity-50"
+              className="w-full bg-white text-black py-5 rounded-2xl font-bold text-[10px] uppercase tracking-widest flex items-center justify-center gap-3 transition-all active:scale-95 hover:bg-slate-200 disabled:opacity-50 shadow-xl shadow-white/5"
             >
-              {loading ? <Loader2 size={22} className="animate-spin" /> : 'Access Node'}
+              {loading ? (
+                <Loader2 size={20} className="animate-spin" />
+              ) : (
+                <>
+                  Enter Network <ArrowRight size={16} />
+                </>
+              )}
             </button>
-
           </form>
 
+          {/* OR SEPARATOR */}
+          <div className="relative my-8">
+            <div className="absolute inset-0 flex items-center">
+              <div className="w-full border-t border-white/5"></div>
+            </div>
+            <div className="relative flex justify-center text-[8px] font-bold uppercase tracking-[0.3em]">
+              <span className="bg-[#0b0e14] px-4 text-slate-600">Secure Bridge</span>
+            </div>
+          </div>
+
+          {/* GOOGLE LOGIN */}
+          <div className="flex justify-center">
+            <div className="w-full grayscale opacity-80 hover:grayscale-0 hover:opacity-100 transition-all duration-500 rounded-xl overflow-hidden border border-white/5">
+              <GoogleLogin
+                onSuccess={handleGoogleSuccess}
+                onError={handleGoogleError}
+                theme="filled_black"
+                shape="rectangular"
+                width="100%"
+                text="continue_with"
+              />
+            </div>
+          </div>
+
           {/* FOOTER */}
-          <div className="text-center mt-10 pt-8 border-t border-white/5">
-            <span className="text-slate-500 text-xs uppercase tracking-widest italic">
-              Don't have an account?
+          <div className="text-center mt-10 pt-8 border-t border-white/5 relative z-10">
+            <span className="text-slate-500 text-[10px] uppercase tracking-widest font-bold">
+              New Member?
             </span>
-            <Link to="/signup" className="text-blue-500 font-bold ml-2 text-xs uppercase tracking-widest hover:text-blue-400">
-              Sign Up
+            <Link to="/signup" className="text-indigo-500 font-bold ml-2 text-[10px] uppercase tracking-widest hover:text-indigo-400 transition-colors">
+              Establish Node
             </Link>
           </div>
 
-          {/* DEMO */}
-          <div className="mt-8 p-5 bg-blue-600/5 rounded-2xl border border-blue-500/10 text-xs uppercase tracking-widest text-slate-500 text-center italic">
-            <strong className="text-blue-500 mr-2">Demo:</strong>
+          {/* DEMO TOOLTIP */}
+          <div className="mt-8 p-4 bg-indigo-600/5 rounded-2xl border border-white/5 text-[10px] font-bold uppercase tracking-widest text-slate-600 text-center relative z-10">
+            <span className="text-indigo-500 mr-2">Demo Access:</span>
             admin@educred.com / admin123
           </div>
 

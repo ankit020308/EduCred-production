@@ -11,6 +11,10 @@ export default function ProtectedRoute({ children, roles = [] }) {
   );
 
   if (!user) return <Navigate to="/login" replace />;
+  
+  if (user.role === 'pending' && !roles.includes('pending')) {
+    return <Navigate to="/onboarding" replace />;
+  }
 
   if (roles.length > 0 && !roles.includes(user.role)) {
     console.warn(`Unauthorized role: ${user.role}. Expected: ${roles}`);

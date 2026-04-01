@@ -1,0 +1,15 @@
+{
+  "name": "educred-root",
+  "version": "1.0.0",
+  "description": "Unified Identity Node Controller",
+  "main": "index.js",
+  "scripts": {
+    "blockchain": "cd blockchain && npx hardhat node",
+    "server": "cd server && npm start",
+    "start": "concurrently \"npm run blockchain\" \"npm run server\"",
+    "install:all": "npm install && cd server && npm install && cd ../client && npm install && cd ../blockchain && npm install"
+  },
+  "dependencies": {
+    "concurrently": "^8.2.2"
+  }
+}

@@ -31,7 +31,12 @@ const CertificateSchema = new mongoose.Schema({
   },
   blockchainTxHash: { 
     type: String, 
-    required: true 
+    sparse: true // Optional during PENDING state
+  },
+  status: {
+    type: String,
+    enum: ['PENDING', 'CONFIRMED', 'FAILED'],
+    default: 'PENDING'
   },
   issuedAt: { 
     type: Date, 
