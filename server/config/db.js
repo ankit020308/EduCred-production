@@ -4,51 +4,47 @@ import dotenv from 'dotenv';
 dotenv.config();
 
 /**
- * Establishment of the primary Data Layer.
- * Connects to MongoDB Atlas, local MongoDB, or falls back to an In-Memory instance.
+ * 🗄️ PRODUCTION DATA LAYER: MongoDB Atlas Connectivity
+ * Engineered for high-concurrency certificate registry operations.
+ * Enforces strict URI requirements and connection pooling.
  */
 const connectDB = async () => {
-    const uri = process.env.MONGO_URI;
+    const MONGO_URI = process.env.MONGO_URI;
+
+    if (!MONGO_URI) {
+        console.error("❌ [FATAL]: MONGO_URI environment variable is missing. Node initialization aborted.");
+        process.exit(1);
+    }
+
+    const connectionOptions = {
+        maxPoolSize: 10,             // Efficient connection pooling for distributed queries
+        serverSelectionTimeoutMS: 5000, // Fail fast if Atlas is unreachable
+        socketTimeoutMS: 45000,      // Pre-emptively close hanging sockets
+        family: 4                    // Use IPv4 if available
+    };
+
+    mongoose.set('strictQuery', true);
 
     try {
-        if (uri && uri.startsWith('mongodb+srv')) {
-            // Production: Atlas Connection
-            await mongoose.connect(uri);
-            console.log('✅ PROTOCOL: Connected to Distributed Data Mesh (MongoDB Atlas)');
-        } else if (uri && uri.startsWith('mongodb://localhost')) {
-            // Development: Local Node
-            try {
-                await mongoose.connect(uri);
-                console.log('✅ PROTOCOL: Connected to Local Data Node');
-            } catch (err) {
-                console.warn('⚠️ LOCAL NODE OFFLINE: Initiating In-Memory Fallback...');
-                await startMemoryServer();
-            }
-        } else {
-            // Fallback: In-Memory (Episodic Storage)
-            await startMemoryServer();
-        }
+        const conn = await mongoose.connect(MONGO_URI, connectionOptions);
+        console.log(`✅ [LEDGER_NODE]: Connected to ${conn.connection.host}`);
     } catch (err) {
-        console.error('❌ PROTOCOL ERROR: Data Layer Failed to Initialize');
-        console.error(err.message);
+        console.error(`❌ [LEDGER_FAIL]: ${err.message}`);
         process.exit(1);
     }
 };
 
-/**
- * Local In-Memory Fallback Logic
- */
-async function startMemoryServer() {
-    try {
-        const { MongoMemoryServer } = await import('mongodb-memory-server');
-        const mongod = await MongoMemoryServer.create();
-        const memoryUri = mongod.getUri();
-        await mongoose.connect(memoryUri);
-        console.log('✅ PROTOCOL: Connected to Episodic In-Memory Node (Testing Mode)');
-    } catch (err) {
-        console.error('❌ CRITICAL: Memory Server Logic Unavailable');
-        throw err;
-    }
-}
+// 🛰️ Global Connection Listeners (Cloud Resilience)
+mongoose.connection.on('connected', () => {
+    console.log('✅ [DATA_SYNC]: Distributed Ledger established.');
+});
+
+mongoose.connection.on('error', (err) => {
+    console.error(`⚠️ [DATA_INTEGRITY]: Data layer error detected - ${err}`);
+});
+
+mongoose.connection.on('disconnected', () => {
+    console.log('🛑 [DATA_OFFLINE]: Ledger connection severed. Attempting protocol recovery...');
+});
 
 export default connectDB;

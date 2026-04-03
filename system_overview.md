@@ -17,9 +17,9 @@ This document provides a comprehensive update on the **EduCred** project's new a
 ## 🛠️ Exact Technical Flow
 
 ### 1. Issuance (Academic Credentialing)
-1.  **Home Univ Admin**: Inputs student data in the frontend.
-2.  **Deterministic Hashing**: The backend takes the data, **sorts keys alphabetically**, and hashes it via **SHA-256**.
-3.  **On-Chain Anchoring**: ONLY the resulting hash is anchored to the smart contract (`issueCertificate(bytes32 _hash)`).
+1.  **Home Univ Admin**: Inputs student data in the frontend and uploads the certificate file.
+2.  **Cryptographic Fingerprinting**: The backend computes a **SHA-256 hash of the raw binary file content**, ensuring absolute integrity of the issued document.
+3.  **On-Chain Anchoring**: ONLY the resulting file hash is anchored to the smart contract (`issueCertificate(bytes32 _hash)`).
 4.  **Credential Retrieval**: The full JSON file is provided to the student as their **Digital Credential**.
 
 ### 2. Application (Student-to-Verifier)

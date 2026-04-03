@@ -6,6 +6,9 @@
   "scripts": {
     "blockchain": "cd blockchain && npx hardhat node",
     "server": "cd server && npm start",
+    "build": "npm run build:client && npm run build:server",
+    "build:client": "cd client && npm install && npm run build",
+    "build:server": "cd server && npm install",
     "start": "concurrently \"npm run blockchain\" \"npm run server\"",
     "install:all": "npm install && cd server && npm install && cd ../client && npm install && cd ../blockchain && npm install"
   },

@@ -4,6 +4,7 @@ import Certificate from '../models/Certificate.js';
 import Student from '../models/Student.js';
 import University from '../models/University.js';
 import { issueCertificateOnChain } from '../utils/blockchain.js';
+import { logAudit } from '../utils/logger.js';
 import crypto from 'crypto';
 
 export const createRequest = async (req, res) => {
@@ -28,12 +29,11 @@ export const createRequest = async (req, res) => {
 
     const university = await University.findById(universityId);
 
-    // Initial log
-    await Ledger.create({
-      type: 'REQUEST',
-      studentName: student.name,
-      universityName: university.name,
-      metadata: { requestId: newRequest._id }
+    // Standardized log
+    await logAudit(req, 'CERTIFICATE_REQUEST', 'SUCCESS', `Transcript request initiated for ${student.name}.`, { 
+      requestId: newRequest._id,
+      universityId,
+      studentId: student._id
     });
 
     res.status(201).json(newRequest);
@@ -109,12 +109,10 @@ export const approveRequest = async (req, res) => {
       activityLog: [{ action: 'Approved and Hash generated' }]
     });
 
-    // Log APPROVE
-    await Ledger.create({
-      type: 'APPROVE',
-      studentName: student.name,
-      universityName: university.name,
-      certificateId: newCert._id
+    // Standardized log
+    await logAudit(req, 'CERTIFICATE_APPROVE', 'SUCCESS', `Credential approval and anchor generation for ${student.name}.`, { 
+      certificateId: newCert._id,
+      requestId: id
     });
 
     // 3. Send to Blockchain
@@ -125,11 +123,8 @@ export const approveRequest = async (req, res) => {
       newCert.status = 'MINED';
       await newCert.save();
 
-      // Log ISSUE
-      await Ledger.create({
-        type: 'ISSUE',
-        studentName: student.name,
-        universityName: university.name,
+      // Standardized log
+      await logAudit(req, 'CERTIFICATE_ISSUE', 'SUCCESS', `Credential successfully anchored for ${student.name}.`, { 
         certificateId: newCert._id,
         txHash: receipt.hash
       });
@@ -155,11 +150,8 @@ export const rejectRequest = async (req, res) => {
     request.status = 'rejected';
     await request.save();
 
-    await Ledger.create({
-      type: 'REJECT',
-      studentName: request.studentId.name,
-      universityName: request.universityId.name,
-      metadata: { requestId: request._id }
+    await logAudit(req, 'CERTIFICATE_REJECT', 'SUCCESS', `Credential request rejected for ${request.studentId.name}.`, { 
+      requestId: request._id 
     });
 
     res.json({ message: 'Request rejected' });

@@ -1,241 +1,420 @@
-import { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ShieldCheck, Loader2, ArrowRight } from 'lucide-react';
+import {
+  ShieldCheck, Mail, Lock, User, Building2, FileText, Loader2,
+  ArrowRight, Hexagon, Zap, Cpu, Network, ChevronLeft, Terminal, Eye, EyeOff
+} from 'lucide-react';
 import { GoogleLogin } from '@react-oauth/google';
 import { useAuth } from '../context/AuthContext';
 import BlockchainBackground from '../components/BlockchainBackground';
 
+// ─── Animation Variants ───────────────────────────────────────────────────────
+const spring = { type: 'spring', stiffness: 120, damping: 20 };
+
+const formVariants = {
+  hidden: { opacity: 0, x: 40, filter: 'blur(8px)' },
+  visible: { opacity: 1, x: 0, filter: 'blur(0px)', transition: spring },
+  exit: { opacity: 0, x: -40, filter: 'blur(8px)', transition: { duration: 0.25 } }
+};
+
+// ─── Password Strength ────────────────────────────────────────────────────────
+function getPasswordStrength(pwd) {
+  if (!pwd) return { score: 0, label: '', color: '' };
+  let score = 0;
+  if (pwd.length >= 8) score++;
+  if (/[A-Z]/.test(pwd)) score++;
+  if (/[0-9]/.test(pwd)) score++;
+  if (/[^A-Za-z0-9]/.test(pwd)) score++;
+  const levels = [
+    { label: '', color: '' },
+    { label: 'Weak', color: 'bg-rose-500' },
+    { label: 'Fair', color: 'bg-amber-500' },
+    { label: 'Good', color: 'bg-blue-500' },
+    { label: 'Strong', color: 'bg-emerald-500' },
+  ];
+  return { score, ...levels[score] };
+}
+
+// ─── Node Visualizer (left panel decoration) ─────────────────────────────────
+const NodeVisualizer = () => {
+  const [nodes, setNodes] = useState(Array.from({ length: 12 }, () => false));
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setNodes(prev => {
+        const next = [...prev];
+        next[Math.floor(Math.random() * next.length)] = !next[Math.floor(Math.random() * next.length)];
+        return next;
+      });
+    }, 500);
+    return () => clearInterval(interval);
+  }, []);
+
+  return (
+    <div className="grid grid-cols-3 gap-6 opacity-70 select-none pointer-events-none p-10">
+      {nodes.map((isActive, i) => (
+        <div key={i} className="flex flex-col items-center gap-3">
+          <motion.div
+            animate={{
+              scale: isActive ? 1.15 : 1,
+              backgroundColor: isActive ? 'rgba(59,130,246,0.15)' : 'rgba(255,255,255,0.02)',
+              borderColor: isActive ? 'rgba(59,130,246,0.4)' : 'rgba(255,255,255,0.05)'
+            }}
+            transition={{ duration: 0.4 }}
+            className="w-12 h-12 rounded-xl border flex items-center justify-center"
+          >
+            {isActive
+              ? <Cpu size={16} className="text-blue-500 animate-pulse" />
+              : <div className="w-1.5 h-1.5 rounded-full bg-slate-700" />}
+          </motion.div>
+          <div className="h-4 w-[1px] bg-gradient-to-b from-white/[0.05] to-transparent" />
+        </div>
+      ))}
+    </div>
+  );
+};
+
+// ─── Main Component ───────────────────────────────────────────────────────────
 export default function Signup() {
-  const { register } = useAuth();
+  const { register, googleLogin } = useAuth();
   const navigate = useNavigate();
 
+  const [authStep, setAuthStep] = useState(0);
   const [form, setForm] = useState({
-    name: '',
-    email: '',
-    password: '',
-    role: 'student',
-    universityName: '',
-    description: '',
-    documents: ''
+    name: '', email: '', password: '', role: 'student', universityName: '', description: ''
   });
-
-  const [loading, setLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
+  const [logs, setLogs] = useState(['PREPARING GENESIS BLOCK...', 'AWAITING NODE SPECIFICATIONS...']);
 
-  const handleSubmit = async (e) => {
+  const addLog = (msg) => setLogs(prev =>
+    [...prev.slice(-5), `[${new Date().toTimeString().slice(0, 8)}] ${msg}`]
+  );
+
+  const passwordStrength = getPasswordStrength(form.password);
+
+  const handleNext = (e) => {
     e.preventDefault();
-    setLoading(true);
     setError('');
+    if (authStep === 0) {
+      addLog(`ROLE: ${form.role.toUpperCase()}`);
+      setAuthStep(1);
+    } else if (authStep === 1) {
+      if (!form.name || !form.email || !form.password) return setError('All fields are required.');
+      if (form.password.length < 8) return setError('Password must be at least 8 characters.');
+      addLog(`IDENTITY: ${form.email}`);
+      form.role === 'university' ? setAuthStep(2) : executeRegistration();
+    } else if (authStep === 2) {
+      if (!form.universityName || !form.description) return setError('Institution details are required.');
+      executeRegistration();
+    }
+  };
 
+  const executeRegistration = async () => {
+    setError('');
+    setAuthStep(3);
+    addLog('INITIATING HANDSHAKE...');
     try {
-      await register(form);
-      navigate('/dashboard');
+      await new Promise(r => setTimeout(r, 1200));
+      addLog('ALLOCATING LEDGER SPACE...');
+      const result = await register(form);
+      if (result?.requiresVerification) {
+        addLog('ACTIVATION CODE DISPATCHED.');
+        setTimeout(() => navigate(`/verify-otp?email=${encodeURIComponent(form.email)}`), 700);
+      } else {
+        addLog('NODE ESTABLISHED.');
+        setTimeout(() => navigate('/dashboard'), 700);
+      }
     } catch (err) {
-      console.error('Signup Failure:', err);
-      setError(
-        err.response?.data?.message ||
-        err.response?.data?.error ||
-        'Signup failed. Please check network connectivity.'
-      );
-    } finally {
-      setLoading(false);
+      const msg = err?.response?.data?.error || err?.response?.data?.message || 'Registration failed.';
+      setError(msg);
+      addLog('CRITICAL: REGISTRATION FAILED.');
+      setAuthStep(form.role === 'university' ? 2 : 1);
     }
   };
 
   const handleGoogleSuccess = async (credentialResponse) => {
-    setLoading(true);
+    setAuthStep(3);
+    addLog('INTERCEPTING OAUTH PAYLOAD...');
     setError('');
     try {
-      // Use the currently selected role from the form
-      const { isNewUser } = await googleLogin(credentialResponse.credential, form.role);
-      if (isNewUser) {
+      const { isNewUser, user } = await googleLogin(credentialResponse.credential, form.role);
+      addLog('OAUTH VERIFIED.');
+      if (isNewUser || user?.role === 'pending') {
         navigate('/onboarding');
       } else {
         navigate('/dashboard');
       }
     } catch (err) {
-      console.error('Google Signup Failure:', err);
-      setError(err || 'Google identity verification failed.');
-    } finally {
-      setLoading(false);
+      setError('Google sign-in failed. Please try again.');
+      addLog('OAUTH REJECTED.');
+      setAuthStep(0);
     }
   };
 
-  const handleGoogleError = () => {
-    setError('Google identity verification failed.');
-  };
+  const stepTitles = ['Create Account', 'Personal Info', 'Institution', 'Anchoring...'];
+  const stepSubs = [
+    'Select account type',
+    'Provide your details',
+    'Institution information',
+    'Writing to global state...'
+  ];
 
   return (
-    <div className="relative min-h-screen flex flex-col items-center justify-center px-6 py-32 overflow-hidden bg-[#010409]">
-      
-      {/* 🌌 INTERACTIVE BACKGROUND: Neural-Link Mesh */}
-      <BlockchainBackground />
+    <div className="relative min-h-screen flex bg-[#000000] font-sans selection:bg-blue-500/30 overflow-hidden">
 
-      {/* AMBIENT NEBULA GLOW */}
-      <div className="absolute inset-0 z-0 pointer-events-none">
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] bg-indigo-600/10 blur-[140px] rounded-full animate-pulse" />
+      <div className="fixed inset-0 z-0 opacity-30 mix-blend-screen pointer-events-none">
+        <BlockchainBackground />
       </div>
 
-      <motion.div
-        initial={{ opacity: 0, scale: 0.98, y: 20 }}
-        animate={{ opacity: 1, scale: 1, y: 0 }}
-        transition={{ duration: 0.8, ease: [0.22, 1, 0.36, 1] }}
-        className="relative w-full max-w-[480px] z-10"
-      >
-        <div className="glass-card p-10 md:p-12 border border-white/10 group">
-          
-          {/* HEADER */}
-          <div className="text-center mb-10 space-y-4">
-            <div className="w-16 h-16 bg-indigo-600/10 rounded-2xl flex items-center justify-center mx-auto border border-white/5 animate-levitate shadow-xl shadow-indigo-500/10">
-              <ShieldCheck size={28} className="text-indigo-500" />
+      <div className="relative z-10 w-full flex flex-col lg:flex-row h-screen">
+
+        {/* ─── LEFT PANEL ────────────────────────────────────────────── */}
+        <div className="hidden lg:flex w-1/2 flex-col justify-between p-12 border-r border-white/[0.04] bg-[#020202]/80 backdrop-blur-md relative overflow-hidden">
+          <div className="absolute top-1/2 left-0 -translate-y-1/2 w-[800px] h-[800px] bg-blue-600/8 blur-[150px] rounded-full pointer-events-none" />
+
+          {/* Logo */}
+          <button onClick={() => navigate('/')} className="relative z-10 flex items-center gap-4 w-fit">
+            <div className="w-12 h-12 bg-[#111111] border border-white/[0.06] rounded-xl flex items-center justify-center">
+              <Hexagon className="text-blue-500" size={24} />
+            </div>
+            <div>
+              <span className="text-2xl font-extrabold text-white tracking-tight block">
+                Edu<span className="text-blue-500">Cred</span>
+              </span>
+              <span className="text-[9px] font-bold uppercase tracking-[0.3em] text-slate-500">User Registration</span>
+            </div>
+          </button>
+
+          {/* Node visualizer */}
+          <div className="relative z-10 flex-1 my-12 flex flex-col justify-end">
+            <div className="flex-1 flex items-center justify-center">
+              <NodeVisualizer />
             </div>
 
-            <h1 className="text-3xl font-bold text-white tracking-tight">
-              Establish <span className="text-indigo-500">Node</span>
-            </h1>
-
-            <p className="text-slate-500 text-[10px] font-bold uppercase tracking-[0.4em] opacity-60">
-              Identity Protocol Registration
-            </p>
-          </div>
-
-          {/* ERROR ALERT */}
-          <AnimatePresence mode="wait">
-            {error && (
-              <motion.div 
-                initial={{ opacity: 0, height: 0 }}
-                animate={{ opacity: 1, height: 'auto' }}
-                exit={{ opacity: 0, height: 0 }}
-                className="bg-rose-500/10 border border-rose-500/20 rounded-2xl p-4 mb-8 text-rose-400 text-[10px] font-bold uppercase tracking-widest text-center"
-              >
-                {error}
-              </motion.div>
-            )}
-          </AnimatePresence>
-
-          {/* ROLE SWITCH */}
-          <div className="flex gap-4 mb-8 p-1 bg-white/[0.03] rounded-2xl border border-white/5 shadow-2xl">
-            {['student', 'university'].map((role) => (
-              <button
-                key={role}
-                type="button"
-                onClick={() => setForm({ ...form, role, universityName: '' })}
-                className={`flex-1 py-3.5 rounded-xl text-[10px] font-bold uppercase tracking-widest transition-all
-                  ${form.role === role
-                    ? 'bg-indigo-600 text-white shadow-lg'
-                    : 'text-slate-500 hover:text-white hover:bg-white/5'
-                  }`}
-              >
-                {role}
-              </button>
-            ))}
-          </div>
-
-          {/* FORM */}
-          <form onSubmit={handleSubmit} className="space-y-5">
-            <div className="space-y-4">
-              <input
-                placeholder="FULL LEGAL NAME"
-                required
-                value={form.name}
-                onChange={(e) => setForm({ ...form, name: e.target.value.toUpperCase() })}
-                className="w-full bg-white/[0.02] border border-white/10 rounded-xl py-4 px-6 text-white text-[11px] font-bold tracking-widest outline-none transition-all focus:border-indigo-500/50"
+            {/* Telemetry */}
+            <div className="bg-[#050505] border border-white/[0.06] rounded-2xl p-6 font-mono text-xs text-blue-400 space-y-2 shadow-[inset_0_0_30px_rgba(0,0,0,0.5)]">
+              <div className="flex items-center gap-2 mb-4 border-b border-white/[0.04] pb-3 text-slate-500">
+                <Terminal size={14} />
+                <span className="tracking-widest uppercase text-[10px] font-bold">Registration Telemetry</span>
+              </div>
+              {logs.map((log, i) => (
+                <motion.div key={i} initial={{ opacity: 0, x: -8 }} animate={{ opacity: 1, x: 0 }} className="opacity-80 text-[11px]">
+                  {log}
+                </motion.div>
+              ))}
+              <motion.span
+                animate={{ opacity: [0, 1, 0] }}
+                transition={{ repeat: Infinity, duration: 0.8 }}
+                className="inline-block w-2 h-4 bg-blue-500 align-middle mt-1"
               />
+            </div>
+          </div>
 
-              {form.role === 'university' && (
-                <div className="space-y-4 animate-in fade-in slide-in-from-top-4 duration-500">
-                  <input
-                    placeholder="INSTITUTIONAL IDENTITY"
-                    required
-                    value={form.universityName}
-                    onChange={(e) => setForm({ ...form, universityName: e.target.value.toUpperCase() })}
-                    className="w-full bg-white/[0.02] border border-white/10 rounded-xl py-4 px-6 text-white text-[11px] font-bold tracking-widest outline-none transition-all focus:border-indigo-500/50"
-                  />
-                  <textarea
-                    placeholder="INSTITUTIONAL DESCRIPTION"
-                    rows="2"
-                    required
-                    value={form.description}
-                    onChange={(e) => setForm({ ...form, description: e.target.value })}
-                    className="w-full bg-white/[0.02] border border-white/10 rounded-xl py-4 px-6 text-white text-[10px] font-medium leading-relaxed outline-none transition-all focus:border-indigo-500/50 resize-none"
-                  />
+          {/* Footer */}
+          <div className="relative z-10 flex justify-between text-[10px] font-bold uppercase tracking-widest text-slate-600 border-t border-white/[0.04] pt-6">
+            <span className="flex items-center gap-2"><Network size={12} className="text-blue-500" /> Topology: Active</span>
+            <span>Protocol v2.4</span>
+            <span className="flex items-center gap-2"><ShieldCheck size={12} /> Secure</span>
+          </div>
+        </div>
+
+        {/* ─── RIGHT PANEL ───────────────────────────────────────────── */}
+        <div className="w-full lg:w-1/2 flex items-center justify-center p-6 relative overflow-y-auto custom-scrollbar">
+          <div className="w-full max-w-[460px] py-12">
+
+            {/* Mobile logo */}
+            <button onClick={() => navigate('/')} className="lg:hidden flex items-center justify-center gap-3 mb-10 w-full">
+              <Hexagon className="text-blue-500" size={28} />
+              <span className="text-3xl font-extrabold text-white">Edu<span className="text-blue-500">Cred</span></span>
+            </button>
+
+            {/* Error */}
+            <AnimatePresence>
+              {error && (
+                <motion.div
+                  initial={{ opacity: 0, y: -16 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
+                  className="bg-rose-500/10 border border-rose-500/20 rounded-2xl p-4 mb-6 text-rose-400 text-sm font-medium text-center"
+                >
+                  {error}
+                </motion.div>
+              )}
+            </AnimatePresence>
+
+            <div className="bg-[#0A0A0A]/80 backdrop-blur-3xl p-10 md:p-12 border border-white/[0.06] rounded-[2.5rem] shadow-[0_0_80px_rgba(0,0,0,0.5)] relative overflow-hidden">
+
+              {/* Step Header */}
+              <div className="mb-10">
+                <div className="flex items-center justify-between mb-6">
+                  <div className="w-12 h-12 bg-blue-500/10 rounded-xl flex items-center justify-center border border-blue-500/20">
+                    {authStep === 0 ? <Network size={22} className="text-blue-500" />
+                      : authStep === 1 ? <User size={22} className="text-blue-500" />
+                      : authStep === 2 ? <Building2 size={22} className="text-blue-500" />
+                      : <Cpu size={22} className="text-blue-500 animate-pulse" />}
+                  </div>
+                  {authStep > 0 && authStep < 3 && (
+                    <button
+                      onClick={() => setAuthStep(p => p - 1)}
+                      className="text-[10px] font-bold uppercase tracking-widest text-slate-500 hover:text-white flex items-center gap-1 transition-colors"
+                    >
+                      <ChevronLeft size={14} /> Back
+                    </button>
+                  )}
+                </div>
+                <h1 className="text-3xl font-extrabold text-white tracking-tighter">{stepTitles[authStep]}</h1>
+                <p className="text-slate-500 text-[11px] font-medium mt-1">{stepSubs[authStep]}</p>
+              </div>
+
+              {/* Step 0: Role Selection */}
+              {authStep === 0 && (
+                <form onSubmit={handleNext} className="space-y-8">
+                  <div className="flex gap-2 p-1.5 bg-[#111111] rounded-[1.5rem] border border-white/[0.04]">
+                    {['student', 'university'].map((role) => (
+                      <button
+                        key={role} type="button"
+                        onClick={() => setForm({ ...form, role, universityName: '', description: '' })}
+                        className={`relative flex-1 py-4 text-[11px] font-bold uppercase tracking-[0.2em] transition-colors z-10 rounded-xl ${form.role === role ? 'text-white' : 'text-slate-500 hover:text-slate-300'}`}
+                      >
+                        {form.role === role && (
+                          <motion.div layoutId="role-pill" className="absolute inset-0 bg-blue-600 rounded-xl shadow-lg shadow-blue-500/30 z-[-1]" />
+                        )}
+                        {role === 'student' ? '🎓 Student' : '🏛️ University'}
+                      </button>
+                    ))}
+                  </div>
+                  <button type="submit" className="w-full bg-white text-black py-4 rounded-2xl font-bold text-[11px] uppercase tracking-[0.2em] hover:scale-[1.02] active:scale-95 transition-all flex items-center justify-center gap-3">
+                    Continue <ArrowRight size={16} />
+                  </button>
+                </form>
+              )}
+
+              {/* Step 1: Personal Info */}
+              {authStep === 1 && (
+                <form onSubmit={handleNext} className="space-y-5">
+                  <div className="relative group/input">
+                    <User className="absolute left-5 top-1/2 -translate-y-1/2 text-slate-600 group-focus-within/input:text-blue-500 transition-colors" size={18} />
+                    <input
+                      placeholder="Full Name" required autoFocus value={form.name}
+                      onChange={(e) => setForm({ ...form, name: e.target.value })}
+                      className="w-full bg-[#111111] border border-white/[0.06] rounded-2xl py-4 pl-14 pr-5 text-white text-sm outline-none focus:border-blue-500/50 transition-all placeholder:text-slate-600"
+                    />
+                  </div>
+                  <div className="relative group/input">
+                    <Mail className="absolute left-5 top-1/2 -translate-y-1/2 text-slate-600 group-focus-within/input:text-blue-500 transition-colors" size={18} />
+                    <input
+                      type="email" placeholder="Email Address" required value={form.email}
+                      onChange={(e) => setForm({ ...form, email: e.target.value })}
+                      className="w-full bg-[#111111] border border-white/[0.06] rounded-2xl py-4 pl-14 pr-5 text-white text-sm outline-none focus:border-blue-500/50 transition-all placeholder:text-slate-600"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <div className="relative group/input">
+                      <Lock className="absolute left-5 top-1/2 -translate-y-1/2 text-slate-600 group-focus-within/input:text-blue-500 transition-colors" size={18} />
+                      <input
+                        type={showPassword ? 'text' : 'password'}
+                        placeholder="Password (min 8 chars)" required value={form.password}
+                        onChange={(e) => setForm({ ...form, password: e.target.value })}
+                        className="w-full bg-[#111111] border border-white/[0.06] rounded-2xl py-4 pl-14 pr-14 text-white text-sm outline-none focus:border-blue-500/50 transition-all placeholder:text-slate-600"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowPassword(p => !p)}
+                        className="absolute right-5 top-1/2 -translate-y-1/2 text-slate-600 hover:text-white transition-colors"
+                      >
+                        {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                      </button>
+                    </div>
+                    {/* Password Strength Bar */}
+                    {form.password && (
+                      <div className="space-y-1.5 px-1">
+                        <div className="flex gap-1.5">
+                          {[1, 2, 3, 4].map(i => (
+                            <div key={i} className={`h-1 flex-1 rounded-full transition-all duration-300 ${i <= passwordStrength.score ? passwordStrength.color : 'bg-white/10'}`} />
+                          ))}
+                        </div>
+                        <p className={`text-[10px] font-bold ${passwordStrength.score >= 3 ? 'text-emerald-400' : passwordStrength.score >= 2 ? 'text-amber-400' : 'text-rose-400'}`}>
+                          {passwordStrength.label}
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                  <button type="submit" className="w-full bg-white text-black py-4 rounded-2xl font-bold text-[11px] uppercase tracking-[0.2em] hover:scale-[1.02] active:scale-95 transition-all flex items-center justify-center gap-3 mt-2">
+                    {form.role === 'university' ? <>Continue <ArrowRight size={16} /></> : <>Create Account <Zap size={16} /></>}
+                  </button>
+                </form>
+              )}
+
+              {/* Step 2: University Info */}
+              {authStep === 2 && (
+                <form onSubmit={handleNext} className="space-y-5">
+                  <div className="relative group/input">
+                    <Building2 className="absolute left-5 top-[22px] text-slate-600 group-focus-within/input:text-blue-500 transition-colors" size={18} />
+                    <input
+                      placeholder="University / Institution Name" required autoFocus value={form.universityName}
+                      onChange={(e) => setForm({ ...form, universityName: e.target.value })}
+                      className="w-full bg-[#111111] border border-white/[0.06] rounded-2xl py-4 pl-14 pr-5 text-white text-sm outline-none focus:border-blue-500/50 transition-all placeholder:text-slate-600"
+                    />
+                  </div>
+                  <div className="relative group/input">
+                    <FileText className="absolute left-5 top-5 text-slate-600 group-focus-within/input:text-blue-500 transition-colors" size={18} />
+                    <textarea
+                      placeholder="Brief description of your institution (accreditation, region, etc.)"
+                      rows="3" required value={form.description}
+                      onChange={(e) => setForm({ ...form, description: e.target.value })}
+                      className="w-full bg-[#111111] border border-white/[0.06] rounded-2xl py-4 pl-14 pr-5 text-white text-sm leading-relaxed outline-none focus:border-blue-500/50 transition-all placeholder:text-slate-600 resize-none"
+                    />
+                  </div>
+                  <div className="bg-amber-500/[0.06] border border-amber-500/20 rounded-xl p-4 text-amber-400 text-[11px] font-medium leading-relaxed">
+                    ⚠️ University accounts require admin approval before you can issue certificates.
+                  </div>
+                  <button type="submit" className="w-full bg-blue-600 text-white py-4 rounded-2xl font-bold text-[11px] uppercase tracking-[0.2em] hover:bg-blue-500 active:scale-95 transition-all flex items-center justify-center gap-3">
+                    Submit Application <Zap size={16} />
+                  </button>
+                </form>
+              )}
+
+              {/* Step 3: Processing */}
+              {authStep === 3 && (
+                <div className="flex flex-col items-center justify-center py-10 space-y-6">
+                  <div className="relative">
+                    <div className="absolute inset-0 border-[3px] border-blue-500/20 rounded-[1.5rem] animate-ping" />
+                    <div className="w-20 h-20 border-[3px] border-t-blue-500 border-r-blue-500 border-b-transparent border-l-transparent rounded-[1.5rem] animate-spin" />
+                    <Hexagon className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-blue-500" size={24} />
+                  </div>
+                  <p className="text-[11px] font-mono text-blue-400 uppercase tracking-widest animate-pulse text-center">
+                    {logs[logs.length - 1]}
+                  </p>
                 </div>
               )}
 
-              <input
-                type="email"
-                placeholder="NETWORK EMAIL"
-                required
-                value={form.email}
-                onChange={(e) => setForm({ ...form, email: e.target.value })}
-                className="w-full bg-white/[0.02] border border-white/10 rounded-xl py-4 px-6 text-white text-[11px] font-bold tracking-widest outline-none transition-all focus:border-indigo-500/50"
-              />
-
-              <input
-                type="password"
-                placeholder="SECURITY KEY"
-                required
-                value={form.password}
-                onChange={(e) => setForm({ ...form, password: e.target.value })}
-                className="w-full bg-white/[0.02] border border-white/10 rounded-xl py-4 px-6 text-white text-[11px] font-bold tracking-widest outline-none transition-all focus:border-indigo-500/50"
-              />
-            </div>
-
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full bg-white text-black py-5 mt-6 rounded-2xl font-bold text-[10px] uppercase tracking-[0.2em] flex items-center justify-center gap-3 transition-all active:scale-95 hover:bg-slate-200 disabled:opacity-50"
-            >
-              {loading ? (
-                <Loader2 className="animate-spin" size={20} />
-              ) : (
-                <>
-                  <ArrowRight size={18} /> Establish Protocol
-                </>
+              {/* Google OAuth — Step 0 only */}
+              {authStep === 0 && import.meta.env.VITE_GOOGLE_CLIENT_ID && (
+                <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="mt-8">
+                  <div className="relative my-6">
+                    <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-white/[0.06]" /></div>
+                    <div className="relative flex justify-center">
+                      <span className="bg-[#0A0A0A] px-4 text-[10px] font-bold text-slate-600 uppercase tracking-widest">or continue with</span>
+                    </div>
+                  </div>
+                  <div className="flex justify-center">
+                    <GoogleLogin
+                      onSuccess={handleGoogleSuccess}
+                      onError={() => { setError('Google sign-in failed.'); }}
+                      theme="outline" shape="rectangular" width="360" text="signup_with"
+                    />
+                  </div>
+                </motion.div>
               )}
-            </button>
-          </form>
-
-          {/* OR SEPARATOR */}
-          <div className="relative my-8">
-            <div className="absolute inset-0 flex items-center">
-              <div className="w-full border-t border-white/5"></div>
             </div>
-            <div className="relative flex justify-center text-[8px] font-bold uppercase tracking-[0.3em]">
-              <span className="bg-[#0b0e14] px-4 text-slate-600">Secure Protocol Bridge</span>
-            </div>
-          </div>
 
-          {/* GOOGLE SIGNUP */}
-          <div className="flex justify-center">
-            <div className="w-full grayscale opacity-80 hover:grayscale-0 hover:opacity-100 transition-all duration-500 rounded-xl overflow-hidden border border-white/5">
-              <GoogleLogin
-                onSuccess={handleGoogleSuccess}
-                onError={handleGoogleError}
-                theme="filled_black"
-                shape="rectangular"
-                width="100%"
-                text="signup_with"
-              />
-            </div>
+            <p className="text-center mt-8 text-slate-500 text-sm">
+              Already have an account?{' '}
+              <Link to="/login" className="text-blue-500 font-semibold hover:text-blue-400 transition-colors">Sign in</Link>
+            </p>
           </div>
-
-          {/* FOOTER */}
-          <div className="text-center mt-10 pt-8 border-t border-white/5">
-            <span className="text-slate-500 text-[10px] font-bold uppercase tracking-widest">
-              Existing Node?
-            </span>
-            <Link
-              to="/login"
-              className="text-indigo-500 font-bold ml-2 text-[10px] uppercase tracking-widest hover:text-indigo-400 transition-colors"
-            >
-              Access Node
-            </Link>
-          </div>
-
         </div>
-      </motion.div>
+      </div>
     </div>
   );
 }

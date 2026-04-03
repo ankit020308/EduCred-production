@@ -1,12 +1,12 @@
 import express from 'express';
 import { createRequest, getRequests, approveRequest, rejectRequest } from '../controllers/requestController.js';
-import { protect } from '../middleware/authMiddleware.js';
+import { protect, requireRole } from '../middleware/authMiddleware.js';
 
 const router = express.Router();
 
-router.post('/', protect, createRequest);
+router.post('/', protect, requireRole('student'), createRequest);
 router.get('/', protect, getRequests);
-router.post('/:id/approve', protect, approveRequest);
-router.post('/:id/reject', protect, rejectRequest);
+router.post('/:id/approve', protect, requireRole('university'), approveRequest);
+router.post('/:id/reject', protect, requireRole('university'), rejectRequest);
 
 export default router;

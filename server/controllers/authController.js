@@ -1,9 +1,15 @@
 import { sendOTP } from '../utils/emailService.js';
 import { sendPhoneOTP } from '../utils/smsService.js';
 import { logAudit } from '../utils/logger.js';
+import { registerSchema, loginSchema, otpSchema } from '../utils/validation.js';
 import { OAuth2Client } from 'google-auth-library';
+import jwt from 'jsonwebtoken';
 import crypto from 'crypto';
-import bcrypt from 'bcryptjs';
+
+
+import User from '../models/User.js';
+import University from '../models/University.js';
+import Student from '../models/Student.js';
 
 const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
@@ -148,7 +154,12 @@ export const verifyOTP = async (req, res) => {
       return res.status(403).json({ error: 'Security key blocked. Please request a new one.' });
     }
 
-    // 2. Compare hashed OTP
+    // 2. Check expiry FIRST — before any hash comparison to prevent timing oracle
+    if (!user.otpExpires || user.otpExpires < Date.now()) {
+      return res.status(400).json({ error: 'Security key expired. Request a new one.' });
+    }
+
+    // 3. Compare hashed OTP
     if (user.otp !== hashOTP(otp)) {
       user.otpAttempts += 1;
       await user.save();
@@ -158,11 +169,6 @@ export const verifyOTP = async (req, res) => {
         error: `Invalid security key. ${remaining} attempts remaining.`,
         attemptsRemaining: remaining
       });
-    }
-
-    // 3. Check for expiration
-    if (user.otpExpires < Date.now()) {
-      return res.status(400).json({ error: 'Security key expired. Request a new one.' });
     }
 
     // 4. Activate node
@@ -436,7 +442,8 @@ export const createAdmin = async (req, res) => {
       name,
       email,
       passwordHash: password,
-      role
+      role,
+      isEmailVerified: true // Admins are provisioned by existing admins — no OTP required
     });
 
     res.status(201).json({

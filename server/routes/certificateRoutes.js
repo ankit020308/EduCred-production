@@ -6,7 +6,7 @@ import {
     getStats 
 } from '../controllers/certificateController.js';
 import { protect, requireRole } from '../middleware/authMiddleware.js';
-import { uploadCloud } from '../utils/cloudinary.js';
+import { upload } from '../middleware/uploadMiddleware.js';
 
 const router = express.Router();
 
@@ -17,7 +17,7 @@ const router = express.Router();
 router.get('/', protect, requireRole('university'), getCertificates);
 router.get('/stats', protect, requireRole('university'), getStats);
 
-router.post('/issue', protect, requireRole('university'), uploadCloud.single('file'), (req, res, next) => {
+router.post('/issue', protect, requireRole('university'), upload.single('file'), (req, res, next) => {
     // Audit-logged issuance logic follows in controller
     next();
 }, issueCertificate);
@@ -26,6 +26,6 @@ router.post('/issue', protect, requireRole('university'), uploadCloud.single('fi
  * 🛡️ Public Verification Portal
  * Verifies authenticity against the decentralized ledger.
  */
-router.post('/verify', uploadCloud.single('file'), verifyCertificate);
+router.post('/verify', upload.single('file'), verifyCertificate);
 
 export default router;

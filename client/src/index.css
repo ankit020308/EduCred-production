@@ -1,198 +1,198 @@
 @import "tailwindcss";
-@config "../tailwind.config.js";
 
-/* =========================================================
-   1. DESIGN TOKENS (FOUNDATION)
-========================================================= */
+/* ──────────────────────────────────────────────────────────────────────────
+   💠 MASTER DESIGN SYSTEM: BASE LAYER
+   ────────────────────────────────────────────────────────────────────────── */
 @layer base {
   :root {
-    --color-bg-primary: #020408;
-    --color-bg-surface: #0a0d14;
-    --color-bg-elevated: #111524;
+    /* 🕋 FAANG-GRADE MATTE PALETTE (Deep Indigo/Sapphire Focus) */
+    --color-bg-deep: #000000;
+    --color-bg-matte: #050505;
+    --color-bg-surface: #0a0a0a;
+    --color-bg-elevated: #111111;
 
-    --color-indigo-400: #818cf8;
-    --color-indigo-500: #6366f1;
-    --color-indigo-600: #4f46e5;
+    /* 💎 SEAMLESS ACCENT ARCHITECTURE */
+    --color-blue-500: #3b82f6;
+    --color-emerald-500: #10b981;
+    --color-amber-500: #f59e0b;
 
-    --color-emerald-400: #34d399;
-    --color-rose-400: #fb7185;
-    --color-cyan-400: #22d3ee;
-
-    --color-text-primary: #ffffff;
-    --color-text-secondary: #94a3b8;
+    /* 📄 NEOTERIC TYPOGRAPHY */
+    --color-text-vibrant: #ffffff;
+    --color-text-dim: #94a3b8;
     --color-text-muted: #475569;
+
+    --font-sans: 'Inter', 'Satoshi', 'Geist', system-ui, sans-serif;
   }
 
   html {
     scroll-behavior: smooth;
+    background-color: var(--color-bg-deep);
   }
 
   body {
     margin: 0;
-    background-color: var(--color-bg-primary);
-    color: var(--color-text-primary);
-    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    background-color: var(--color-bg-deep);
+    color: var(--color-text-vibrant);
+    font-family: var(--font-sans);
     -webkit-font-smoothing: antialiased;
-    -moz-osx-font-smoothing: grayscale;
-    text-rendering: optimizeLegibility;
     overflow-x: hidden;
-    overscroll-behavior-y: none;
   }
 
   ::selection {
-    background: rgba(99, 102, 241, 0.3);
+    background-color: rgba(59, 130, 246, 0.2);
     color: #ffffff;
-    text-shadow: none;
   }
 }
 
-/* =========================================================
-   2. VISUAL SYSTEM (BACKGROUND & TEXTURES)
-========================================================= */
-@layer utilities {
-  .pixel-grid {
-    background-image:
-      linear-gradient(to right, rgba(255, 255, 255, 0.02) 1px, transparent 1px),
-      linear-gradient(to bottom, rgba(255, 255, 255, 0.02) 1px, transparent 1px);
-    background-size: 48px 48px;
-    -webkit-mask-image: radial-gradient(ellipse 80% 80% at 50% 50%, black 20%, transparent 100%);
-    mask-image: radial-gradient(ellipse 80% 80% at 50% 50%, black 20%, transparent 100%);
+/* ──────────────────────────────────────────────────────────────────────────
+   🪄 UTILITIES: GLASS & GLOW SYSTEMS
+   ────────────────────────────────────────────────────────────────────────── */
+
+  /* FAANG-Grade Glassmorphism */
+@utility glass-pane {
+  background: rgba(10, 10, 10, 0.8);
+  backdrop-filter: blur(40px) saturate(180%);
+  border: 1px solid rgba(255, 255, 255, 0.04);
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+}
+
+/* Interactive Glow States */
+@utility glow-blue {
+  box-shadow: 0 0 80px -20px rgba(59, 130, 246, 0.15);
+}
+
+@utility glow-emerald {
+  box-shadow: 0 0 80px -20px rgba(16, 185, 129, 0.15);
+}
+
+@utility text-glow-blue {
+  text-shadow: 0 0 15px rgba(59, 130, 246, 0.5);
+}
+
+/* Precision Typography */
+@utility tracking-widest {
+  letter-spacing: 0.25em;
+}
+
+@utility tracking-command {
+  letter-spacing: 0.4em;
+}
+
+/* Linear-style Grid & Mesh */
+@utility mesh-grid {
+  background-image:
+    radial-gradient(circle at 1px 1px, rgba(255, 255, 255, 0.03) 1px, transparent 0);
+  background-size: 32px 32px;
+}
+
+@utility mask-radial-fade {
+  mask-image: radial-gradient(circle at center, black 30%, transparent 100%);
+}
+
+/* Custom Smooth Scrollbar */
+@utility custom-scrollbar {
+  &::-webkit-scrollbar {
+    width: 4px;
   }
 
-  .noise-overlay {
-    position: absolute;
-    inset: 0;
-    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E");
-    opacity: 0.025;
-    pointer-events: none;
-    mix-blend-mode: overlay;
-    z-index: 50;
+  &::-webkit-scrollbar-track {
+    background: transparent;
   }
 
-  /* Custom utility for the terminal output area */
-  .terminal-scrollbar::-webkit-scrollbar {
-    width: 6px;
-  }
-
-  .terminal-scrollbar::-webkit-scrollbar-track {
-    background: rgba(0, 0, 0, 0.3);
-    border-radius: 4px;
-  }
-
-  .terminal-scrollbar::-webkit-scrollbar-thumb {
-    background: rgba(99, 102, 241, 0.3);
-    border-radius: 4px;
-  }
-
-  .terminal-scrollbar::-webkit-scrollbar-thumb:hover {
-    background: rgba(99, 102, 241, 0.6);
+  &::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 10px;
   }
 }
 
-/* =========================================================
-   3. ELITE GLASSMORPHISM & BORDERS
-========================================================= */
-@layer components {
+/* Emissive text glow — referenced across Landing, Verifier, SystemAdmin */
+@utility text-glow-emissive {
+  text-shadow:
+    0 0 20px rgba(99, 102, 241, 0.6),
+    0 0 60px rgba(99, 102, 241, 0.3),
+    0 0 100px rgba(99, 102, 241, 0.1);
+}
+
+/* Shimmer skeleton loading animation */
+@utility shimmer {
+  background: linear-gradient(
+    90deg,
+    rgba(255,255,255,0.03) 0%,
+    rgba(255,255,255,0.08) 50%,
+    rgba(255,255,255,0.03) 100%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.6s ease-in-out infinite;
+}
+
+/* ──────────────────────────────────────────────────────────────────────────
+   🔳 COMPONENTS: REUSABLE UI ELEMENTS
+   ────────────────────────────────────────────────────────────────────────── */
+
+  /* The "Command" style button used in Login/Signup/Admin */
+  .btn-command {
+    @apply uppercase tracking-widest font-bold text-[10px] px-8 py-4 rounded-xl transition-all duration-500 active:scale-95 flex items-center justify-center gap-3;
+  }
+
+  .btn-blue {
+    @apply bg-blue-600 text-white hover:bg-blue-500 hover:scale-[1.02] glow-blue border border-blue-400/20;
+  }
+
+  .btn-outline {
+    @apply border border-white/10 bg-white/[0.02] text-white hover:bg-white hover:text-black hover:border-white;
+  }
+
+  /* Glass Card variation for Admin & Dashboards */
   .glass-card {
-    background: linear-gradient(145deg, rgba(255, 255, 255, 0.03) 0%, rgba(255, 255, 255, 0.01) 100%);
-    backdrop-filter: blur(20px) saturate(180%);
-    -webkit-backdrop-filter: blur(20px) saturate(180%);
-    border-radius: 2.5rem;
-    position: relative;
-    overflow: hidden;
-    transition: all 0.6s cubic-bezier(0.16, 1, 0.3, 1);
-    isolation: isolate;
-    transform: translateZ(0);
-    will-change: transform, box-shadow;
+    @apply bg-[#0A0A0A]/80 backdrop-blur-3xl border border-white/[0.06] rounded-[2rem] p-8 shadow-2xl;
   }
 
-  .glass-card::before {
-    content: "";
-    position: absolute;
-    inset: 0;
-    border-radius: inherit;
-    padding: 1px;
-    background: linear-gradient(to bottom right,
-        rgba(255, 255, 255, 0.15),
-        rgba(255, 255, 255, 0.02) 40%,
-        rgba(255, 255, 255, 0.01));
-    -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
-    -webkit-mask-composite: destination-out;
-    mask-composite: exclude;
-    pointer-events: none;
-    z-index: -1;
-  }
-
-  .glass-card:hover {
-    transform: translateY(-8px) scale(1.005);
-    box-shadow:
-      0 40px 100px -20px rgba(0, 0, 0, 0.8),
-      0 0 40px -10px rgba(99, 102, 241, 0.15);
-  }
-
-  .glass-card::after {
-    content: '';
-    position: absolute;
-    inset: 0;
-    background: radial-gradient(600px circle at var(--mouse-x, 50%) var(--mouse-y, 50%),
-        rgba(255, 255, 255, 0.06),
-        transparent 40%);
+/* ──────────────────────────────────────────────────────────────────────────
+   🌀 QUANTUM MOTION: HIGH-FIDELITY ANIMATIONS
+   ────────────────────────────────────────────────────────────────────────── */
+@keyframes scan {
+  0% {
+    transform: translateY(-100%);
     opacity: 0;
-    transition: opacity 0.5s ease;
-    pointer-events: none;
-    z-index: -1;
   }
 
-  .glass-card:hover::after {
+  50% {
     opacity: 1;
   }
+
+  100% {
+    transform: translateY(1000%);
+    opacity: 0;
+  }
 }
 
-/* =========================================================
-   4. MOTION & PHYSICS SYSTEM
-========================================================= */
+@keyframes pulse-mesh {
+
+  0%,
+  100% {
+    opacity: 0.2;
+  }
+
+  50% {
+    opacity: 0.4;
+  }
+}
+
 @keyframes levitate {
 
   0%,
   100% {
-    transform: translateY(0) rotate(0deg);
+    transform: translateY(0);
   }
 
   50% {
-    transform: translateY(-15px) rotate(1deg);
+    transform: translateY(-10px);
   }
 }
 
-@keyframes orbit-path {
-  0% {
-    transform: rotate(0deg) translateX(50px) rotate(0deg) scale(1);
-  }
-
-  50% {
-    transform: rotate(180deg) translateX(50px) rotate(-180deg) scale(1.1);
-  }
-
-  100% {
-    transform: rotate(360deg) translateX(50px) rotate(-360deg) scale(1);
-  }
-}
-
-@keyframes emissive-glow {
-
-  0%,
-  100% {
-    text-shadow: 0 0 20px rgba(99, 102, 241, 0.4), 0 0 40px rgba(99, 102, 241, 0.1);
-  }
-
-  50% {
-    text-shadow: 0 0 30px rgba(99, 102, 241, 0.7), 0 0 60px rgba(99, 102, 241, 0.3);
-  }
-}
-
-/* Global Ticker Animation */
 @keyframes marquee {
   0% {
-    transform: translateX(0%);
+    transform: translateX(0);
   }
 
   100% {
@@ -200,41 +200,44 @@
   }
 }
 
+@keyframes shimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+@keyframes toast-in {
+  from { opacity: 0; transform: translateY(16px) scale(0.96); }
+  to   { opacity: 1; transform: translateY(0)    scale(1); }
+}
+
+@keyframes toast-out {
+  from { opacity: 1; transform: translateY(0)    scale(1); }
+  to   { opacity: 0; transform: translateY(-8px) scale(0.96); }
+}
+
+.animate-scan {
+  animation: scan 4s linear infinite;
+}
+
 .animate-levitate {
-  animation: levitate 8s cubic-bezier(0.45, 0.05, 0.55, 0.95) infinite;
+  animation: levitate 5s ease-in-out infinite;
 }
 
-.animate-orbit {
-  animation: orbit-path 20s linear infinite;
-}
-
-.text-glow-emissive {
-  animation: emissive-glow 4s ease-in-out infinite;
-}
-
-/* =========================================================
-   5. SCROLLBAR (STEALTH MODE)
-========================================================= */
+/* 🎨 SCROLLBAR THEME (CHROME/SAFARI) */
 ::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
+  width: 6px;
 }
 
 ::-webkit-scrollbar-track {
-  background: var(--color-bg-primary);
+  background: #000000;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.1);
+  background: #1a1a1a;
   border-radius: 10px;
-  border: 2px solid var(--color-bg-primary);
-  transition: background 0.3s ease;
+  border: 1px solid #000000;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(255, 255, 255, 0.25);
-}
-
-::-webkit-scrollbar-corner {
-  background: var(--color-bg-primary);
+  background: #252525;
 }

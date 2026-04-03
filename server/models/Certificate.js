@@ -10,6 +10,17 @@ const CertificateSchema = new mongoose.Schema({
     required: true,
     trim: true
   },
+  studentEmail: {
+    type: String,
+    required: true,
+    lowercase: true,
+    trim: true
+  },
+  studentPhone: {
+    type: String,
+    required: true,
+    trim: true
+  },
   course: { 
     type: String, 
     required: true,

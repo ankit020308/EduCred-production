@@ -1,103 +1,163 @@
 /* =========================================================
-   APP.CSS — APPLICATION SHELL & ROUTING
-   Replaces default Vite boilerplate
+   EDUCRED CORE APP SHELL — SAPPHIRE SPEC v2.4
+   Architectural Layout & Global Transitions
 ========================================================= */
 
-/* 1. Root Application Container */
+/* 1. PRIMARY CONTAINER
+   Ensures the app takes over the viewport without scroll-jumping */
 #root {
   width: 100vw;
   min-height: 100vh;
   display: flex;
   flex-direction: column;
+  background-color: var(--color-bg-deep);
 
-  /* Inherit the deep space background from index.css */
-  background-color: var(--color-bg-primary);
-
-  /* Creates a new stacking context to keep z-indexes perfectly contained */
+  /* Critical for 3D/Background performance */
   isolation: isolate;
-
-  /* Prevent horizontal scrolling caused by animations */
   overflow-x: hidden;
+  position: relative;
 }
 
-/* 2. Main Layout Wrapper */
-.app-main {
-  flex-grow: 1;
+/* 2. MAIN NAVIGATION WRAPPER
+   Acts as the parent for all page routes */
+.app-viewport {
+  flex: 1 0 auto;
   display: flex;
   flex-direction: column;
   position: relative;
-  z-index: 1;
+  z-index: 10;
+  /* Sits above the fixed background components */
 }
 
-/* =========================================================
-   3. PREMIUM ROUTE TRANSITIONS (If using React Router)
-   Use these with Framer Motion or React Transition Group
-========================================================= */
+/* ─────────────────────────────────────────────────────────
+   3. CINEMATIC ROUTE TRANSITIONS (SAPPHIRE PHYSICS)
+   Optimized for use with AnimatePresence/React Router
+───────────────────────────────────────────────────────── */
 
-/* Cinematic Fade & Scale for Page Loads */
-.page-enter {
+/* We use the Zero-G Bezier: cubic-bezier(0.22, 1, 0.36, 1)
+   This mimics the "snap and float" feel of elite desktop apps.
+*/
+
+.page-transition-enter {
   opacity: 0;
-  transform: translateY(15px) scale(0.99);
-  filter: blur(8px);
+  transform: translateY(20px) scale(0.98);
+  filter: blur(12px) brightness(0.8);
 }
 
-.page-enter-active {
+.page-transition-enter-active {
   opacity: 1;
   transform: translateY(0) scale(1);
-  filter: blur(0);
+  filter: blur(0) brightness(1);
   transition:
-    opacity 0.6s cubic-bezier(0.16, 1, 0.3, 1),
-    transform 0.6s cubic-bezier(0.16, 1, 0.3, 1),
-    filter 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+    opacity 600ms cubic-bezier(0.22, 1, 0.36, 1),
+    transform 600ms cubic-bezier(0.22, 1, 0.36, 1),
+    filter 600ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 
-.page-exit {
+.page-transition-exit {
   opacity: 1;
   filter: blur(0);
 }
 
-.page-exit-active {
+.page-transition-exit-active {
   opacity: 0;
   transform: translateY(-10px) scale(0.99);
-  filter: blur(4px);
+  filter: blur(8px);
   transition:
-    opacity 0.4s ease-in,
-    transform 0.4s ease-in,
-    filter 0.4s ease-in;
+    opacity 400ms ease-in,
+    transform 400ms ease-in,
+    filter 400ms ease-in;
 }
 
-/* =========================================================
-   4. LOADING STATES (Global App Spinners)
-========================================================= */
+/* ─────────────────────────────────────────────────────────
+   4. MISSION-CRITICAL UI: GLOBAL LOADER
+───────────────────────────────────────────────────────── */
 
-.global-loader-overlay {
+.global-terminal-loader {
   position: fixed;
   inset: 0;
-  background: rgba(2, 4, 8, 0.8);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
+  background: rgba(0, 0, 0, 0.9);
+  backdrop-filter: blur(20px);
   display: flex;
-  place-content: center;
-  place-items: center;
-  z-index: 9999;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  z-index: 10000;
+  /* Stays above everything */
 }
 
-.loader-ring {
-  width: 48px;
-  height: 48px;
-  border: 2px solid rgba(99, 102, 241, 0.1);
+/* Sapphire Glowing Ring */
+.loader-quantum-ring {
+  width: 64px;
+  height: 64px;
+  position: relative;
   border-radius: 50%;
-  border-top-color: var(--color-indigo-500);
-  animation: spin 1s cubic-bezier(0.55, 0.085, 0.68, 0.53) infinite;
-  box-shadow: 0 0 20px rgba(99, 102, 241, 0.2);
+  padding: 3px;
+  background: conic-gradient(from 0deg, transparent 20%, var(--color-blue-500));
+  mask: radial-gradient(circle, transparent 58%, black 60%);
+  -webkit-mask: radial-gradient(circle, transparent 58%, black 60%);
+  animation: spin 0.8s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+  filter: drop-shadow(0 0 15px rgba(59, 130, 246, 0.4));
 }
 
 @keyframes spin {
-  0% {
-    transform: rotate(0deg);
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* ─────────────────────────────────────────────────────────
+   5. LAYOUT UTILITIES (SAPPHIRE SYSTEM)
+───────────────────────────────────────────────────────── */
+
+/* Dashboard Grid Pattern */
+.dashboard-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 1.5rem;
+}
+
+/* Sub-pixel Border - The "Linear" Look */
+.subpixel-border {
+  border: 1px solid rgba(255, 255, 255, 0.04);
+  position: relative;
+}
+
+.subpixel-border::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border: 1px solid rgba(255, 255, 255, 0.02);
+  pointer-events: none;
+  border-radius: inherit;
+}
+
+/* Utility for the "Command" text styling */
+.text-protocol {
+  font-size: 10px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.3em;
+  color: var(--color-text-dim);
+}
+
+/* Glowing text variant */
+.glow-text-sapphire {
+  color: #fff;
+  text-shadow: 0 0 20px rgba(59, 130, 246, 0.5);
+}
+
+/* ─────────────────────────────────────────────────────────
+   6. RESPONSIVE ARCHITECTURE
+───────────────────────────────────────────────────────── */
+
+@media (max-width: 768px) {
+  .dashboard-grid {
+    grid-template-columns: 1fr;
   }
 
-  100% {
-    transform: rotate(360deg);
+  /* Reduce motion for mobile devices to save battery/performance */
+  .page-transition-enter-active {
+    transition-duration: 400ms;
   }
 }

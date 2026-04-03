@@ -2,7 +2,7 @@ import express from 'express';
 import User from '../models/User.js';
 import Certificate from '../models/Certificate.js';
 import crypto from 'crypto';
-import { protect } from '../middleware/authMiddleware.js';
+import { protect, requireRole } from '../middleware/authMiddleware.js';
 
 const router = express.Router();
 
@@ -74,7 +74,7 @@ router.post('/verify-email', protect, async (req, res) => {
 });
 
 // ─── 🎯 STUDENT WALLET (FINAL VERSION) ────────────────
-router.get('/certificates', protect, async (req, res) => {
+router.get('/certificates', protect, requireRole('student'), async (req, res) => {
     try {
         const certificates = await Certificate.find({
             studentId: req.user.id

@@ -1,0 +1,212 @@
+[
+    {
+        "id": "IN-01",
+        "name": "IIT Bombay",
+        "country": "India",
+        "lat": 19.1334,
+        "lng": 72.9133
+    },
+    {
+        "id": "IN-02",
+        "name": "IISc Bangalore",
+        "country": "India",
+        "lat": 13.0169,
+        "lng": 77.5640
+    },
+    {
+        "id": "IN-03",
+        "name": "IIT Delhi",
+        "country": "India",
+        "lat": 28.5450,
+        "lng": 77.1926
+    },
+    {
+        "id": "IN-04",
+        "name": "IIT Madras",
+        "country": "India",
+        "lat": 12.9915,
+        "lng": 80.2337
+    },
+    {
+        "id": "IN-05",
+        "name": "IIT Kanpur",
+        "country": "India",
+        "lat": 26.5123,
+        "lng": 80.2329
+    },
+    {
+        "id": "IN-06",
+        "name": "IIT Kharagpur",
+        "country": "India",
+        "lat": 22.3149,
+        "lng": 87.3105
+    },
+    {
+        "id": "IN-07",
+        "name": "IIT Roorkee",
+        "country": "India",
+        "lat": 29.8649,
+        "lng": 77.8966
+    },
+    {
+        "id": "IN-08",
+        "name": "IIT Guwahati",
+        "country": "India",
+        "lat": 26.1878,
+        "lng": 91.6916
+    },
+    {
+        "id": "IN-09",
+        "name": "University of Delhi",
+        "country": "India",
+        "lat": 28.6883,
+        "lng": 77.2069
+    },
+    {
+        "id": "IN-10",
+        "name": "Jawaharlal Nehru University",
+        "country": "India",
+        "lat": 28.5398,
+        "lng": 77.1665
+    },
+    {
+        "id": "IN-11",
+        "name": "Banaras Hindu University",
+        "country": "India",
+        "lat": 25.2677,
+        "lng": 82.9913
+    },
+    {
+        "id": "IN-12",
+        "name": "University of Hyderabad",
+        "country": "India",
+        "lat": 17.4600,
+        "lng": 78.3278
+    },
+    {
+        "id": "IN-13",
+        "name": "Jadavpur University",
+        "country": "India",
+        "lat": 22.4986,
+        "lng": 88.3714
+    },
+    {
+        "id": "IN-14",
+        "name": "Anna University",
+        "country": "India",
+        "lat": 13.0102,
+        "lng": 80.2359
+    },
+    {
+        "id": "IN-15",
+        "name": "Aligarh Muslim University",
+        "country": "India",
+        "lat": 27.9135,
+        "lng": 78.0774
+    },
+    {
+        "id": "IN-16",
+        "name": "Jamia Millia Islamia",
+        "country": "India",
+        "lat": 28.5616,
+        "lng": 77.2802
+    },
+    {
+        "id": "IN-17",
+        "name": "BITS Pilani",
+        "country": "India",
+        "lat": 28.3639,
+        "lng": 75.5869
+    },
+    {
+        "id": "IN-18",
+        "name": "VIT Vellore",
+        "country": "India",
+        "lat": 12.9692,
+        "lng": 79.1559
+    },
+    {
+        "id": "IN-19",
+        "name": "NIT Trichy",
+        "country": "India",
+        "lat": 10.7648,
+        "lng": 78.8184
+    },
+    {
+        "id": "IN-20",
+        "name": "Pune University",
+        "country": "India",
+        "lat": 18.5538,
+        "lng": 73.8252
+    },
+    {
+        "id": "IN-21",
+        "name": "SRM Institute of Science and Technology",
+        "country": "India",
+        "lat": 12.8230,
+        "lng": 80.0444
+    },
+    {
+        "id": "US-01",
+        "name": "Massachusetts Institute of Technology",
+        "country": "United States",
+        "lat": 42.3601,
+        "lng": -71.0942
+    },
+    {
+        "id": "US-02",
+        "name": "Stanford University",
+        "country": "United States",
+        "lat": 37.4275,
+        "lng": -122.1697
+    },
+    {
+        "id": "US-03",
+        "name": "Harvard University",
+        "country": "United States",
+        "lat": 42.3770,
+        "lng": -71.1167
+    },
+    {
+        "id": "DE-01",
+        "name": "Technical University of Munich",
+        "country": "Germany",
+        "lat": 48.1484,
+        "lng": 11.5682
+    },
+    {
+        "id": "RU-01",
+        "name": "Lomonosov Moscow State University",
+        "country": "Russian Federation",
+        "lat": 55.7028,
+        "lng": 37.5308
+    },
+    {
+        "id": "JP-01",
+        "name": "University of Tokyo",
+        "country": "Japan",
+        "lat": 35.7128,
+        "lng": 139.7620
+    },
+    {
+        "id": "SE-01",
+        "name": "Karolinska Institute",
+        "country": "Sweden",
+        "lat": 59.3490,
+        "lng": 18.0260
+    },
+    {
+        "id": "KR-01",
+        "name": "Seoul National University",
+        "country": "South Korea",
+        "lat": 37.4599,
+        "lng": 126.9519
+    },
+    {
+        "id": "CA-01",
+        "name": "University of Toronto",
+        "country": "Canada",
+        "lat": 43.6629,
+        "lng": -79.3957
+    }
+]

@@ -12,12 +12,12 @@ export const registerSchema = Joi.object({
     email: Joi.string().email().required().messages({
         'string.email': 'A valid institutional email is required.'
     }),
-    password: Joi.string().min(8).required().pattern(new RegExp('^[a-zA-Z0-9]{3,30}$')).messages({
+    password: Joi.string().min(8).required().pattern(new RegExp('^[a-zA-Z0-9!@#$%^&*_]{8,30}$')).messages({
         'string.min': 'Security key must be at least 8 characters.',
-        'string.pattern.base': 'Password must only contain alphanumeric characters.'
+        'string.pattern.base': 'Password must contain alphanumeric or special characters (!@#$%^&*_).'
     }),
     role: Joi.string().valid('student', 'university').required(),
-    universityName: Joi.string().when('role', {
+    universityName: Joi.string().allow('', null).when('role', {
         is: 'university',
         then: Joi.required(),
         otherwise: Joi.optional()
