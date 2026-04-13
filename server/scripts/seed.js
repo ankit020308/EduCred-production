@@ -1,116 +1,116 @@
 import mongoose from 'mongoose';
 import crypto from 'crypto';
-import Certificate from '../models/Certificate.js';
+import dotenv from 'dotenv';
+import path from 'path';
+import { fileURLToPath } from 'url';
+
 import User from '../models/User.js';
+import University from '../models/University.js';
+import Certificate from '../models/Certificate.js';
+import Student from '../models/Student.js';
 
-// No dotenv in this simplistic seed script for now, 
-// using the same connection logic as the main server
-const MONGO_URI = 'mongodb://localhost:27017/educred';
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+dotenv.config({ path: path.join(__dirname, '../.env') });
 
-const students = [
-  { name: 'Aarav Sharma', reg: '20BCS001', branch: 'Computer Science', year: 2024 },
-  { name: 'Isha Patel', reg: '20BIT012', branch: 'Information Technology', year: 2024 },
-  { name: 'Rohan Gupta', reg: '20BME045', branch: 'Mechanical Engineering', year: 2024 },
-  { name: 'Ananya Iyer', reg: '20BEC089', branch: 'Electronics', year: 2024 },
-  { name: 'Vikram Singh', reg: '20BCE033', branch: 'Civil Engineering', year: 2024 },
-  { name: 'Sanya Malhotra', reg: '20BCS056', branch: 'Computer Science', year: 2024 },
-  { name: 'Kabir Verma', reg: '20BIT099', branch: 'Information Technology', year: 2024 },
-  { name: 'Megha Reddy', reg: '20BEC112', branch: 'Electronics', year: 2024 },
-  { name: 'Arjun Das', reg: '20BME019', branch: 'Mechanical Engineering', year: 2024 },
-  { name: 'Pooja Nair', reg: '20BCH007', branch: 'Chemical Engineering', year: 2024 },
-];
-
-const subjects_pool = [
-  { name: 'Data Structures', weight: 'Computer' },
-  { name: 'Algorithms', weight: 'Computer' },
-  { name: 'Thermodynamics', weight: 'Core' },
-  { name: 'Digital Logic', weight: 'Electronics' },
-  { name: 'Operating Systems', weight: 'Computer' },
-  { name: 'Fluid Mechanics', weight: 'Core' },
-  { name: 'Calculus', weight: 'Math' },
-  { name: 'Discrete Math', weight: 'Math' },
-  { name: 'Networks', weight: 'Computer' },
-  { name: 'Database Management', weight: 'Computer' },
-];
-
-function buildHashPayload(data, selectedFields = ['core', 'cgpa', 'semesters']) {
-  const payload = {
-    degreeName:     data.degreeName,
-    graduationYear: Number(data.graduationYear),
-    studentName:    data.studentName,
-    universityName: data.universityName,
-    regNo:          data.regNo,
-  };
-  if (data.cgpa != null) payload.cgpa = data.cgpa;
-  if (Array.isArray(data.semesters)) {
-    payload.semesters = data.semesters.map(sem => ({
-      semesterNumber: sem.semesterNumber,
-      sgpa: sem.sgpa,
-      subjects: sem.subjects.map(s => ({
-        grade: s.grade,
-        marks: s.marks,
-        name: s.name
-      })).sort((a, b) => a.name.localeCompare(b.name))
-    })).sort((a,b) => a.semesterNumber - b.semesterNumber);
-  }
-  return JSON.stringify(payload, Object.keys(payload).sort());
-}
+const MONGO_URI = process.env.MONGO_URI || 'mongodb://localhost:27017/educred';
 
 async function runSeed() {
   try {
     await mongoose.connect(MONGO_URI);
     console.log('Connected to MongoDB');
 
-    const admin = await User.findOne({ email: 'admin@educred.com' });
-    if (!admin) {
-        console.log('Admin user not found. Please run the server first.');
-        process.exit(1);
-    }
-
+    // Clean DB
+    await User.deleteMany({});
+    await University.deleteMany({});
     await Certificate.deleteMany({});
-    console.log('Certs cleared');
+    await Student.deleteMany({});
+    console.log('Cleared DB');
 
-    for (const s of students) {
-      const semesters = [1, 2, 3, 4].map(num => ({
-        semesterNumber: num,
-        sgpa: parseFloat((Math.random() * (10 - 7) + 7).toFixed(2)),
-        subjects: Array.from({ length: 5 }, (_, i) => ({
-          name: subjects_pool[Math.floor(Math.random() * subjects_pool.length)].name,
-          marks: Math.floor(Math.random() * (100 - 60) + 60),
-          grade: 'A'
-        }))
-      }));
+    // Demo Admin (Institution) — plain password, pre-save hook hashes it
+    const adminUser = await User.create({
+      name: 'EduCred University Admin',
+      email: 'admin@educred.com',
+      passwordHash: '123456',
+      role: 'university',
+      isEmailVerified: true
+    });
 
+    const university = await University.create({
+      name: 'EduCred University',
+      email: 'admin@educred.com',
+      userId: adminUser._id,
+      status: 'APPROVED',
+      isVerified: true
+    });
+
+    adminUser.linkedUniversityId = university._id;
+    await adminUser.save();
+
+    console.log('Created Demo Institution (admin@educred.com:123456)');
+
+    // System Admin — plain password, pre-save hook hashes it
+    await User.create({
+      name: 'System Administrator',
+      email: 'sysadmin@educred.com',
+      passwordHash: '123456',
+      role: 'admin',
+      isEmailVerified: true
+    });
+    console.log('Created System Admin (sysadmin@educred.com:123456)');
+
+    // Demo Student — plain password, pre-save hook hashes it
+    const studentUser = await User.create({
+      name: 'John Doe',
+      email: 'student@educred.com',
+      passwordHash: '123456',
+      role: 'student',
+      isEmailVerified: true
+    });
+
+    // Create Student profile record
+    const studentRecord = await Student.create({ name: 'John Doe', userId: studentUser._id });
+
+    // Demo certificates
+    const studentsData = [
+      { name: 'John Doe', email: 'student@educred.com', phone: '9876543210', course: 'Computer Science', studentId: studentRecord._id },
+      { name: 'Isha Patel', email: 'isha@example.com', phone: '9876543211', course: 'Information Technology' },
+      { name: 'Rohan Gupta', email: 'rohan@example.com', phone: '9876543212', course: 'Mechanical Engineering' },
+      { name: 'Ananya Iyer', email: 'ananya@example.com', phone: '9876543213', course: 'Electronics' },
+      { name: 'Vikram Singh', email: 'vikram@example.com', phone: '9876543214', course: 'Civil Engineering' }
+    ];
+
+    for (let i = 0; i < studentsData.length; i++) {
+      const s = studentsData[i];
+      const year = new Date().getFullYear();
+      const seq = 10001 + i;
       const certData = {
+        certificateId: `EDUCRED-${year}-CS-${seq}`,
         studentName: s.name,
-        regNo: s.reg,
-        universityName: 'EduCred University',
-        degreeName: 'Bachelor of Technology',
-        graduationYear: s.year,
-        branch: s.branch,
-        cgpa: parseFloat((semesters.reduce((acc, curr) => acc + curr.sgpa, 0) / 4).toFixed(2)),
-        semesters: semesters,
-        courseType: 'Full-Time',
-        status: 'MINED',
-        issuedBy: admin._id,
-        branding: { color: '#3B82F6' },
-        selectedFields: ['core', 'cgpa', 'semesters']
+        studentEmail: s.email,
+        studentPhone: s.phone,
+        studentId: s.studentId || undefined,
+        course: s.course,
+        issuer: university.name,
+        fileUrl: `/uploads/demo_cert_${i}.pdf`,
+        status: 'CONFIRMED',
+        workflowStatus: 'ISSUED',
+        issuedBy: adminUser._id,
+        universityId: university._id,
+        blockchainTxHash: '0x' + crypto.randomBytes(32).toString('hex')
       };
 
-      const hashPayload = buildHashPayload(certData);
-      const certificateHash = crypto.createHash('sha256').update(hashPayload).digest('hex');
+      const certString = JSON.stringify({ studentEmail: s.email, course: s.course, seq });
+      const certificateHash = crypto.createHash('sha256').update(certString).digest('hex');
       
       await Certificate.create({
         ...certData,
-        hashPayload,
-        certificateHash,
-        transactionHash: '0x' + crypto.randomBytes(32).toString('hex'),
-        qrCodeDataUrl: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==', 
+        certificateHash
       });
-      console.log(`Seeded: ${s.name}`);
+      console.log(`Seeded Certificate for: ${s.name}`);
     }
 
-    console.log('✅ 10 Students Seeded Successfully');
+    console.log('✅ Seeding Successfully Completed!');
     process.exit(0);
   } catch (err) {
     console.error('Seed error:', err);

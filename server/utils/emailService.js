@@ -1,117 +1,89 @@
 import nodemailer from 'nodemailer';
-import dotenv from 'dotenv';
-
-dotenv.config();
+import { isProduction } from './runtimeConfig.js';
 
 /**
- * 📧 INSTITUTIONAL NOTIFICATION NODE
- * Dispatches high-fidelity credential alerts to students once consensus is reached.
+ * Lazily creates the SMTP transporter so that missing env vars
+ * throw at call-time (with a clear error) rather than crashing
+ * the server on import.
  */
-const transporter = nodemailer.createTransport({
-    service: 'gmail', // or use host/port for professional SMTP
-    auth: {
-        user: process.env.EMAIL_USER,
-        pass: process.env.EMAIL_PASS
-    }
-});
+let _transporter = null;
 
-// ⚡ PROTOCOL DIAGNOSTICS: Verify node connection on startup
-if (process.env.EMAIL_USER && process.env.EMAIL_PASS) {
-    transporter.verify((error, success) => {
-        if (error) {
-            console.error("❌ [EMAIL_DIAGNOSTIC]: Protocol handshake failed -", error.message);
-        } else {
-            console.log("✅ [EMAIL_DIAGNOSTIC]: Notification node ready for dispatch.");
-        }
-    });
+function getTransporter() {
+  if (_transporter) return _transporter;
+
+  const host     = process.env.EMAIL_HOST;
+  const port     = Number(process.env.EMAIL_PORT);
+  const secure   = process.env.EMAIL_SECURE === 'true';
+  const user     = process.env.EMAIL_USER;
+  const pass     = process.env.EMAIL_PASS;
+  const fromAddr = process.env.EMAIL_FROM;
+
+  if (!host || !port || !user || !pass || !fromAddr) {
+    throw new Error(
+      'Email service not configured. Set EMAIL_HOST, EMAIL_PORT, EMAIL_SECURE, EMAIL_USER, EMAIL_PASS, EMAIL_FROM.'
+    );
+  }
+
+  _transporter = nodemailer.createTransport({ host, port, secure, auth: { user, pass } });
+  return _transporter;
 }
 
-/**
- * Sends a branded certificate issuance alert.
- * @param {string} to - Student email
- * @param {Object} cert - Certificate metadata
- */
-export const sendCertificateEmail = async (to, cert) => {
-    const isProd = process.env.NODE_ENV === 'production';
-    const verifyUrl = `${process.env.CLIENT_URL || 'http://localhost:3000'}/verify?id=${cert._id}`;
-
-    const mailOptions = {
-        from: `"EduCred Protocol" <${process.env.EMAIL_USER}>`,
-        to: to,
-        subject: `📜 New Credential Issued: ${cert.course}`,
-        html: `
-            <div style="font-family: sans-serif; max-width: 600px; margin: auto; border: 1px solid #e1e1e1; padding: 20px; border-radius: 10px;">
-                <h2 style="color: #4f46e5;">Identity Protocol: Credential Issued</h2>
-                <p>Hello <strong>${cert.studentName}</strong>,</p>
-                <p>A new academic credential has been anchored to the decentralized ledger on your behalf by <strong>${cert.issuer}</strong>.</p>
-                
-                <div style="background: #f8fafc; padding: 15px; border-radius: 8px; margin: 20px 0;">
-                    <p style="margin: 0; font-size: 0.9em; color: #64748b;">COURSE</p>
-                    <p style="margin: 5px 0 15px; font-weight: bold;">${cert.course}</p>
-                    
-                    <p style="margin: 0; font-size: 0.9em; color: #64748b;">CERTIFICATE ID</p>
-                    <p style="margin: 5px 0 15px; font-family: monospace; font-size: 0.85em;">${cert._id}</p>
-                    
-                    <p style="margin: 0; font-size: 0.9em; color: #64748b;">BLOCKCHAIN ANCHOR (SHA-256)</p>
-                    <p style="margin: 5px 0; font-family: monospace; font-size: 0.75em; word-break: break-all; color: #4f46e5;">${cert.certificateHash}</p>
-                </div>
-
-                <a href="${verifyUrl}" style="display: block; text-align: center; background: #000; color: #fff; text-decoration: none; padding: 12px; border-radius: 6px; font-weight: bold; margin-top: 20px;">
-                    Verify Authenticity
-                </a>
-
-                <p style="font-size: 0.8em; color: #94a3b8; margin-top: 30px; border-top: 1px solid #f1f5f9; padding-top: 15px;">
-                    This is an authoritative system message from the EduCred Protocol. If you did not expect this, please contact your academic institution.
-                </p>
-            </div>
-        `
-    };
-
+// Verify SMTP connection at startup (non-blocking, non-fatal)
+if (isProduction) {
+  // Skip verbose verification logs in production to avoid noise at boot
+} else {
+  Promise.resolve().then(async () => {
     try {
-        if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
-            console.warn("⚠️ [EMAIL_NODE]: Node offline. Credentials missing in variables. Email suppressed.");
-            return;
-        }
-        await transporter.sendMail(mailOptions);
-        console.log(`📧 [EMAIL_NODE]: Notification dispatched to ${to}`);
-    } catch (error) {
-        console.error("❌ [EMAIL_FAIL]: Protocol interrupted -", error.message);
+      const t = getTransporter();
+      await t.verify();
+      console.log('[EMAIL] SMTP ready');
+    } catch (err) {
+      console.warn('[EMAIL] SMTP verify failed — emails will fail until fixed:', err.message);
     }
+  });
+}
+
+function baseMailOptions(to, subject, html) {
+  return { from: process.env.EMAIL_FROM, to, subject, html };
+}
+
+export const sendCertificateEmail = async (to, cert) => {
+  const verifyUrl = `${process.env.CLIENT_URL}/verify?id=${cert._id}`;
+  const mailOptions = baseMailOptions(
+    to,
+    `Certificate issued: ${cert.course}`,
+    `
+      <div style="font-family:sans-serif;max-width:600px;margin:auto;border:1px solid #e5e7eb;padding:24px;border-radius:16px;">
+        <h2 style="margin:0 0 12px;color:#111827;">Your certificate is ready</h2>
+        <p style="color:#4b5563;">Hello <strong>${cert.studentName}</strong>,</p>
+        <p style="color:#4b5563;">A new credential has been issued for <strong>${cert.course}</strong>.</p>
+        <p style="color:#4b5563;">Certificate ID: <strong>${cert._id}</strong></p>
+        <p style="color:#4b5563;word-break:break-all;">Hash: <strong>${cert.certificateHash}</strong></p>
+        <a href="${verifyUrl}" style="display:inline-block;margin-top:16px;padding:12px 18px;background:#111827;color:#fff;text-decoration:none;border-radius:10px;">
+          Verify certificate
+        </a>
+      </div>
+    `,
+  );
+
+  const info = await getTransporter().sendMail(mailOptions);
+  if (!isProduction) console.log(`[EMAIL] Certificate sent to ${to} (${info.messageId})`);
 };
 
-/**
- * Sends a cryptographic identity key (OTP) for node activation.
- * @param {string} to - User email
- * @param {string} otp - 6-digit cryptographic key
- */
 export const sendOTP = async (to, otp) => {
-    const mailOptions = {
-        from: `"EduCred Protocol" <${process.env.EMAIL_USER}>`,
-        to: to,
-        subject: `🔑 Security Key: Identity Activation`,
-        html: `
-            <div style="font-family: sans-serif; max-width: 500px; margin: auto; border: 1px solid #e1e1e1; padding: 30px; border-radius: 15px; text-align: center;">
-                <h2 style="color: #3b82f6; margin-bottom: 20px;">Identity Activation</h2>
-                <p style="color: #64748b;">Your cryptographic identity key for node activation is:</p>
-                <div style="background: #f1f5f9; padding: 20px; border-radius: 10px; margin: 25px 0;">
-                    <span style="font-size: 32px; font-weight: bold; letter-spacing: 12px; color: #1e293b;">${otp}</span>
-                </div>
-                <p style="font-size: 0.85em; color: #94a3b8;">This key expires in 10 minutes. If you did not request this, please disregard.</p>
-                <div style="margin-top: 30px; border-top: 1px solid #f1f5f9; pt: 20px;">
-                    <p style="font-size: 0.75em; color: #cbd5e1; uppercase; tracking: 0.2em;">EduCred Decentralized Node Network</p>
-                </div>
-            </div>
-        `
-    };
+  const mailOptions = baseMailOptions(
+    to,
+    'EduCred — Your verification code',
+    `
+      <div style="font-family:sans-serif;max-width:520px;margin:auto;border:1px solid #e5e7eb;padding:24px;border-radius:16px;text-align:center;">
+        <h2 style="margin:0 0 12px;color:#111827;">Verify your email</h2>
+        <p style="color:#4b5563;">Use this one-time code to finish your EduCred sign up.</p>
+        <div style="margin:20px 0;padding:16px;background:#f3f4f6;border-radius:12px;font-size:30px;font-weight:700;letter-spacing:10px;color:#111827;">${otp}</div>
+        <p style="color:#6b7280;font-size:14px;">This code expires in 10 minutes. Do not share it.</p>
+      </div>
+    `,
+  );
 
-    try {
-        if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
-            console.warn("⚠️ [OTP_EMAIL_NODE]: Node offline. Credentials missing. Suppressing delivery.");
-            return;
-        }
-        await transporter.sendMail(mailOptions);
-        console.log(`✅ [OTP_EMAIL]: Security key dispatched to ${to}`);
-    } catch (error) {
-        console.error("❌ [OTP_EMAIL_FAIL]:", error.message);
-    }
+  const info = await getTransporter().sendMail(mailOptions);
+  if (!isProduction) console.log(`[OTP] Sent to ${to} (${info.messageId})`);
 };

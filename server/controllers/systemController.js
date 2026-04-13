@@ -3,6 +3,8 @@ import process from 'process';
 import Certificate from '../models/Certificate.js';
 import University from '../models/University.js';
 import { logAudit } from '../utils/logger.js';
+import UniversityGeo from '../models/UniversityGeo.js';
+import { blockchainMode } from '../utils/blockchain.js';
 
 /**
  * @desc Get real-time global system statistics
@@ -19,27 +21,31 @@ export const getSystemStats = async (req, res) => {
             credentialsSecured = (totalCertificates / 1000000).toFixed(1) + "M+";
         } else if (totalCertificates >= 1000) {
             credentialsSecured = (totalCertificates / 1000).toFixed(1) + "K+";
+        } else if (totalCertificates > 0) {
+            credentialsSecured = totalCertificates.toLocaleString();
+        } else {
+            credentialsSecured = "0";
         }
 
-        // 2. Active Nodes (Strictly Approved Universities from DB)
-        const activeNodes = await University.countDocuments({ status: 'APPROVED' });
+        // 2. Active Nodes (Strictly Approved Universities)
+        const universityNodes = await University.countDocuments({ status: 'APPROVED' });
+        const activeNodes = universityNodes.toLocaleString();
 
-        // 3. Network Uptime (Actual server stability since last node restart)
+        // 3. Service uptime derived from current process uptime
         const serverUptimeSeconds = process.uptime();
-        const networkUptime = serverUptimeSeconds > 0 ? "100.000%" : "0.000%";
+        const networkUptime = `${(serverUptimeSeconds / 3600).toFixed(2)}h`;
 
-        // 4. Avg Block Time (Real server processing latency)
-        const cpuLoad = os.loadavg()[0]; 
-        const avgBlockTime = (0.5 + (cpuLoad * 0.1)).toFixed(1) + "s";
+        // 4. Report only what we can actually support right now
+        const avgBlockTime = blockchainMode === 'LIVE' ? 'external-chain' : 'not-available';
 
-        // 5. Build and return the payload
         res.status(200).json({
             success: true,
             data: {
-                activeNodes,          // University nodes + base network
-                credentialsSecured,   // Total credentials from DB
-                avgBlockTime,         // Process-adjusted latency
-                networkUptime         // Dynamic stability metric
+                activeNodes,          
+                credentialsSecured,   
+                avgBlockTime,         
+                networkUptime,
+                blockchainMode
             }
         });
 
@@ -92,16 +98,13 @@ export const getTickerData = async (req, res) => {
             events.push(`NODE: ${uni.name.toUpperCase()} SYNCED`);
         });
 
-        // 3. Static Protocol Truths (Mixed with real load)
-        const cpuLoad = os.loadavg()[0];
-        events.push(`NETWORK LATENCY: ${Math.round(cpuLoad * 12 + 8)}MS`);
-        events.push(`PEER DISCOVERY: ACTIVE`);
-        events.push(`PROTOCOL V2.5 SECURE`);
-        events.push(`LEDGER_SYNC: OPTIMAL`);
+        events.push(`BLOCKCHAIN MODE: ${blockchainMode}`);
+        events.push(`APPROVED NODES: ${recentUnis.length}`);
+        events.push(`CERTIFICATES INDEXED: ${recentCerts.length}`);
 
         // If no real events exist yet, provide initializing placeholders
         if (events.length < 5) {
-            events.unshift("PROTOCOL INITIALIZING...", "P2P MESH ESTABLISHED");
+            events.unshift("REGISTRY INITIALIZING...", "AWAITING LIVE ACTIVITY");
         }
 
         res.status(200).json({
@@ -132,7 +135,7 @@ export const getNetworkMap = async (req, res) => {
             id: uni._id,
             name: uni.name,
             nodeType: 'Institutional_Validator',
-            status: 'SYNCED',
+            status: 'APPROVED',
             location: uni.location || 'Global Cluster', // Fallback if no location set
             joinedAt: uni.createdAt
         }));
@@ -146,5 +149,14 @@ export const getNetworkMap = async (req, res) => {
     } catch (error) {
         console.error("[❌ NETWORK_MAP_FAILURE]:", error.message);
         res.status(500).json({ success: false, message: "Protocol map offline" });
+    }
+};
+
+export const getUniversitiesGeo = async (req, res) => {
+    try {
+        const geo = await UniversityGeo.find({ isActive: true });
+        res.json(geo);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
     }
 };

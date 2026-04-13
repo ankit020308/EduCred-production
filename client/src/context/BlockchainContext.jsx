@@ -12,12 +12,13 @@ export function BlockchainProvider({ children }) {
   useEffect(() => {
     const init = async () => {
       try {
-        // Connect to the local Hardhat node
-        const rpcUrl = "http://127.0.0.1:8545";
+        if (!contractData?.contractAddress || !contractData?.abi?.length) {
+          setIsReady(false);
+          return;
+        }
+
+        const rpcUrl = import.meta.env.VITE_BLOCKCHAIN_RPC_URL || contractData.rpcUrl || 'http://127.0.0.1:8545';
         const newProvider = new ethers.JsonRpcProvider(rpcUrl);
-        
-        // We use a read-only contract instance for global events
-        // If specific components need to sign, they can use the user's wallet
         const newContract = new ethers.Contract(
           contractData.contractAddress,
           contractData.abi,
@@ -27,9 +28,9 @@ export function BlockchainProvider({ children }) {
         setProvider(newProvider);
         setContract(newContract);
         setIsReady(true);
-        console.log("✅ Blockchain Context Initialized (Local Node)");
       } catch (err) {
         console.error("❌ Blockchain Init Error:", err);
+        setIsReady(false);
       }
     };
 

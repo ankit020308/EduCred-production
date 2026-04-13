@@ -29,7 +29,7 @@ const viewTransition = {
 };
 
 export default function Profile() {
-  const { user } = useAuth();
+  const { user, updateUser } = useAuth();
   const [profileData, setProfileData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [isEditing, setIsEditing] = useState(false);
@@ -41,10 +41,10 @@ export default function Profile() {
 
   const fetchProfile = async () => {
     try {
-      const res = await api.get('/api/profile');
+      const res = await api.get('/api/user/profile');
       setProfileData(res.data);
     } catch (err) {
-      console.error(err);
+      setMsg({ type: 'error', text: err?.response?.data?.error || 'Failed to load profile.' });
     } finally {
       setLoading(false);
     }
@@ -52,12 +52,15 @@ export default function Profile() {
 
   const handleSave = async () => {
     try {
-      await api.put('/api/profile', profileData);
-      setMsg({ type: 'success', text: 'Identity Manifest Synchronized.' });
+      const res = await api.put('/api/user/profile', profileData);
+      setProfileData(res.data);
+      // Keep AuthContext in sync so Navbar reflects updated name
+      updateUser({ ...user, name: res.data.name });
+      setMsg({ type: 'success', text: 'Profile updated successfully.' });
       setIsEditing(false);
       setTimeout(() => setMsg(null), 3000);
     } catch (err) {
-      setMsg({ type: 'error', text: 'Synchronization Failure.' });
+      setMsg({ type: 'error', text: err?.response?.data?.error || 'Update failed. Try again.' });
     }
   };
 
@@ -134,8 +137,8 @@ export default function Profile() {
                {[
                  { label: 'FULL LEGAL NAME', value: profileData?.name, key: 'name', icon: User },
                  { label: 'NETWORK EMAIL', value: profileData?.email, key: 'email', icon: Mail },
-                 { label: 'PRIMARY AUTHORITY', value: user?.universityName || 'EDUGRED GLOBAL NETWORK', icon: Building2 },
-                 { label: 'AUTHENTICATION DATE', value: new Date(user?.createdAt).toLocaleDateString(), icon: Calendar }
+                 { label: 'PRIMARY AUTHORITY', value: profileData?.universityName || user?.universityName || 'EDUCRED GLOBAL NETWORK', icon: Building2 },
+                 { label: 'AUTHENTICATION DATE', value: profileData?.createdAt ? new Date(profileData.createdAt).toLocaleDateString() : '\u2014', icon: Calendar }
                ].map((item, idx) => (
                  <div key={idx} className="space-y-4">
                    <div className="flex items-center gap-3 ml-1">
@@ -163,16 +166,16 @@ export default function Profile() {
               
             {/* ── PROTOCOL SECURITY ─────────────────────────────── */}
             <motion.div {...viewTransition} transition={{ ...viewTransition.transition, delay: 0.2 }} className="glass-card p-10 border border-white/5 space-y-10 relative overflow-hidden group">
-              <div className="absolute top-0 right-0 w-40 h-40 bg-emerald-500/5 blur-[50px] pointer-events-none group-hover:bg-emerald-500/10 transition-all duration-1000" />
+              <div className="absolute top-0 right-0 w-40 h-40 bg-blue-500/5 blur-[50px] pointer-events-none group-hover:bg-blue-500/10 transition-all duration-1000" />
               
               <h3 className="text-xl font-bold text-white uppercase tracking-tight flex items-center gap-4">
-                <Smartphone size={20} className="text-emerald-500" /> Protocol Security
+                <Smartphone size={20} className="text-blue-500" /> Protocol Security
               </h3>
 
               <div className="space-y-6">
                 <div className="p-6 rounded-[1.5rem] bg-white/[0.02] border border-white/5 flex items-center justify-between group/item">
                   <div className="flex items-center gap-5">
-                    <div className="w-12 h-12 bg-emerald-500/10 rounded-2xl flex items-center justify-center text-emerald-500 border border-white/5">
+                    <div className="w-12 h-12 bg-blue-500/10 rounded-2xl flex items-center justify-center text-blue-500 border border-white/5">
                       <Smartphone size={20} />
                     </div>
                     <div>
@@ -180,7 +183,7 @@ export default function Profile() {
                       <p className="text-slate-600 text-[9px] font-bold uppercase tracking-widest mt-0.5">Extra Layer Active</p>
                     </div>
                   </div>
-                  <div className="w-12 h-6 bg-emerald-500/20 rounded-full relative cursor-pointer group-hover/item:bg-emerald-500/30 transition-all">
+                  <div className="w-12 h-6 bg-blue-500/20 rounded-full relative cursor-pointer group-hover/item:bg-blue-500/30 transition-all">
                     <div className="absolute right-1 top-1 w-4 h-4 bg-white rounded-full shadow-lg" />
                   </div>
                 </div>
@@ -230,7 +233,7 @@ export default function Profile() {
             animate={{ opacity: 1, y: 0, scale: 1 }} 
             exit={{ opacity: 0, scale: 0.9 }}
             className={`fixed bottom-12 right-12 px-8 py-5 rounded-[2rem] shadow-3xl border flex items-center gap-4 z-[100] backdrop-blur-xl ${
-              msg.type === 'success' ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-500' : 'bg-rose-500/10 border-rose-500/20 text-rose-400'
+              msg.type === 'success' ? 'bg-blue-500/10 border-blue-500/20 text-blue-500' : 'bg-rose-500/10 border-rose-500/20 text-rose-400'
             }`}
           >
             {msg.type === 'success' ? <CheckCircle2 size={24} /> : <X size={24} />}

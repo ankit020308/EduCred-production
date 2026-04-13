@@ -21,7 +21,13 @@ export const registerSchema = Joi.object({
         is: 'university',
         then: Joi.required(),
         otherwise: Joi.optional()
-    })
+    }),
+    description: Joi.string().allow('', null).when('role', {
+        is: 'university',
+        then: Joi.required(),
+        otherwise: Joi.optional()
+    }),
+    documents: Joi.array().items(Joi.string()).optional()
 });
 
 export const loginSchema = Joi.object({

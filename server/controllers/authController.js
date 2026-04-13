@@ -10,16 +10,15 @@ import crypto from 'crypto';
 import User from '../models/User.js';
 import University from '../models/University.js';
 import Student from '../models/Student.js';
+import { jwtSecret, refreshSecret, requireEnv } from '../utils/runtimeConfig.js';
 
-const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
+const googleClient = new OAuth2Client(requireEnv('GOOGLE_CLIENT_ID'));
 
-const JWT_SECRET = process.env.JWT_SECRET || 'educred_dev_secret_2026';
-const REFRESH_SECRET = process.env.REFRESH_SECRET || 'educred_refresh_secret_2026';
 const JWT_EXPIRES = '1h'; // Short-lived access token
 const REFRESH_EXPIRES = '7d'; // Long-lived refresh token
 
-const signToken = (id) => jwt.sign({ id }, JWT_SECRET, { expiresIn: JWT_EXPIRES });
-const signRefreshToken = (id) => jwt.sign({ id }, REFRESH_SECRET, { expiresIn: REFRESH_EXPIRES });
+const signToken = (id) => jwt.sign({ id }, jwtSecret, { expiresIn: JWT_EXPIRES });
+const signRefreshToken = (id) => jwt.sign({ id }, refreshSecret, { expiresIn: REFRESH_EXPIRES });
 const generateOTP = () => Math.floor(100000 + Math.random() * 900000).toString();
 const hashOTP = (otp) => crypto.createHash('sha256').update(otp).digest('hex');
 
@@ -36,6 +35,9 @@ export const register = async (req, res) => {
     }
 
     const otp = generateOTP();
+    if (process.env.NODE_ENV !== 'production') {
+      console.log(`\n🔑 [DEV_AUTH]: Activation Code for ${email} is: ${otp}\n`);
+    }
     const hashedOtp = hashOTP(otp);
 
     const user = await User.create({ 
@@ -61,15 +63,23 @@ export const register = async (req, res) => {
         description: description || '',
         isFlagged: !isInstitutional 
       });
+
+      req.app.get('io')?.to('admin_room')?.emit('universityRegistered', {
+        name: universityName,
+        email,
+        timestamp: new Date()
+      });
     } else {
       await Student.create({ name, userId: user._id });
     }
 
-    // Attempt to send OTP (Failure doesn't block creation but should notify)
     try {
       await sendOTP(email, otp);
-    } catch (err) {
-      console.error('Failed to send registration OTP:', err);
+    } catch (error) {
+      await University.deleteOne({ userId: user._id });
+      await Student.deleteOne({ userId: user._id });
+      await User.deleteOne({ _id: user._id });
+      return res.status(502).json({ error: 'OTP email delivery failed. Check SMTP settings and try again.' });
     }
 
     await logAudit(req, 'NODE_REGISTRATION', 'SUCCESS', 'New identity node provisioned.', { userId: user._id, role: user.role });
@@ -121,8 +131,10 @@ export const login = async (req, res) => {
         email: user.email, 
         role: user.role, 
         universityName: user.universityName,
+        universityId: university ? university._id : null,
         universityStatus: university ? university.status : null,
-        isVerified: university ? university.isVerified : false
+        isVerified: university ? university.isVerified : false,
+        createdAt: user.createdAt
       },
     });
   } catch (err) {
@@ -191,7 +203,8 @@ export const verifyOTP = async (req, res) => {
         id: user._id,
         name: user.name,
         email: user.email,
-        role: user.role
+        role: user.role,
+        createdAt: user.createdAt
       }
     });
 
@@ -227,7 +240,13 @@ export const resendOTP = async (req, res) => {
     user.lastOtpResend = now;
     await user.save();
 
-    await sendOTP(email, otp);
+    try {
+      await sendOTP(email, otp);
+    } catch (emailErr) {
+      console.error('Resend OTP email failure:', emailErr);
+      await logAudit(req, 'OTP_RESEND', 'FAILURE', 'Email delivery failed on resend.', { email, error: emailErr.message });
+      return res.status(502).json({ error: 'Failed to deliver security key via email. Check SMTP settings.' });
+    }
     await logAudit(req, 'OTP_RESEND', 'SUCCESS', 'New security key dispatched.', { email });
 
     res.status(200).json({ message: 'Security key re-synchronized and dispatched.' });
@@ -248,7 +267,7 @@ export const refreshToken = async (req, res) => {
     const { token } = req.body;
     if (!token) return res.status(401).json({ error: 'Refresh proof required.' });
 
-    const decoded = jwt.verify(token, REFRESH_SECRET);
+    const decoded = jwt.verify(token, refreshSecret);
     const user = await User.findById(decoded.id);
 
     if (!user) return res.status(401).json({ error: 'Identity node no longer exists.' });
@@ -269,13 +288,21 @@ export const googleLogin = async (req, res) => {
   try {
     const { idToken, role } = req.body;
     if (!idToken) return res.status(400).json({ error: 'Google identity proof required.' });
+    if (!process.env.GOOGLE_CLIENT_ID) {
+      return res.status(500).json({ error: 'Google OAuth is not configured.' });
+    }
 
     const ticket = await googleClient.verifyIdToken({
       idToken,
       audience: process.env.GOOGLE_CLIENT_ID,
     });
 
-    const { name, email, picture, sub: googleId } = ticket.getPayload();
+    const payload = ticket.getPayload();
+    if (!payload?.email) {
+      return res.status(400).json({ error: 'Google account email is unavailable.' });
+    }
+
+    const { name, email, picture, sub: googleId } = payload;
     
     let user = await User.findOne({ email });
 
@@ -285,7 +312,7 @@ export const googleLogin = async (req, res) => {
         name,
         email,
         passwordHash: crypto.randomBytes(16).toString('hex'), // Randomized password for social-only nodes
-        role: 'pending', // Post-auth onboarding required
+        role: 'pending',
         isEmailVerified: true, // Google emails are pre-verified
         isGoogleUser: true,
         avatar: picture,
@@ -412,6 +439,7 @@ export const getMe = async (req, res) => {
     email: u.email, 
     role: u.role, 
     universityName: u.universityName,
+    universityId: university ? university._id : null,
     universityStatus: university ? university.status : null,
     isVerified: university ? university.isVerified : false
   });

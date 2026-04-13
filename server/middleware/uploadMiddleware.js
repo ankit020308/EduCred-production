@@ -6,10 +6,23 @@ import streamifier from 'streamifier';
 // Serverless environments (Vercel/Lambda) cannot write to local disk.
 // We keep the file in a temporary buffer for hashing and immediate streaming.
 const storage = multer.memoryStorage();
+const ALLOWED_MIME_TYPES = new Set([
+    'application/pdf',
+    'image/png',
+    'image/jpeg',
+    'image/jpg',
+]);
 
 export const upload = multer({ 
     storage,
-    limits: { fileSize: 10 * 1024 * 1024 } // 10MB Limit
+    limits: { fileSize: 10 * 1024 * 1024 }, // 10MB Limit
+    fileFilter: (req, file, cb) => {
+        if (!ALLOWED_MIME_TYPES.has(file.mimetype)) {
+            cb(new Error('Only PDF, PNG, and JPEG certificate files are allowed.'));
+            return;
+        }
+        cb(null, true);
+    }
 });
 
 /**

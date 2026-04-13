@@ -10,14 +10,6 @@ import { useAuth } from '../context/AuthContext';
 import BlockchainBackground from '../components/BlockchainBackground';
 
 // ─── Animation Variants ───────────────────────────────────────────────────────
-const spring = { type: 'spring', stiffness: 120, damping: 20 };
-
-const formVariants = {
-  hidden: { opacity: 0, x: 40, filter: 'blur(8px)' },
-  visible: { opacity: 1, x: 0, filter: 'blur(0px)', transition: spring },
-  exit: { opacity: 0, x: -40, filter: 'blur(8px)', transition: { duration: 0.25 } }
-};
-
 // ─── Password Strength ────────────────────────────────────────────────────────
 function getPasswordStrength(pwd) {
   if (!pwd) return { score: 0, label: '', color: '' };
@@ -31,7 +23,7 @@ function getPasswordStrength(pwd) {
     { label: 'Weak', color: 'bg-rose-500' },
     { label: 'Fair', color: 'bg-amber-500' },
     { label: 'Good', color: 'bg-blue-500' },
-    { label: 'Strong', color: 'bg-emerald-500' },
+    { label: 'Strong', color: 'bg-blue-500' },
   ];
   return { score, ...levels[score] };
 }
@@ -116,18 +108,17 @@ export default function Signup() {
     setAuthStep(3);
     addLog('INITIATING HANDSHAKE...');
     try {
-      await new Promise(r => setTimeout(r, 1200));
       addLog('ALLOCATING LEDGER SPACE...');
       const result = await register(form);
       if (result?.requiresVerification) {
         addLog('ACTIVATION CODE DISPATCHED.');
-        setTimeout(() => navigate(`/verify-otp?email=${encodeURIComponent(form.email)}`), 700);
+        setTimeout(() => navigate(`/verify-otp?email=${encodeURIComponent(form.email)}`), 400);
       } else {
         addLog('NODE ESTABLISHED.');
-        setTimeout(() => navigate('/dashboard'), 700);
+        setTimeout(() => navigate('/dashboard'), 400);
       }
     } catch (err) {
-      const msg = err?.response?.data?.error || err?.response?.data?.message || 'Registration failed.';
+      const msg = typeof err === 'string' ? err : err?.response?.data?.error || err?.response?.data?.message || 'Registration failed.';
       setError(msg);
       addLog('CRITICAL: REGISTRATION FAILED.');
       setAuthStep(form.role === 'university' ? 2 : 1);
@@ -146,7 +137,7 @@ export default function Signup() {
       } else {
         navigate('/dashboard');
       }
-    } catch (err) {
+    } catch {
       setError('Google sign-in failed. Please try again.');
       addLog('OAUTH REJECTED.');
       setAuthStep(0);
@@ -295,7 +286,7 @@ export default function Signup() {
                   <div className="relative group/input">
                     <User className="absolute left-5 top-1/2 -translate-y-1/2 text-slate-600 group-focus-within/input:text-blue-500 transition-colors" size={18} />
                     <input
-                      placeholder="Full Name" required autoFocus value={form.name}
+                      placeholder="Full Name" required autoFocus autoComplete="name" value={form.name}
                       onChange={(e) => setForm({ ...form, name: e.target.value })}
                       className="w-full bg-[#111111] border border-white/[0.06] rounded-2xl py-4 pl-14 pr-5 text-white text-sm outline-none focus:border-blue-500/50 transition-all placeholder:text-slate-600"
                     />
@@ -303,7 +294,7 @@ export default function Signup() {
                   <div className="relative group/input">
                     <Mail className="absolute left-5 top-1/2 -translate-y-1/2 text-slate-600 group-focus-within/input:text-blue-500 transition-colors" size={18} />
                     <input
-                      type="email" placeholder="Email Address" required value={form.email}
+                      type="email" placeholder="Email Address" required autoComplete="email" value={form.email}
                       onChange={(e) => setForm({ ...form, email: e.target.value })}
                       className="w-full bg-[#111111] border border-white/[0.06] rounded-2xl py-4 pl-14 pr-5 text-white text-sm outline-none focus:border-blue-500/50 transition-all placeholder:text-slate-600"
                     />
@@ -313,7 +304,7 @@ export default function Signup() {
                       <Lock className="absolute left-5 top-1/2 -translate-y-1/2 text-slate-600 group-focus-within/input:text-blue-500 transition-colors" size={18} />
                       <input
                         type={showPassword ? 'text' : 'password'}
-                        placeholder="Password (min 8 chars)" required value={form.password}
+                        placeholder="Password (min 8 chars)" required autoComplete="new-password" value={form.password}
                         onChange={(e) => setForm({ ...form, password: e.target.value })}
                         className="w-full bg-[#111111] border border-white/[0.06] rounded-2xl py-4 pl-14 pr-14 text-white text-sm outline-none focus:border-blue-500/50 transition-all placeholder:text-slate-600"
                       />
@@ -333,7 +324,7 @@ export default function Signup() {
                             <div key={i} className={`h-1 flex-1 rounded-full transition-all duration-300 ${i <= passwordStrength.score ? passwordStrength.color : 'bg-white/10'}`} />
                           ))}
                         </div>
-                        <p className={`text-[10px] font-bold ${passwordStrength.score >= 3 ? 'text-emerald-400' : passwordStrength.score >= 2 ? 'text-amber-400' : 'text-rose-400'}`}>
+                        <p className={`text-[10px] font-bold ${passwordStrength.score >= 3 ? 'text-blue-400' : passwordStrength.score >= 2 ? 'text-amber-400' : 'text-rose-400'}`}>
                           {passwordStrength.label}
                         </p>
                       </div>

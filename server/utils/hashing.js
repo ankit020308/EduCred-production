@@ -33,10 +33,14 @@ export function generateHash(data) {
 }
 
 /**
- * Generates a SHA-256 hash from binary content (e.g., PDF/Image).
+ * Generates a SHA-256 hash from strictly verified binary buffers (e.g., PDF/Image).
  * @param {Buffer} buffer The binary content
  * @returns {string} Hex string hash
  */
 export function generateBinaryHash(buffer) {
+  if (!Buffer.isBuffer(buffer)) {
+    console.error("🚨 [SECURITY]: generateBinaryHash received non-buffer. Coercing strictly to Buffer.");
+    buffer = Buffer.from(buffer);
+  }
   return crypto.createHash('sha256').update(buffer).digest('hex');
 }

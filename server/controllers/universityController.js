@@ -21,7 +21,7 @@ export const getPendingUniversities = async (req, res) => {
 export const getAllUniversities = async (req, res) => {
     try {
       const universities = await University.find()
-        .select('name email status isVerified isFlagged createdAt')
+        .select('name email status isVerified isFlagged description documents createdAt')
         .sort({ createdAt: -1 });
       res.json({ data: universities });
     } catch (err) {

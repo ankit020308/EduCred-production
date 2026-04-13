@@ -60,9 +60,8 @@ services:
       - key: TWILIO_PHONE_FROM
         sync: false
 
-  - type: web
+  - type: static
     name: educred-frontend
-    runtime: static
     rootDir: client
     buildCommand: "npm install && npm run build"
     staticPublishPath: "./dist"

@@ -10,6 +10,7 @@ import { useAuth } from '../context/AuthContext';
 import BlockchainBackground from '../components/BlockchainBackground';
 import StatusBadge from '../components/StatusBadge';
 import { ToastProvider, useToast } from '../components/Toast';
+import socket, { joinInstitutionalRoom } from '../services/socket.mjs';
 
 // 💠 ANIMATION CONSTANTS
 const viewTransition = {
@@ -42,7 +43,39 @@ function AdminDashboard() {
     fetchUniversityStatus();
     fetchLocalCerts();
     fetchStats();
-  }, []);
+
+    // ⚡ Socket.io Lifecycle
+    if (user?.universityId) {
+      socket.connect();
+      joinInstitutionalRoom(user.universityId);
+
+      socket.on('certificateIssued', (data) => {
+        console.log('⚡ [SOCKET]: Certificate Issued', data);
+        fetchLocalCerts();
+        fetchStats();
+        toast.info(`New ${data.certificateType} issued successfully.`);
+      });
+
+      socket.on('certificateConfirmed', (data) => {
+        console.log('⚡ [SOCKET]: Certificate Anchored', data);
+        fetchLocalCerts();
+        fetchStats();
+      });
+
+      socket.on('certificateRevoked', (data) => {
+        console.log('⚡ [SOCKET]: Certificate Revoked', data);
+        fetchLocalCerts();
+        fetchStats();
+        toast.warning(`Certificate ${data.certificateId} has been revoked.`);
+      });
+    }
+
+    return () => {
+      if (socket.connected) {
+        socket.disconnect();
+      }
+    };
+  }, [user]);
 
   const fetchUniversityStatus = async () => {
     try {
@@ -202,7 +235,7 @@ function AdminDashboard() {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
             {[
               { icon: Activity, label: 'Total Issued', val: stats.total, color: 'text-blue-400', bg: 'bg-blue-500/10', border: 'border-blue-500/20' },
-              { icon: ShieldCheck, label: 'Confirmed', val: stats.confirmed, color: 'text-emerald-400', bg: 'bg-emerald-500/10', border: 'border-emerald-500/20' },
+              { icon: ShieldCheck, label: 'Confirmed', val: stats.confirmed, color: 'text-blue-400', bg: 'bg-blue-500/10', border: 'border-blue-500/20' },
               { icon: Clock, label: 'Pending', val: stats.pending, color: 'text-amber-400', bg: 'bg-amber-500/10', border: 'border-amber-500/20' },
               { icon: Zap, label: 'Failed', val: stats.failed, color: 'text-rose-400', bg: 'bg-rose-500/10', border: 'border-rose-500/20' },
             ].map((s, i) => (
@@ -295,7 +328,7 @@ function AdminDashboard() {
                               {cert.certificateHash?.slice(0, 14) || '—'}...
                             </span>
                             {copiedId === cert._id
-                              ? <Check size={12} className="text-emerald-500" />
+                              ? <Check size={12} className="text-blue-500" />
                               : <Copy size={12} className="text-slate-700 group-hover/copy:text-blue-400 transition-colors" />
                             }
                           </button>
@@ -335,9 +368,9 @@ function AdminDashboard() {
               {issuedResult ? (
                 /* ── SUCCESS STATE ── */
                 <div className="p-12 space-y-8 text-center relative overflow-hidden">
-                  <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full h-1/2 bg-emerald-500/10 blur-[80px] pointer-events-none" />
+                  <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full h-1/2 bg-blue-500/10 blur-[80px] pointer-events-none" />
                   <div className="space-y-4 relative z-10">
-                    <div className="w-20 h-20 bg-emerald-500/10 rounded-2xl mx-auto flex items-center justify-center text-emerald-400 border border-emerald-500/20 shadow-[0_0_40px_rgba(16,185,129,0.2)]">
+                    <div className="w-20 h-20 bg-blue-500/10 rounded-2xl mx-auto flex items-center justify-center text-blue-400 border border-blue-500/20 shadow-[0_0_40px_rgba(59,130,246,0.2)]">
                       <ShieldCheck size={36} />
                     </div>
                     <h3 className="text-2xl font-bold text-white tracking-tight">Certificate Issued.</h3>
@@ -355,7 +388,7 @@ function AdminDashboard() {
                         onClick={() => copyToClipboard(String(issuedResult.certificateId), 'result')}
                         className="flex-1 flex items-center justify-center gap-2 py-3 bg-[#111111] border border-white/[0.06] rounded-xl text-[10px] font-bold uppercase tracking-widest text-slate-400 hover:text-white hover:border-white/20 transition-all"
                       >
-                        {copiedId === 'result' ? <Check size={14} className="text-emerald-400" /> : <Copy size={14} />}
+                        {copiedId === 'result' ? <Check size={14} className="text-blue-400" /> : <Copy size={14} />}
                         Copy ID
                       </button>
                       <a
@@ -404,13 +437,13 @@ function AdminDashboard() {
                   <div
                     onClick={() => fileInputRef.current.click()}
                     className={`w-full h-36 border border-dashed rounded-[1.5rem] flex flex-col items-center justify-center gap-3 transition-all cursor-pointer group
-                      ${formData.file ? 'border-emerald-500/40 bg-emerald-500/[0.03]' : 'border-white/10 bg-[#111111] hover:border-blue-500/40'}`}
+                      ${formData.file ? 'border-blue-500/40 bg-blue-500/[0.03]' : 'border-white/10 bg-[#111111] hover:border-blue-500/40'}`}
                   >
                     <input type="file" ref={fileInputRef} onChange={(e) => setFormData({ ...formData, file: e.target.files[0] })} className="hidden" accept=".pdf,.jpg,.jpeg,.png" />
                     {formData.file ? (
-                      <div className="flex flex-col items-center gap-2 text-emerald-400">
+                      <div className="flex flex-col items-center gap-2 text-blue-400">
                         <CheckCircle2 size={28} />
-                        <span className="text-[11px] font-bold text-emerald-500">{formData.file.name}</span>
+                        <span className="text-[11px] font-bold text-blue-500">{formData.file.name}</span>
                       </div>
                     ) : (
                       <>

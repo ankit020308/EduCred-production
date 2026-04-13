@@ -8,101 +8,170 @@ dotenv.config();
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+const isProduction = process.env.NODE_ENV === 'production';
+const DEFAULT_RPC_URL = 'http://127.0.0.1:8545';
+const DEFAULT_DEV_PRIVATE_KEY =
+  '0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80';
 
-// ─── Blockchain Configuration ────────────────────────────────────────────────
-// All values are read from environment variables — nothing is hardcoded.
-// If RPC_URL or PRIVATE_KEY are not set, the system operates in SIMULATION MODE:
-//   - storeHashOnChain() returns a mock receipt (hash is stored in DB only)
-//   - verifyHashOnChain() falls back to DB-level hash matching
-// This allows the full app to run without a local Ganache/Hardhat instance.
-const RPC_URL = process.env.RPC_URL;
-const PRIVATE_KEY = process.env.PRIVATE_KEY;
-const CONTRACT_ADDRESS = process.env.CONTRACT_ADDRESS;
+function loadContractMetadata() {
+  const metadataPath = path.join(__dirname, 'EduCred.json');
+  if (!fs.existsSync(metadataPath)) {
+    return null;
+  }
 
-const isBlockchainConfigured = !!(RPC_URL && PRIVATE_KEY && CONTRACT_ADDRESS);
-
-if (!isBlockchainConfigured) {
-  console.warn('⚠️  [BLOCKCHAIN]: RPC_URL / PRIVATE_KEY / CONTRACT_ADDRESS not set.');
-  console.warn('    Running in SIMULATION MODE — hashes stored in DB only.');
-  console.warn('    Set RPC_URL, PRIVATE_KEY, CONTRACT_ADDRESS in .env to enable on-chain anchoring.');
-}
-
-// ─── Live Contract Instance (only created when fully configured) ─────────────
-let eduCredContract = null;
-
-if (isBlockchainConfigured) {
   try {
-    const contractData = JSON.parse(
-      fs.readFileSync(path.join(__dirname, 'EduCred.json'), 'utf-8')
-    );
-    const provider = new ethers.JsonRpcProvider(RPC_URL);
-    const wallet = new ethers.Wallet(PRIVATE_KEY, provider);
-    eduCredContract = new ethers.Contract(CONTRACT_ADDRESS, contractData.abi, wallet);
-    console.log('✅ [BLOCKCHAIN]: Live contract connected at', CONTRACT_ADDRESS);
-  } catch (err) {
-    console.error('❌ [BLOCKCHAIN]: Failed to initialise contract -', err.message);
-    console.warn('    Falling back to SIMULATION MODE.');
+    return JSON.parse(fs.readFileSync(metadataPath, 'utf-8'));
+  } catch (error) {
+    console.error('❌ [BLOCKCHAIN]: Failed to read synced contract metadata -', error.message);
+    return null;
   }
 }
 
-/**
- * Anchors a certificate hash to the blockchain.
- * In SIMULATION MODE (no env vars set), returns a mock receipt so the rest
- * of the issuance pipeline continues uninterrupted.
- *
- * @param {string} certificateHash - SHA-256 hex hash
- * @returns {object} receipt or simulation stub
- */
+const contractMetadata = loadContractMetadata();
+const RPC_URL = process.env.RPC_URL || contractMetadata?.rpcUrl || DEFAULT_RPC_URL;
+const CONTRACT_ADDRESS = process.env.CONTRACT_ADDRESS || contractMetadata?.contractAddress || null;
+const PRIVATE_KEY =
+  process.env.PRIVATE_KEY ||
+  (!isProduction && CONTRACT_ADDRESS ? DEFAULT_DEV_PRIVATE_KEY : null);
+const CONTRACT_ABI = contractMetadata?.abi || null;
+
+let provider = null;
+let wallet = null;
+let eduCredContract = null;
+let runtimeMode = 'SIMULATION';
+
+function normalizeHash(certificateHash) {
+  if (!certificateHash) {
+    throw new Error('Certificate hash is required.');
+  }
+
+  const prefixed = certificateHash.startsWith('0x') ? certificateHash : `0x${certificateHash}`;
+  if (!/^0x[0-9a-fA-F]{64}$/.test(prefixed)) {
+    throw new Error('Certificate hash must be a 32-byte SHA-256 hex string.');
+  }
+
+  return prefixed;
+}
+
+async function initializeContract() {
+  if (!CONTRACT_ADDRESS || !CONTRACT_ABI || !PRIVATE_KEY || !RPC_URL) {
+    console.warn('⚠️  [BLOCKCHAIN]: Missing config. Running in SIMULATION mode.');
+    return;
+  }
+
+  const tempProvider = new ethers.JsonRpcProvider(RPC_URL);
+
+  try {
+    // Race the connection check against a 3s timeout.
+    // If Ganache isn't running, we fail fast and destroy the provider
+    // to stop the ethers v6 internal "retry in 1s" polling loop.
+    await Promise.race([
+      tempProvider.getBlockNumber(),
+      new Promise((_, reject) =>
+        setTimeout(() => reject(new Error('Connection timeout — Ganache not running')), 3000)
+      ),
+    ]);
+
+    wallet = new ethers.Wallet(PRIVATE_KEY, tempProvider);
+    eduCredContract = new ethers.Contract(CONTRACT_ADDRESS, CONTRACT_ABI, wallet);
+    provider = tempProvider;
+    runtimeMode = 'LIVE';
+    console.log('✅ [BLOCKCHAIN]: Live contract connected at', CONTRACT_ADDRESS);
+  } catch (error) {
+    // CRITICAL: destroy() stops the internal ethers polling loop
+    // that would otherwise spam "retry in 1s" to the console forever.
+    try { tempProvider.destroy(); } catch {}
+    provider = null;
+    wallet = null;
+    eduCredContract = null;
+    runtimeMode = 'SIMULATION';
+    console.warn('⚠️  [BLOCKCHAIN]: Ganache not reachable — running in SIMULATION mode.');
+    console.warn('    To enable LIVE mode: start Ganache on', RPC_URL);
+  }
+}
+
+
+await initializeContract();
+
+export const blockchainMode = runtimeMode;
+
+export function getBlockchainRuntimeInfo() {
+  return {
+    mode: blockchainMode,
+    rpcUrl: RPC_URL,
+    contractAddress: CONTRACT_ADDRESS,
+    chainId: contractMetadata?.chainId || null,
+  };
+}
+
 export async function storeHashOnChain(certificateHash) {
   if (!eduCredContract) {
-    // Simulation mode — hash is already stored in MongoDB
-    console.log(`🔵 [SIMULATION]: Hash anchored (DB-only): ${certificateHash}`);
     return {
-      hash: `0xSIMULATED_${certificateHash.slice(0, 20)}`,
+      hash: `0xSIMULATED_${certificateHash.replace(/^0x/, '').slice(0, 20)}`,
       simulated: true,
     };
   }
 
-  try {
-    console.log(`⛓️  [BLOCKCHAIN]: Anchoring hash: ${certificateHash}`);
-    const hashBytes = certificateHash.startsWith('0x')
-      ? certificateHash
-      : `0x${certificateHash}`;
-    const tx = await eduCredContract.storeHash(hashBytes);
-    const receipt = await tx.wait();
-    console.log(`✅ [BLOCKCHAIN]: Anchored at tx ${receipt.hash}`);
-    return receipt;
-  } catch (error) {
-    console.error('❌ [BLOCKCHAIN]: Store failed -', error.message);
-    throw error;
-  }
+  const hashBytes = normalizeHash(certificateHash);
+  const tx = await eduCredContract.storeHash(hashBytes);
+  return tx.wait();
 }
 
-/**
- * Verifies a certificate hash against the blockchain.
- * In SIMULATION MODE, always returns true (verification falls back to DB).
- * The caller (certificateController) handles the DB-level re-check.
- *
- * @param {string} certificateHash - SHA-256 hex hash
- * @returns {Promise<boolean>}
- */
+export async function issueCertificateOnChain(certificateId, certificateHash, certType = 0) {
+  if (!eduCredContract) {
+    return {
+      hash: `0xSIMULATED_${certificateHash.replace(/^0x/, '').slice(0, 20)}`,
+      simulated: true,
+      certificateId,
+    };
+  }
+
+  const hashBytes = normalizeHash(certificateHash);
+  const tx = typeof eduCredContract.storeCertificate === 'function'
+    ? await eduCredContract.storeCertificate(hashBytes, certType)
+    : await eduCredContract.storeHash(hashBytes);
+  return tx.wait();
+}
+
 export async function verifyHashOnChain(certificateHash) {
   if (!eduCredContract) {
-    // In simulation mode, signal to caller that blockchain is unavailable
-    // so it can fall back to DB-only verification
-    return null; // null = "not checked on-chain" — distinct from false = "not found"
+    return null;
   }
 
   try {
-    const hashBytes = certificateHash.startsWith('0x')
-      ? certificateHash
-      : `0x${certificateHash}`;
-    const isValid = await eduCredContract.verifyHash(hashBytes);
-    return isValid;
+    return await eduCredContract.verifyHash(normalizeHash(certificateHash));
   } catch (error) {
     console.error('❌ [BLOCKCHAIN]: Verify failed -', error.message);
-    return null; // treat as unavailable, not as invalid
+    return null;
   }
 }
 
-export const blockchainMode = isBlockchainConfigured ? 'LIVE' : 'SIMULATION';
+export async function verifyHashDetailsOnChain(certificateHash) {
+  if (!eduCredContract || typeof eduCredContract.verifyHashFull !== 'function') {
+    return null;
+  }
+
+  try {
+    const [exists, revoked, issuer, timestamp] = await eduCredContract.verifyHashFull(
+      normalizeHash(certificateHash)
+    );
+    return {
+      exists,
+      revoked,
+      issuer,
+      timestamp: Number(timestamp),
+    };
+  } catch (error) {
+    console.error('❌ [BLOCKCHAIN]: Full verification failed -', error.message);
+    return null;
+  }
+}
+
+export async function revokeHashOnChain(certificateHash, reasonCode = 0) {
+  if (!eduCredContract || typeof eduCredContract.revokeHash !== 'function') {
+    return null;
+  }
+
+  const tx = await eduCredContract.revokeHash(normalizeHash(certificateHash), reasonCode);
+  return tx.wait();
+}

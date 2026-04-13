@@ -6,13 +6,13 @@ import {
   rejectUniversity 
 } from '../controllers/universityController.js';
 import { protect, requireRole } from '../middleware/authMiddleware.js';
+import University from '../models/University.js';
 
 const router = express.Router();
 
 /**
  * Public Route: List all Approved Universities (for verification portal)
  */
-import University from '../models/University.js';
 router.get('/public', async (req, res) => {
   try {
     const universities = await University.find({ status: 'APPROVED' }, 'name _id');
@@ -23,11 +23,11 @@ router.get('/public', async (req, res) => {
 });
 
 /**
- * Admin Routes: Manage applications (Requires Admin role)
+ * Admin Routes: Manage applications
  */
-router.get('/pending', protect, requireRole('admin'), getPendingUniversities);
-router.get('/all', protect, requireRole('admin'), getAllUniversities);
-router.post('/approve/:id', protect, requireRole('admin'), approveUniversity);
-router.post('/reject/:id', protect, requireRole('admin'), rejectUniversity);
+router.get('/pending', protect, requireRole('admin', 'super_admin', 'SUPER_ADMIN'), getPendingUniversities);
+router.get('/all', protect, requireRole('admin', 'super_admin', 'SUPER_ADMIN'), getAllUniversities);
+router.post('/approve/:id', protect, requireRole('admin', 'super_admin', 'SUPER_ADMIN'), approveUniversity);
+router.post('/reject/:id', protect, requireRole('admin', 'super_admin', 'SUPER_ADMIN'), rejectUniversity);
 
 export default router;

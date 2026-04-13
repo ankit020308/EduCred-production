@@ -19,7 +19,7 @@ const UserSchema = new mongoose.Schema({
   },
   role: {
     type: String,
-    enum: ['student', 'university', 'admin', 'super_admin', 'verifier', 'pending'],
+    enum: ['student', 'university', 'admin', 'super_admin', 'verifier', 'pending', 'STUDENT', 'UNIVERSITY', 'SUPER_ADMIN'],
     default: 'pending'
   },
   universityName: {
@@ -72,6 +72,24 @@ const UserSchema = new mongoose.Schema({
   isGoogleUser: {
     type: Boolean,
     default: false,
+  },
+  provider: {
+    type: String,
+    enum: ['local', 'google'],
+    default: 'local',
+  },
+  displayName: {
+    type: String,
+  },
+  profilePhoto: {
+    type: String,
+  },
+  linkedUniversityId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'University',
+  },
+  lastLoginAt: {
+    type: Date,
   },
   loginAttempts: {
     type: Number,

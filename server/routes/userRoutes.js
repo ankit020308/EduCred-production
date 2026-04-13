@@ -20,24 +20,48 @@ router.get('/profile', protect, async (req, res) => {
             .substring(0, 6)
             .toUpperCase()}`;
 
-        res.json({ ...user._doc, profileId });
+        const userObj = user.toObject();
+        // Strip sensitive fields before sending
+        delete userObj.passwordHash;
+        delete userObj.otp;
+        delete userObj.otpExpires;
+
+        res.json({ ...userObj, profileId });
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
 });
 
-// ─── UPDATE Profile (PROTECTED) ───────────────────────
+// ─── UPDATE Profile (PROTECTED) ─────────────────────
 router.put('/profile', protect, async (req, res) => {
     try {
         const { name, phoneNumber, bio, avatar } = req.body;
 
+        // Build update object — only include fields that were explicitly provided
+        const updates = {};
+        if (name !== undefined) updates.name = String(name).trim().slice(0, 100);
+        if (phoneNumber !== undefined) updates.phoneNumber = String(phoneNumber).trim().slice(0, 20);
+        if (bio !== undefined) updates.bio = String(bio).trim().slice(0, 500);
+        if (avatar !== undefined) updates.avatar = String(avatar).trim().slice(0, 1024);
+
+        if (Object.keys(updates).length === 0) {
+            return res.status(400).json({ error: 'No valid fields provided to update.' });
+        }
+
         const user = await User.findByIdAndUpdate(
             req.user.id,
-            { name, phoneNumber, bio, avatar },
-            { new: true }
+            { $set: updates },
+            { new: true, runValidators: true }
         );
 
-        res.json(user);
+        if (!user) return res.status(404).json({ error: 'User not found.' });
+
+        const userObj = user.toObject();
+        delete userObj.passwordHash;
+        delete userObj.otp;
+        delete userObj.otpExpires;
+
+        res.json(userObj);
     } catch (err) {
         res.status(500).json({ error: err.message });
     }

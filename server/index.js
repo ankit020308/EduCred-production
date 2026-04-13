@@ -1,6 +1,8 @@
 import express from 'express';
 import mongoose from 'mongoose';
 import cors from 'cors';
+import { Server } from 'socket.io';
+import http from 'http';
 import helmet from 'helmet';
 import dotenv from 'dotenv';
 import path from 'path';
@@ -16,18 +18,69 @@ import certificateRoutes from './routes/certificateRoutes.js';
 import authRoutes from './routes/authRoutes.js';
 import universityRoutes from './routes/universityRoutes.js';
 import userRoutes from './routes/userRoutes.js';
+import studentRoutes from './routes/studentRoutes.js';
 import systemRoutes from './routes/systemRoutes.js'; // Added your new system routes
+import adminRoutes from './routes/adminRoutes.js';
+import requestRoutes from './routes/requestRoutes.js';
+import ledgerRoutes from './routes/ledgerRoutes.js';
 import connectDB from './config/db.js';
+import passport from 'passport';
+import { configurePassport } from './config/passport.js';
+import session from 'express-session';
 
 import User from './models/User.js';
 import University from './models/University.js';
+import { getAllowedOrigins, isProduction, sessionSecret, validateServerEnv, requireEnv } from './utils/runtimeConfig.js';
 
 dotenv.config();
+validateServerEnv();
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const app = express();
+const httpServer = http.createServer(app);
+const allowedOrigins = getAllowedOrigins();
+const io = new Server(httpServer, {
+  cors: {
+    origin: allowedOrigins,
+    methods: ['GET', 'POST']
+  }
+});
+app.set('io', io); // make io accessible in controllers via req.app.get('io')
+
+io.on('connection', (socket) => {
+  if (!isProduction) console.log(`🔌 Socket connected: ${socket.id}`);
+
+  socket.on('join_institutional_room', (universityId) => {
+    socket.join(`university_${universityId}`);
+  });
+
+  socket.on('leave_institutional_room', (universityId) => {
+    socket.leave(`university_${universityId}`);
+  });
+
+  socket.on('join_user_room', (userId) => {
+    socket.join(`user_${userId}`);
+  });
+
+  socket.on('leave_user_room', (userId) => {
+    socket.leave(`user_${userId}`);
+  });
+
+  socket.on('join_admin_room', () => {
+    socket.join('admin_room');
+  });
+
+  socket.on('leave_admin_room', () => {
+    socket.leave('admin_room');
+  });
+
+  socket.on('disconnect', () => {
+    if (!isProduction) console.log(`🔌 Socket disconnected: ${socket.id}`);
+  });
+});
+
 const PORT = process.env.PORT || 5001;
 
 // ─── CLOUD PROXY CONFIGURATION ────────────────────────
@@ -40,12 +93,12 @@ app.use(helmet({
   contentSecurityPolicy: {
     directives: {
       defaultSrc: ["'self'"],
-      scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'", "https://accounts.google.com"],
+      scriptSrc: ["'self'", "'unsafe-inline'", ...(isProduction ? [] : ["'unsafe-eval'"]), "https://accounts.google.com"],
       frameSrc: ["'self'", "https://accounts.google.com"],
       styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com", "https://accounts.google.com"],
-      imgSrc: ["'self'", "data:", "https://res.cloudinary.com"],
+      imgSrc: ["'self'", "data:", "https://res.cloudinary.com", "blob:"],
       fontSrc: ["'self'", "https://fonts.gstatic.com"],
-      connectSrc: ["'self'", "http://localhost:5001", "https://accounts.google.com"],
+      connectSrc: ["'self'", ...allowedOrigins, "http://localhost:5001", "http://127.0.0.1:8545", "https://accounts.google.com"],
     },
   },
 }));
@@ -54,9 +107,7 @@ app.use(morgan('dev')); // HTTP request logging
 
 // ─── STRICT CORS PROTOCOL ────────────────────────────
 const corsOptions = {
-  origin: process.env.NODE_ENV === 'production' 
-    ? process.env.CLIENT_URL 
-    : ['http://localhost:3000', 'http://localhost:3001', 'http://localhost:5173'],
+  origin: allowedOrigins,
   methods: ['GET', 'POST', 'PUT', 'DELETE'],
   credentials: true
 };
@@ -73,15 +124,37 @@ const apiLimiter = rateLimit({
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
-app.use('/uploads', express.static('uploads')); // Serve uploaded files locally
+
+app.use(session({
+  secret: sessionSecret,
+  resave: false,
+  saveUninitialized: false,
+  cookie: {
+    httpOnly: true,
+    sameSite: isProduction ? 'none' : 'lax',
+    secure: isProduction,
+  },
+}));
+app.use(passport.initialize());
+app.use(passport.session());
+configurePassport();
+
+if (!isProduction) {
+  app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
+}
 
 // ─── Routes ───────────────────────────────────────────
 app.use('/api', apiLimiter); // Apply rate limiter to all /api routes
+app.use('/auth', authRoutes); // OAuth top-level callback support
 app.use('/api/auth', authRoutes);
 app.use('/api/certificates', certificateRoutes);
 app.use('/api/universities', universityRoutes);
 app.use('/api/user', userRoutes);
+app.use('/api/student', studentRoutes);
 app.use('/api/system', systemRoutes); // Mount system stats endpoint
+app.use('/api/admin', adminRoutes);
+app.use('/api/requests', requestRoutes);
+app.use('/api/ledger', ledgerRoutes);
 
 // ─── Health Check ─────────────────────────────────────
 app.get('/api/health', (req, res) => {
@@ -95,21 +168,24 @@ app.get('/api/health', (req, res) => {
 
 // ─── GLOBAL ERROR HANDLER ─────────────────────────────
 app.use((err, req, res, next) => {
-  const isProd = process.env.NODE_ENV === 'production';
-  
   // LOG: Internal monitoring (do not expose to client)
-  console.error(`[❌ PROTOCOL_ERROR] ${err.message}${!isProd ? `\n${err.stack}` : ''}`);
+  console.error(`[❌ PROTOCOL_ERROR] ${err.message}${!isProduction ? `\n${err.stack}` : ''}`);
 
   res.status(err.status || 500).json({
     success: false,
-    message: isProd ? 'Internal Server Error' : err.message,
-    ...(isProd ? {} : { stack: err.stack })
+    message: isProduction ? 'Internal Server Error' : err.message,
+    ...(isProduction ? {} : { stack: err.stack })
   });
 });
 
 // ─── Static Frontend Serving (Production) ─────────────
 const distPath = path.join(__dirname, '../client/dist');
 app.use(express.static(distPath));
+
+// ─── API 404 (Must be before SPA fallback) ──────────
+app.use('/api', (req, res) => {
+  res.status(404).json({ error: `API route not found: ${req.method} ${req.originalUrl}` });
+});
 
 // ─── SPA Fallback (MUST BE LAST ROUTE) ────────────────
 app.get(/.*/, (req, res) => {
@@ -119,8 +195,13 @@ app.get(/.*/, (req, res) => {
 // ─── Seed Data (System Authorization) ────────────────
 async function seedSystem() {
   try {
-    const adminEmail = process.env.ADMIN_EMAIL || 'admin@educred.com';
-    const adminPassword = process.env.ADMIN_PASSWORD || 'admin123';
+    const adminEmail = requireEnv('ADMIN_EMAIL');
+    const adminPassword = requireEnv('ADMIN_PASSWORD');
+    const shouldSeedAdmin = process.env.SEED_DEFAULT_ADMIN === 'true';
+
+    if (!shouldSeedAdmin) {
+      return;
+    }
 
     const adminExists = await User.findOne({ email: adminEmail });
     if (adminExists) {
@@ -133,7 +214,8 @@ async function seedSystem() {
       name: 'System Controller',
       email: adminEmail,
       passwordHash: adminPassword, // Let pre-save hook hash it
-      role: 'admin'
+      role: 'admin',
+      isEmailVerified: true
     });
     console.log(`✅ ROOT AUTHORITY: Global Admin established (${adminEmail})`);
   } catch (error) {
@@ -147,10 +229,11 @@ let server;
 connectDB()
   .then(async () => {
     await seedSystem();
-    server = app.listen(PORT, '0.0.0.0', () => {
+    server = httpServer.listen(PORT, '0.0.0.0', () => {
       console.log(`\n🚀 EduCred Node Active`);
       console.log(`📡 Local:   http://localhost:${PORT}`);
-      console.log(`🌐 Network: http://0.0.0.0:${PORT}\n`);
+      console.log(`🌐 Network: http://0.0.0.0:${PORT}`);
+      console.log(`⚡ Socket.io enabled\n`);
     });
   })
   .catch(err => {

@@ -1,32 +1,34 @@
 import mongoose from 'mongoose';
 import dotenv from 'dotenv';
+import { requireEnv } from '../utils/runtimeConfig.js';
 
 dotenv.config();
 
 /**
- * 🗄️ PRODUCTION DATA LAYER: MongoDB Atlas Connectivity
- * Engineered for high-concurrency certificate registry operations.
- * Enforces strict URI requirements and connection pooling.
+ * 🗄️ DATABASE CONNECTIVITY LAYER
+ *
+ * Modes:
+ *  1. LIVE  — MONGO_URI points to localhost / Atlas → production-grade persistent store.
+ *  2. DEV   — MONGO_URI is absent or set to "memory" in non-production →
+ *             mongodb-memory-server spins up an ephemeral instance so the stack
+ *             runs without a local MongoDB install.
+ *
+ * ⚠️  DEV mode data is wiped on every restart. Never use in production.
  */
 const connectDB = async () => {
-    const MONGO_URI = process.env.MONGO_URI;
-
-    if (!MONGO_URI) {
-        console.error("❌ [FATAL]: MONGO_URI environment variable is missing. Node initialization aborted.");
-        process.exit(1);
-    }
+    const RAW_URI = requireEnv('MONGO_URI');
 
     const connectionOptions = {
-        maxPoolSize: 10,             // Efficient connection pooling for distributed queries
-        serverSelectionTimeoutMS: 5000, // Fail fast if Atlas is unreachable
-        socketTimeoutMS: 45000,      // Pre-emptively close hanging sockets
-        family: 4                    // Use IPv4 if available
+        maxPoolSize: 10,
+        serverSelectionTimeoutMS: 5000,
+        socketTimeoutMS: 45000,
+        family: 4,
     };
 
     mongoose.set('strictQuery', true);
 
     try {
-        const conn = await mongoose.connect(MONGO_URI, connectionOptions);
+        const conn = await mongoose.connect(RAW_URI, connectionOptions);
         console.log(`✅ [LEDGER_NODE]: Connected to ${conn.connection.host}`);
     } catch (err) {
         console.error(`❌ [LEDGER_FAIL]: ${err.message}`);

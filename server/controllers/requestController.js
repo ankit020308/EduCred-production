@@ -3,9 +3,10 @@ import Ledger from '../models/Ledger.js';
 import Certificate from '../models/Certificate.js';
 import Student from '../models/Student.js';
 import University from '../models/University.js';
+import User from '../models/User.js';
 import { issueCertificateOnChain } from '../utils/blockchain.js';
 import { logAudit } from '../utils/logger.js';
-import crypto from 'crypto';
+import { generateHash } from '../utils/hashing.js';
 
 export const createRequest = async (req, res) => {
   try {
@@ -26,8 +27,6 @@ export const createRequest = async (req, res) => {
       universityId,
       transcriptData
     });
-
-    const university = await University.findById(universityId);
 
     // Standardized log
     await logAudit(req, 'CERTIFICATE_REQUEST', 'SUCCESS', `Transcript request initiated for ${student.name}.`, { 
@@ -80,8 +79,9 @@ export const approveRequest = async (req, res) => {
 
     const student = request.studentId;
     const university = request.universityId;
+    const studentUser = await User.findById(student.userId).select('email');
 
-    // 1. Generate hash
+    // 1. Generate a deterministic transcript hash
     const payloadForHash = {
       studentName: student.name,
       regNo: student.regNo,
@@ -89,24 +89,31 @@ export const approveRequest = async (req, res) => {
       degreeName: student.degree,
       transcriptData: request.transcriptData
     };
-    const hashPayload = JSON.stringify(payloadForHash, Object.keys(payloadForHash).sort());
-    const certificateHash = crypto.createHash('sha256').update(hashPayload).digest('hex');
+    const certificateHash = generateHash(payloadForHash);
 
-    // 2. Create Certificate
+    // 2. Create certificate record aligned with the live schema
     const newCert = await Certificate.create({
       studentName: student.name,
-      regNo: student.regNo,
-      universityName: university.name,
-      degreeName: student.degree,
-      graduationYear: 2024,
+      studentEmail: studentUser?.email || student.email || `${student._id}@educred.local`,
+      studentPhone: student.phone || '0000000000',
+      course: student.degree || 'Academic Transcript',
+      issuer: university.name,
+      fileUrl: `/api/requests/${request._id}`,
       studentId: student._id,
       universityId: university._id,
-      transcriptData: request.transcriptData,
-      hashPayload,
       certificateHash,
+      certificateId: `REQ-${new Date().getFullYear()}-${request._id.toString().slice(-6).toUpperCase()}`,
+      certificateType: 'Consolidated Marks Sheet',
+      metadata: {
+        requestId: request._id,
+        regNo: student.regNo,
+        branch: student.branch,
+        transcriptData: request.transcriptData,
+      },
       status: 'PENDING',
       issuedBy: req.user._id,
-      activityLog: [{ action: 'Approved and Hash generated' }]
+      workflowStatus: 'STAGE2',
+      workflowLog: [{ stage: 'Request approved and transcript hashed', actorId: req.user._id, actorName: req.user.name, timestamp: new Date() }]
     });
 
     // Standardized log
@@ -119,9 +126,20 @@ export const approveRequest = async (req, res) => {
     try {
       const receipt = await issueCertificateOnChain(newCert._id.toString(), certificateHash);
       
-      newCert.transactionHash = receipt.hash;
-      newCert.status = 'MINED';
+      newCert.blockchainTxHash = receipt.hash;
+      newCert.status = 'CONFIRMED';
+      newCert.workflowStatus = 'ISSUED';
       await newCert.save();
+
+      await Ledger.create({
+        type: 'APPROVE',
+        studentName: student.name,
+        universityName: university.name,
+        certificateId: newCert._id,
+        txHash: receipt.hash,
+        status: 'SUCCESS',
+        metadata: { requestId: request._id }
+      });
 
       // Standardized log
       await logAudit(req, 'CERTIFICATE_ISSUE', 'SUCCESS', `Credential successfully anchored for ${student.name}.`, { 
@@ -129,10 +147,19 @@ export const approveRequest = async (req, res) => {
         txHash: receipt.hash
       });
 
-      res.json({ message: 'Request approved and certificated minted', certificate: newCert });
+      res.json({ message: 'Request approved and certificate anchored', certificate: newCert });
     } catch (bcError) {
       console.error(bcError);
-      res.status(500).json({ error: 'Failed to mine to blockchain, but approved internally.', certificate: newCert });
+      await Ledger.create({
+        type: 'APPROVE',
+        studentName: student.name,
+        universityName: university.name,
+        certificateId: newCert._id,
+        status: 'FAILED',
+        metadata: { requestId: request._id, error: bcError.message }
+      });
+
+      res.status(500).json({ error: 'Failed to anchor the certificate on blockchain.', certificate: newCert });
     }
 
   } catch (err) {
@@ -152,6 +179,14 @@ export const rejectRequest = async (req, res) => {
 
     await logAudit(req, 'CERTIFICATE_REJECT', 'SUCCESS', `Credential request rejected for ${request.studentId.name}.`, { 
       requestId: request._id 
+    });
+
+    await Ledger.create({
+      type: 'REJECT',
+      studentName: request.studentId.name,
+      universityName: request.universityId.name,
+      status: 'SUCCESS',
+      metadata: { requestId: request._id }
     });
 
     res.json({ message: 'Request rejected' });

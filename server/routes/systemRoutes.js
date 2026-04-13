@@ -1,5 +1,5 @@
 import express from 'express';
-import { getSystemStats, getNetworkMap, getTickerData } from '../controllers/systemController.js';
+import { getSystemStats, getNetworkMap, getTickerData, getUniversitiesGeo } from '../controllers/systemController.js';
 
 const router = express.Router();
 
@@ -20,5 +20,11 @@ router.get('/map', getNetworkMap);
  * @route GET /ticker
  */
 router.get('/ticker', getTickerData);
+
+/**
+ * @desc Get universities geolocation data
+ * @route GET /universities_geo
+ */
+router.get('/universities_geo', getUniversitiesGeo);
 
 export default router;

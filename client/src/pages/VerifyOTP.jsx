@@ -72,13 +72,18 @@ export default function VerifyOTP() {
 
   const handleResend = async () => {
     if (cooldown > 0) return;
-    setCooldown(60);
     setError('');
     try {
       await resendOTP(email);
-      console.log(`Resending transmission to ${email}...`);
+      setCooldown(60);
     } catch (err) {
-      setError('Failed to resend transmission.');
+      const msg = typeof err === 'string' ? err : err?.response?.data?.error || 'Failed to resend. Try again.';
+      // If server says cooldown is still active, parse wait time
+      const match = msg.match(/(\d+)s/);
+      if (match) {
+        setCooldown(parseInt(match[1], 10));
+      }
+      setError(msg);
     }
   };
 
@@ -86,7 +91,7 @@ export default function VerifyOTP() {
     e?.preventDefault();
     const code = otp.join('');
     if (code.length < 6) {
-      setError('Incomplete cryptographic signature.');
+      setError('Please enter all 6 digits.');
       return;
     }
 
@@ -94,17 +99,20 @@ export default function VerifyOTP() {
     setError('');
 
     try {
-      // Security Theater Delay
-      await new Promise(res => setTimeout(res, 1200));
-      
-      // Call Context Method
-      await verifyOTP(email, code); 
-      
+      await verifyOTP(email, code);
       navigate('/dashboard');
     } catch (err) {
-      setError(typeof err === 'string' ? err : err.response?.data?.message || 'Verification failed. Signature rejected.');
+      const errorMsg = typeof err === 'string' ? err : err?.response?.data?.error || 'Verification failed. Please try again.';
+      setError(errorMsg);
+
+      // If OTP expired, unlock resend immediately (per KI spec)
+      if (errorMsg.toLowerCase().includes('expire') || errorMsg.toLowerCase().includes('expired')) {
+        setCooldown(0);
+        setError(`${errorMsg} — Request a new code below.`);
+      }
+
       setOtp(new Array(6).fill(''));
-      inputRefs.current[0].focus();
+      inputRefs.current[0]?.focus();
     } finally {
       setLoading(false);
     }

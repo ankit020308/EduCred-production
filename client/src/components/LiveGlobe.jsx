@@ -1,4 +1,4 @@
-import React, { useMemo } from "react";
+import React from "react";
 import {
   ComposableMap,
   Geographies,
@@ -55,7 +55,7 @@ export default function LiveGlobe() {
           }
         </Geographies>
 
-        {markers.map(({ name, coordinates, markerOffset }) => (
+        {markers.map(({ name, coordinates }) => (
           <Marker key={name} coordinates={coordinates}>
             <motion.circle
               initial={{ r: 0, opacity: 0 }}

@@ -2,6 +2,7 @@ import React, { Suspense, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Canvas } from '@react-three/fiber';
 import { Float, Sphere, MeshDistortMaterial, GradientTexture } from '@react-three/drei';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import {
   Shield,
@@ -13,6 +14,7 @@ import {
   BookOpen,
   LogOut,
   Clock,
+  Search,
   User as UserIcon,
   ChevronRight,
   Hexagon,
@@ -89,11 +91,18 @@ const SidebarItem = ({ icon: Icon, label, active = false, onClick, count }) => (
       </motion.div>
     )}
   </motion.button>
-);// ──────────────────────────────────────────────────────────────────────────
+);
+// ──────────────────────────────────────────────────────────────────────────
 // 🚀 MAIN DASHBOARD LAYOUT: THE ARCHITECTURAL SHELL
 // ──────────────────────────────────────────────────────────────────────────
 export default function DashboardLayout({ children, currentTab, setTab, pendingCount = 0 }) {
   const { user, logout } = useAuth();
+  const navigate = useNavigate();
+
+  const handleLogout = () => {
+    logout();
+    navigate('/');
+  };
 
   // 🛡️ ROLE-BASED ACCESS CONTROL (RBAC)
   const isAdmin = user?.role === 'university';
@@ -217,7 +226,7 @@ export default function DashboardLayout({ children, currentTab, setTab, pendingC
         {/* ── SECTION: TERMINATE SESSION ── */}
         <div className="relative z-10 pt-4 border-t border-white/[0.04]">
           <button
-            onClick={logout}
+            onClick={handleLogout}
             className="w-full flex items-center gap-4 px-6 py-4 rounded-2xl text-slate-500 hover:text-rose-500 hover:bg-rose-500/5 transition-all duration-500 group border border-transparent hover:border-rose-500/20 shadow-none hover:shadow-[0_0_30px_rgba(244,63,94,0.1)]"
           >
             <LogOut size={20} className="group-hover:-translate-x-1 transition-transform duration-500" />

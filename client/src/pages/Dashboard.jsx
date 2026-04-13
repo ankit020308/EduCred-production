@@ -72,8 +72,8 @@ export default function DashboardLayout({ children, currentTab, setTab, pendingC
         <div className="p-6 border-t border-white/[0.04] bg-[#050505]/50">
           <div className="flex items-center gap-4 px-5 py-4 rounded-2xl bg-[#111111] border border-white/[0.04] shadow-inner">
             <div className="relative flex items-center justify-center">
-              <div className="absolute w-3 h-3 bg-emerald-500/20 rounded-full animate-ping" />
-              <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full" />
+              <div className="absolute w-3 h-3 bg-blue-500/20 rounded-full animate-ping" />
+              <div className="w-1.5 h-1.5 bg-blue-500 rounded-full" />
             </div>
             <div className="flex flex-col text-left">
               <span className="text-[8px] font-bold text-slate-500 uppercase tracking-[0.4em] mb-0.5">Network Sync</span>

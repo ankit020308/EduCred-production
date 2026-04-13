@@ -4,10 +4,10 @@ const CONFIG = {
   CONFIRMED: {
     label: 'Confirmed',
     icon: ShieldCheck,
-    color: 'text-emerald-400',
-    bg: 'bg-emerald-500/10',
-    border: 'border-emerald-500/20',
-    dot: 'bg-emerald-500',
+    color: 'text-blue-400',
+    bg: 'bg-blue-500/10',
+    border: 'border-blue-500/20',
+    dot: 'bg-blue-500',
   },
   PENDING: {
     label: 'Pending',
@@ -28,10 +28,10 @@ const CONFIG = {
   APPROVED: {
     label: 'Approved',
     icon: CheckCircle2,
-    color: 'text-emerald-400',
-    bg: 'bg-emerald-500/10',
-    border: 'border-emerald-500/20',
-    dot: 'bg-emerald-500',
+    color: 'text-cyan-400',
+    bg: 'bg-cyan-500/10',
+    border: 'border-cyan-500/20',
+    dot: 'bg-cyan-500',
   },
   REJECTED: {
     label: 'Rejected',

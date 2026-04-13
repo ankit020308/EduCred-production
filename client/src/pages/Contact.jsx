@@ -76,8 +76,8 @@ export default function Contact() {
                     exit={{ opacity: 0, scale: 0.95 }}
                     className="h-full flex flex-col items-center justify-center text-center space-y-8 py-20 relative z-10"
                   >
-                    <div className="w-24 h-24 bg-emerald-500/10 rounded-2xl flex items-center justify-center border border-emerald-500/20 shadow-[0_0_40px_rgba(16,185,129,0.2)]">
-                      <ShieldCheck size={48} className="text-emerald-500" />
+                    <div className="w-24 h-24 bg-blue-500/10 rounded-2xl flex items-center justify-center border border-blue-500/20 shadow-[0_0_40px_rgba(59,130,246,0.2)]">
+                      <ShieldCheck size={48} className="text-blue-500" />
                     </div>
                     <div className="space-y-4">
                       <h2 className="text-3xl font-extrabold text-white tracking-tight uppercase">Transmission Anchored.</h2>
@@ -153,7 +153,7 @@ export default function Contact() {
               <div className="space-y-8">
                 {[
                   { label: "COMM-CHANNEL", val: "SUPPORT@EDUCRED.COM", color: "bg-blue-500" },
-                  { label: "MAINNET NODE", val: "GLOBAL PROTOCOL 01", color: "bg-emerald-500" }
+                  { label: "MAINNET NODE", val: "GLOBAL PROTOCOL 01", color: "bg-blue-500" }
                 ].map((item, i) => (
                   <div key={i} className="space-y-3 pl-6 border-l border-white/[0.06] hover:border-blue-500/50 transition-colors">
                     <div className="flex items-center gap-3">

@@ -4,12 +4,16 @@
   "description": "Unified Identity Node Controller",
   "main": "index.js",
   "scripts": {
-    "blockchain": "cd blockchain && npx hardhat node",
+    "dev": "node start.js",
+    "blockchain": "cd blockchain && npm run node",
+    "compile:contracts": "cd blockchain && npm run compile",
+    "deploy:contracts": "cd blockchain && npm run deploy",
     "server": "cd server && npm start",
+    "client": "cd client && npm run dev",
     "build": "npm run build:client && npm run build:server",
     "build:client": "cd client && npm install && npm run build",
     "build:server": "cd server && npm install",
-    "start": "concurrently \"npm run blockchain\" \"npm run server\"",
+    "start": "concurrently \"npm run blockchain\" \"npm run server\" \"npm run client\"",
     "install:all": "npm install && cd server && npm install && cd ../client && npm install && cd ../blockchain && npm install"
   },
   "dependencies": {

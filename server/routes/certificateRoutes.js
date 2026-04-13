@@ -3,7 +3,13 @@ import {
     issueCertificate, 
     verifyCertificate, 
     getCertificates, 
-    getStats 
+    getStats,
+    batchIssue,
+    revokeCertificate,
+    confirmIssuance,
+    verifyByEnrollment,
+    getCertificateById,
+    downloadCertificateFile
 } from '../controllers/certificateController.js';
 import { protect, requireRole } from '../middleware/authMiddleware.js';
 import { upload } from '../middleware/uploadMiddleware.js';
@@ -12,20 +18,28 @@ const router = express.Router();
 
 /**
  * 🔐 Institutional Issuance Protocol (University Only)
- * Enforces identity-node-protection and cloud storage anchoring.
  */
-router.get('/', protect, requireRole('university'), getCertificates);
-router.get('/stats', protect, requireRole('university'), getStats);
+router.get('/', protect, requireRole('university', 'UNIVERSITY'), getCertificates);
+router.get('/stats', protect, requireRole('university', 'UNIVERSITY'), getStats);
 
-router.post('/issue', protect, requireRole('university'), upload.single('file'), (req, res, next) => {
-    // Audit-logged issuance logic follows in controller
-    next();
-}, issueCertificate);
+router.post('/issue', protect, requireRole('university', 'UNIVERSITY'), upload.single('file'), issueCertificate);
+router.post('/confirm-issuance', protect, requireRole('university', 'UNIVERSITY'), confirmIssuance);
+router.post('/batch', protect, requireRole('university', 'UNIVERSITY'), upload.single('file'), batchIssue);
+router.post('/revoke', protect, requireRole('university', 'UNIVERSITY'), revokeCertificate);
+router.get('/:id/file', protect, downloadCertificateFile);
 
 /**
  * 🛡️ Public Verification Portal
- * Verifies authenticity against the decentralized ledger.
+ * Keep /verify for existing frontend backward compatibility
  */
 router.post('/verify', upload.single('file'), verifyCertificate);
+router.post('/verify/upload', upload.single('file'), verifyCertificate);
+router.post('/verify/id', verifyCertificate);
+router.post('/verify/enrollment', verifyByEnrollment);
+
+/**
+ * 🎓 Public Certificate Lookup (for student sharing link)
+ */
+router.get('/:id', getCertificateById);
 
 export default router;

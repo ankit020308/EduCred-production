@@ -1,11 +1,10 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   ShieldCheck, Mail, Lock, Loader2, ArrowRight,
   Hexagon, Zap, Cpu, Activity, Fingerprint, ChevronLeft, Terminal
 } from 'lucide-react';
-import { GoogleLogin } from '@react-oauth/google';
 import { useAuth } from '../context/AuthContext';
 import BlockchainBackground from '../components/BlockchainBackground';
 
@@ -52,13 +51,14 @@ const SecurityMatrix = () => {
 // 🚀 MAIN LOGIN COMPONENT
 // ──────────────────────────────────────────────────────────────────────────
 export default function Login() {
-  const { login, googleLogin } = useAuth();
+  const { login } = useAuth();
   const navigate = useNavigate();
 
   // State Management
-  const [authStep, setAuthStep] = useState(0); // 0: ID, 1: Password, 2: Verifying
+  const [authStep, setAuthStep] = useState(0); // 0: Email, 1: Password, 2: Verifying
   const [form, setForm] = useState({ email: '', password: '' });
   const [error, setError] = useState('');
+  const [isGoogleRedirecting, setIsGoogleRedirecting] = useState(false);
   const [telemetryLogs, setTelemetryLogs] = useState([
     "INITIALIZING SECURE ENCLAVE...",
     "ESTABLISHING CONNECTION TO MAINNET...",
@@ -93,42 +93,29 @@ export default function Login() {
     addLog("INITIATING CRYPTOGRAPHIC HANDSHAKE...");
 
     try {
-      // Artificial delay for security theater visuals
-      await new Promise(res => setTimeout(res, 1500));
-      addLog("VERIFYING SHA-256 SIGNATURE...");
-
       await login(form.email, form.password);
-
-      addLog("ACCESS GRANTED. ROUTING TO LEDGER...");
-      setTimeout(() => navigate('/dashboard'), 800);
-
+      addLog('ACCESS GRANTED. ROUTING TO LEDGER...');
+      setTimeout(() => navigate('/dashboard'), 500);
     } catch (err) {
-      console.error('Login Failure:', err);
-      if (err.requiresVerification) {
-        addLog("IDENTITY DORMANT. ROUTING TO ACTIVATION...");
-        setTimeout(() => navigate(`/verify-otp?email=${encodeURIComponent(err.email)}`), 800);
+      if (err?.requiresVerification) {
+        addLog('IDENTITY DORMANT. ROUTING TO ACTIVATION...');
+        setTimeout(() => navigate(`/verify-otp?email=${encodeURIComponent(err.email)}`), 500);
         return;
       }
-      setError(err.response?.data?.error || err.response?.data?.message || err || 'Authentication failed. Invalid parameters.');
-      addLog("CRITICAL: HANDSHAKE FAILED. UNAUTHORIZED.");
-      setAuthStep(1); // Kick back to password step
+      const msg = typeof err === 'string' ? err : err?.response?.data?.error || 'Authentication failed.';
+      setError(msg);
+      addLog('CRITICAL: HANDSHAKE FAILED.');
+      setAuthStep(1);
     }
   };
 
-  const handleGoogleSuccess = async (credentialResponse) => {
-    setAuthStep(2);
-    addLog("INTERCEPTING OAUTH PAYLOAD...");
-    setError('');
-    try {
-      const { isNewUser } = await googleLogin(credentialResponse.credential);
-      addLog("OAUTH VERIFIED. ESTABLISHING SESSION...");
-      if (isNewUser) navigate('/onboarding');
-      else navigate('/dashboard');
-    } catch (err) {
-      setError('Third-party identity verification failed.');
-      addLog("OAUTH REJECTED.");
-      setAuthStep(0);
-    }
+  // ── GOOGLE OAUTH: Full page redirect to backend Passport route ──
+  const handleGoogleRedirect = () => {
+    if (isGoogleRedirecting) return;
+    setIsGoogleRedirecting(true);
+    addLog('ROUTING TO GOOGLE IDENTITY NODE...');
+    // Full page redirect — triggers Passport OAuth flow on backend
+    window.location.href = `${import.meta.env.VITE_API_URL || 'http://localhost:5001'}/api/auth/google`;
   };
 
   return (
@@ -185,7 +172,7 @@ export default function Login() {
 
           {/* Footer Metrics */}
           <div className="relative z-10 flex justify-between items-center text-[10px] font-bold uppercase tracking-widest text-slate-600 border-t border-white/[0.04] pt-6">
-            <span className="flex items-center gap-2"><Activity size={12} className="text-emerald-500" /> Network: Optimal</span>
+            <span className="flex items-center gap-2"><Activity size={12} className="text-blue-500" /> Network: Optimal</span>
             <span>Protocol v2.4.0</span>
             <span className="flex items-center gap-2"><Lock size={12} /> E2E Encryption</span>
           </div>
@@ -250,7 +237,7 @@ export default function Login() {
                       <div className="relative group/input">
                         <Mail className="absolute left-5 top-1/2 -translate-y-1/2 text-slate-600 group-focus-within/input:text-blue-500 transition-colors" size={18} />
                         <input
-                          type="email" required autoFocus
+                          type="email" required autoFocus autoComplete="email"
                           value={form.email} onChange={e => setForm({ ...form, email: e.target.value })}
                           placeholder="EMAIL@UNIVERSITY.EDU"
                           className="w-full bg-[#111111] border border-white/[0.06] rounded-2xl py-4.5 pl-14 pr-6 text-white text-[11px] font-bold tracking-widest outline-none transition-all focus:border-blue-500/50 focus:bg-[#161616] placeholder:text-slate-700 uppercase"
@@ -268,7 +255,7 @@ export default function Login() {
                       <div className="relative group/input">
                         <Lock className="absolute left-5 top-1/2 -translate-y-1/2 text-slate-600 group-focus-within/input:text-blue-500 transition-colors" size={18} />
                         <input
-                          type="password" required autoFocus
+                          type="password" required autoFocus autoComplete="current-password"
                           value={form.password} onChange={e => setForm({ ...form, password: e.target.value })}
                           placeholder="••••••••••••"
                           className="w-full bg-[#111111] border border-white/[0.06] rounded-2xl py-4.5 pl-14 pr-6 text-white text-xs outline-none transition-all focus:border-blue-500/50 focus:bg-[#161616] placeholder:text-slate-700 tracking-wider"
@@ -300,9 +287,9 @@ export default function Login() {
                 </AnimatePresence>
               </div>
 
-              {/* THIRD PARTY BRIDGE (Only show on step 0 if ID is present) */}
+              {/* GOOGLE IDENTITY BRIDGE (Passport redirect flow) */}
               <AnimatePresence>
-                {authStep === 0 && import.meta.env.VITE_GOOGLE_CLIENT_ID && (
+                {authStep === 0 && (
                   <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="mt-8">
                     <div className="relative my-8">
                       <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-white/[0.06]"></div></div>
@@ -311,13 +298,31 @@ export default function Login() {
                       </div>
                     </div>
 
-                    <div className="w-full flex justify-center">
-                      <GoogleLogin
-                        onSuccess={handleGoogleSuccess}
-                        onError={() => { setError('Google identity verification failed.'); setAuthStep(0); }}
-                        theme="outline" shape="rectangular" width="360" logo_alignment="center" text="continue_with"
-                      />
-                    </div>
+                    <button
+                      id="google-oauth-btn"
+                      type="button"
+                      disabled={isGoogleRedirecting}
+                      onClick={handleGoogleRedirect}
+                      className="w-full flex items-center justify-center gap-3 bg-[#111111] border border-white/[0.08] hover:border-blue-500/40 hover:bg-[#161616] disabled:opacity-60 disabled:cursor-not-allowed text-white rounded-2xl py-4 px-6 text-[11px] font-bold uppercase tracking-[0.15em] transition-all duration-200 active:scale-95 shadow-[0_0_20px_rgba(0,0,0,0.3)]"
+                    >
+                      {isGoogleRedirecting ? (
+                        <>
+                          <Loader2 size={16} className="animate-spin text-blue-500" />
+                          <span>Routing to Google...</span>
+                        </>
+                      ) : (
+                        <>
+                          {/* Google SVG Icon */}
+                          <svg width="18" height="18" viewBox="0 0 48 48" aria-hidden="true">
+                            <path fill="#FFC107" d="M43.6 20H24v8h11.3C33.7 33.5 29.3 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3 0 5.7 1.1 7.8 2.9l5.7-5.7C33.9 6.7 29.2 5 24 5 12.4 5 3 14.4 3 26s9.4 21 21 21c10.9 0 20-7.9 20-21 0-1.3-.2-2.7-.4-4z"/>
+                            <path fill="#FF3D00" d="M6.3 15.5l6.6 4.8C14.5 16.4 18.9 14 24 14c3 0 5.7 1.1 7.8 2.9l5.7-5.7C33.9 6.7 29.2 5 24 5 16.2 5 9.5 9.4 6.3 15.5z"/>
+                            <path fill="#4CAF50" d="M24 47c5.2 0 9.9-1.7 13.5-4.6l-6.2-5.3C29.4 38.7 26.8 39.5 24 39.5c-5.3 0-9.7-3.5-11.3-8.3l-6.5 5C9.5 43 16.3 47 24 47z"/>
+                            <path fill="#1976D2" d="M43.6 20H24v8h11.3c-.8 2.3-2.3 4.3-4.3 5.7l6.2 5.3C41.3 35.5 44 31 44 26c0-1.3-.2-2.7-.4-4z"/>
+                          </svg>
+                          <span>Continue with Google</span>
+                        </>
+                      )}
+                    </button>
                   </motion.div>
                 )}
               </AnimatePresence>

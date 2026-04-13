@@ -1,7 +1,6 @@
 import React, { StrictMode, Suspense } from 'react';
 import { createRoot } from 'react-dom/client';
 import { GoogleOAuthProvider } from '@react-oauth/google';
-import { motion, AnimatePresence } from 'framer-motion';
 import { Loader2, ShieldAlert } from 'lucide-react';
 
 /* ── STYLES ── */
@@ -17,7 +16,7 @@ import App from './App.jsx';
 const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID;
 
 if (!GOOGLE_CLIENT_ID) {
-  console.warn("⚠️ [EduCred]: VITE_GOOGLE_CLIENT_ID is missing. Identity Bridge: OFFLINE.");
+  throw new Error('Missing VITE_GOOGLE_CLIENT_ID');
 }
 
 /**
@@ -99,20 +98,12 @@ class GlobalErrorBoundary extends React.Component {
 createRoot(document.getElementById('root')).render(
   <StrictMode>
     <GlobalErrorBoundary>
-      {GOOGLE_CLIENT_ID ? (
-        <GoogleOAuthProvider
-          clientId={GOOGLE_CLIENT_ID}
-          onScriptLoadError={() => console.error("Identity Bridge Script Failed to Load.")}
-        >
-          <AnimatePresence mode="wait">
-            <App />
-          </AnimatePresence>
-        </GoogleOAuthProvider>
-      ) : (
-        <AnimatePresence mode="wait">
-          <App />
-        </AnimatePresence>
-      )}
+      <GoogleOAuthProvider
+        clientId={GOOGLE_CLIENT_ID}
+        onScriptLoadError={() => console.error("Identity Bridge Script Failed to Load.")}
+      >
+        <App />
+      </GoogleOAuthProvider>
     </GlobalErrorBoundary>
   </StrictMode>
 );

@@ -66,6 +66,84 @@ const CertificateSchema = new mongoose.Schema({
     type: mongoose.Schema.Types.ObjectId, 
     ref: 'University', 
     required: true 
+  },
+  certificateId: {
+    type: String,
+    sparse: true,
+    unique: true
+  },
+  studentId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Student'
+  },
+  certificateType: {
+    type: String,
+    enum: ['Degree Certificate', 'Provisional Certificate', 'Consolidated Marks Sheet', 'Migration Certificate', 'Transfer Certificate', 'Character Certificate']
+  },
+  metadata: {
+    type: mongoose.Schema.Types.Mixed
+  },
+  ipfsCid: {
+    type: String
+  },
+  sha256Hash: {
+    type: String
+  },
+  blockchainBlockNumber: {
+    type: Number
+  },
+  tokenId: {
+    type: Number
+  },
+  workflowStatus: {
+    type: String,
+    enum: ['DRAFT', 'STAGE1', 'STAGE2', 'ISSUED', 'REVOKED']
+  },
+  workflowLog: [{
+    stage: String,
+    actorId: mongoose.Schema.Types.ObjectId,
+    actorName: String,
+    timestamp: Date,
+    notes: String
+  }],
+  isBatchIssued: {
+    type: Boolean,
+    default: false
+  },
+  batchId: {
+    type: String
+  },
+  merkleProof: [{
+    type: String
+  }],
+  merkleRoot: {
+    type: String
+  },
+  isRevoked: {
+    type: Boolean,
+    default: false
+  },
+  revocationReason: {
+    type: String
+  },
+  revocationReasonCode: {
+    type: Number
+  },
+  revocationTx: {
+    type: String
+  },
+  revocationTimestamp: {
+    type: Date
+  },
+  revokedByStaffName: {
+    type: String
+  },
+  digilockerPushStatus: {
+    type: String,
+    enum: ['PENDING', 'SUCCESS', 'FAILED', 'NOT_CONNECTED']
+  },
+  digilockerPushTimestamp: {
+    type: Date
   }
 }, { timestamps: true });
 

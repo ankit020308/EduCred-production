@@ -1,6 +1,4 @@
 import { sendCertificateEmail } from './emailService.js';
-import { sendPhoneOTP } from './smsService.js'; // This is a general Twilio utility
-import twilio from 'twilio';
 import dotenv from 'dotenv';
 
 dotenv.config();
@@ -9,7 +7,13 @@ dotenv.config();
  * 🍱 UNIFIED NOTIFICATION AGGREGATOR
  * Combines institutional Email (SMTP) and Mobile (WhatsApp/SMS) channels.
  */
-const twilioClient = twilio(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
+
+// Lazily initialized — avoids a crash at startup if Twilio env vars are absent
+let twilioClient = null;
+if (process.env.TWILIO_ACCOUNT_SID && process.env.TWILIO_AUTH_TOKEN) {
+  const twilio = (await import('twilio')).default;
+  twilioClient = twilio(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
+}
 
 /**
  * Dispatches simultaneous multi-channel alerts upon successful credential issuance.
@@ -36,7 +40,7 @@ export const sendCertificateNotification = async (studentName, course, universit
         // 2. Mobile Channel (WhatsApp/SMS)
         (async () => {
             try {
-                if (!process.env.TWILIO_ACCOUNT_SID || !process.env.TWILIO_AUTH_TOKEN) {
+                if (!twilioClient) {
                     console.warn("⚠️ [WHATSAPP_NODE]: Node offline. Twilio credentials missing.");
                     return;
                 }

@@ -10,6 +10,7 @@ import { useAuth } from '../context/AuthContext';
 import BlockchainBackground from '../components/BlockchainBackground';
 import StatusBadge from '../components/StatusBadge';
 import { ToastProvider, useToast } from '../components/Toast';
+import socket from '../services/socket.mjs';
 
 const viewTransition = {
   initial: { opacity: 0, y: 30, scale: 0.98 },
@@ -37,7 +38,7 @@ function ConfirmDialog({ open, action, universityName, onConfirm, onCancel, load
             exit={{ scale: 0.95, opacity: 0 }}
             className="relative bg-[#0A0A0A] border border-white/[0.08] rounded-[1.5rem] p-8 max-w-md w-full shadow-2xl space-y-6"
           >
-            <div className={`w-14 h-14 rounded-2xl mx-auto flex items-center justify-center border ${isApprove ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400' : 'bg-rose-500/10 border-rose-500/20 text-rose-400'}`}>
+            <div className={`w-14 h-14 rounded-2xl mx-auto flex items-center justify-center border ${isApprove ? 'bg-blue-500/10 border-blue-500/20 text-blue-400' : 'bg-rose-500/10 border-rose-500/20 text-rose-400'}`}>
               {isApprove ? <CheckCircle2 size={28} /> : <XCircle size={28} />}
             </div>
             <div className="text-center space-y-2">
@@ -85,14 +86,33 @@ function SystemAdminDashboard() {
   const [filter, setFilter] = useState('ALL');
   const [confirm, setConfirm] = useState({ open: false, action: null, id: null, name: '' });
 
-  useEffect(() => { fetchUniversities(); }, []);
+  useEffect(() => {
+    fetchUniversities();
+
+    // ⚡ Socket.io Lifecycle
+    socket.connect();
+    socket.emit('join_admin_room');
+
+    socket.on('universityRegistered', (data) => {
+        console.log('⚡ [SOCKET]: New University Registered', data);
+        fetchUniversities();
+        toast.info(`New application: ${data.name}`);
+    });
+
+    return () => {
+        if (socket.connected) {
+            socket.emit('leave_admin_room');
+            socket.disconnect();
+        }
+    };
+  }, []);
 
   const fetchUniversities = async () => {
     setLoading(true);
     try {
       const res = await api.get('/api/universities/all');
       setUniversities(res.data.data || []);
-    } catch (err) {
+    } catch {
       toast.error('Failed to fetch universities. Please refresh.');
     } finally {
       setLoading(false);
@@ -134,9 +154,9 @@ function SystemAdminDashboard() {
   };
 
   if (loading && universities.length === 0) return (
-    <div className="h-screen flex items-center justify-center bg-[#010409]">
+    <div className="h-screen flex items-center justify-center bg-[#000000]">
       <div className="flex flex-col items-center gap-6">
-        <Loader2 className="animate-spin text-indigo-500" size={48} />
+        <Loader2 className="animate-spin text-blue-500" size={48} />
         <p className="text-slate-600 font-bold uppercase tracking-[0.5em] text-[10px]">
           Loading Governance Registry...
         </p>
@@ -159,10 +179,10 @@ function SystemAdminDashboard() {
         <motion.div {...viewTransition} className="flex flex-col md:flex-row md:items-end justify-between gap-10">
           <div className="space-y-4">
             <h1 className="text-5xl md:text-7xl font-bold text-white tracking-tighter leading-none">
-              Governance <span className="bg-gradient-to-r from-indigo-400 to-purple-400 bg-clip-text text-transparent">Node.</span>
+              Governance <span className="bg-gradient-to-r from-blue-400 to-cyan-400 bg-clip-text text-transparent glow-blue">Node.</span>
             </h1>
             <p className="text-slate-500 text-[10px] font-black uppercase tracking-[0.4em] flex items-center gap-3">
-              <ShieldCheck size={14} className="text-indigo-400" />
+              <ShieldCheck size={14} className="text-blue-400" />
               Root Authority: {user?.name || 'System Administrator'}
             </p>
           </div>
@@ -178,15 +198,15 @@ function SystemAdminDashboard() {
         {/* STATS */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-6">
           {[
-            { label: 'Total Institutions', val: stats.total, icon: Users, color: 'text-indigo-400' },
+            { label: 'Total Institutions', val: stats.total, icon: Users, color: 'text-blue-400' },
             { label: 'Awaiting Review', val: stats.pending, icon: Clock, color: 'text-amber-400' },
-            { label: 'Approved Issuers', val: stats.approved, icon: CheckCircle2, color: 'text-emerald-400' },
+            { label: 'Approved Issuers', val: stats.approved, icon: CheckCircle2, color: 'text-blue-400' },
             { label: 'Rejected', val: stats.rejected, icon: ShieldAlert, color: 'text-rose-400' }
           ].map((s, i) => (
             <motion.div
               key={i} {...viewTransition}
               transition={{ ...viewTransition.transition, delay: i * 0.05 }}
-              className="glass-card p-8 border border-white/5 text-center flex flex-col items-center gap-4"
+              className="glass-pane p-8 border border-white/5 text-center flex flex-col items-center gap-4"
             >
               <s.icon className={s.color} size={24} />
               <span className="text-4xl font-bold text-white tracking-tighter">{s.val}</span>
@@ -206,7 +226,7 @@ function SystemAdminDashboard() {
                   key={f}
                   onClick={() => setFilter(f)}
                   className={`px-6 py-3 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all
-                    ${filter === f ? 'bg-indigo-600 text-white shadow-xl shadow-indigo-500/20' : 'text-slate-600 hover:text-white hover:bg-white/5'}`}
+                    ${filter === f ? 'bg-blue-600 text-white shadow-xl shadow-blue-500/20' : 'text-slate-600 hover:text-white hover:bg-white/5'}`}
                 >
                   {f} {f === 'PENDING' && stats.pending > 0 && (
                     <span className="ml-1.5 bg-amber-500 text-black text-[8px] font-black px-1.5 py-0.5 rounded-full">{stats.pending}</span>
@@ -216,12 +236,12 @@ function SystemAdminDashboard() {
             </div>
 
             <div className="relative w-full lg:w-96 group/search">
-              <Search className="absolute left-6 top-1/2 -translate-y-1/2 text-slate-700 group-focus-within/search:text-indigo-500 transition-colors" size={18} />
+              <Search className="absolute left-6 top-1/2 -translate-y-1/2 text-slate-700 group-focus-within/search:text-blue-500 transition-colors" size={18} />
               <input
                 placeholder="Search by name or email..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full bg-white/[0.02] border border-white/10 rounded-2xl py-4 pl-14 pr-6 text-sm font-medium text-white outline-none focus:border-indigo-500/40 transition-all placeholder:text-slate-700"
+                className="w-full bg-white/[0.02] border border-white/10 rounded-2xl py-4 pl-14 pr-6 text-sm font-medium text-white outline-none focus:border-blue-500/40 transition-all placeholder:text-slate-700"
               />
             </div>
           </div>
@@ -262,7 +282,7 @@ function SystemAdminDashboard() {
                         <td className="px-10 py-8">
                           <div className="flex items-center gap-5">
                             <div className={`w-12 h-12 rounded-2xl flex items-center justify-center text-lg font-bold border transition-transform group-hover:scale-105
-                              ${uni.status === 'APPROVED' ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' :
+                              ${uni.status === 'APPROVED' ? 'bg-blue-500/10 text-blue-400 border-blue-500/20' :
                                 uni.status === 'REJECTED' ? 'bg-rose-500/10 text-rose-400 border-rose-500/20' :
                                   'bg-amber-500/10 text-amber-400 border-amber-500/20'}`}>
                               {uni.name?.charAt(0)}
