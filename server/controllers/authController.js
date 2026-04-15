@@ -1,4 +1,5 @@
 import Blacklist from '../models/Blacklist.js';
+import { OAuth2Client } from 'google-auth-library';
 
 /**
  * 🚪 Logout
@@ -10,7 +11,7 @@ export const logout = async (req, res) => {
     if (authHeader?.startsWith('Bearer ')) {
       const token = authHeader.split(' ')[1];
       const decoded = jwt.decode(token);
-      
+
       // Blacklist the token until its original expiry
       if (decoded && decoded.exp) {
         await Blacklist.create({
@@ -19,7 +20,7 @@ export const logout = async (req, res) => {
         });
       }
     }
-    
+
     await logAudit(req, 'NODE_LOGOUT', 'SUCCESS', 'Identity node session terminated.', { userId: req.user?._id });
     res.status(200).json({ message: 'Identity node session terminated and token revoked.' });
   } catch (err) {
@@ -28,7 +29,7 @@ export const logout = async (req, res) => {
   }
 };
 
-const googleClient = new OAuth2Client(requireEnv('GOOGLE_CLIENT_ID'));
+const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
 const JWT_EXPIRES = '1h'; // Short-lived access token
 const REFRESH_EXPIRES = '7d'; // Long-lived refresh token
@@ -56,11 +57,11 @@ export const register = async (req, res) => {
     }
     const hashedOtp = hashOTP(otp);
 
-    const user = await User.create({ 
-      name, 
-      email, 
-      passwordHash: password, 
-      role, 
+    const user = await User.create({
+      name,
+      email,
+      passwordHash: password,
+      role,
       universityName: role === 'university' ? universityName : undefined,
       otp: hashedOtp,
       otpExpires: Date.now() + 10 * 60 * 1000, // 10 minutes
@@ -71,13 +72,13 @@ export const register = async (req, res) => {
     if (role === 'university') {
       const { documents, description } = req.body;
       const isInstitutional = email.endsWith('.edu') || email.endsWith('.ac.in');
-      await University.create({ 
-        name: universityName, 
-        email, 
+      await University.create({
+        name: universityName,
+        email,
         userId: user._id,
         documents: documents || [],
         description: description || '',
-        isFlagged: !isInstitutional 
+        isFlagged: !isInstitutional
       });
 
       req.app.get('io')?.to('admin_room')?.emit('universityRegistered', {
@@ -119,15 +120,15 @@ export const login = async (req, res) => {
 
     const { email, password } = req.body;
     const user = await User.findOne({ email }).select('+passwordHash +isEmailVerified +loginAttempts +lockUntil');
-    
+
     if (!user || !(await user.comparePassword(password))) {
       return res.status(401).json({ error: 'Invalid credentials.' });
     }
 
     if (!user.isEmailVerified) {
-      return res.status(403).json({ 
+      return res.status(403).json({
         error: 'Identity node inactive. Please verify your email.',
-        requiresVerification: true 
+        requiresVerification: true
       });
     }
 
@@ -141,11 +142,11 @@ export const login = async (req, res) => {
     res.json({
       accessToken,
       refreshToken,
-      user: { 
-        id: user._id, 
-        name: user.name, 
-        email: user.email, 
-        role: user.role, 
+      user: {
+        id: user._id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
         universityName: user.universityName,
         universityId: university ? university._id : null,
         universityStatus: university ? university.status : null,
@@ -193,7 +194,7 @@ export const verifyOTP = async (req, res) => {
       await user.save();
       const remaining = 3 - user.otpAttempts;
       await logAudit(req, 'OTP_VERIFICATION', 'FAILURE', `Invalid security key. Attempts: ${user.otpAttempts}`, { email, attempts: user.otpAttempts });
-      return res.status(400).json({ 
+      return res.status(400).json({
         error: `Invalid security key. ${remaining} attempts remaining.`,
         attemptsRemaining: remaining
       });
@@ -210,7 +211,7 @@ export const verifyOTP = async (req, res) => {
 
     const accessToken = signToken(user._id);
     const refreshToken = signRefreshToken(user._id);
-    
+
     res.status(200).json({
       message: 'Identity node activated successfully.',
       accessToken,
@@ -319,7 +320,7 @@ export const googleLogin = async (req, res) => {
     }
 
     const { name, email, picture, sub: googleId } = payload;
-    
+
     let user = await User.findOne({ email });
 
     if (!user) {
@@ -388,7 +389,7 @@ export const sendPhoneVerification = async (req, res) => {
 
     const user = await User.findById(req.user.id);
     const otp = generateOTP();
-    
+
     user.phoneNumber = phoneNumber;
     user.otp = hashOTP(otp);
     user.otpExpires = Date.now() + 5 * 60 * 1000;
@@ -439,11 +440,11 @@ export const getMe = async (req, res) => {
   const u = req.user;
   const university = u.role === 'university' ? await University.findOne({ userId: u._id }) : null;
 
-  res.json({ 
-    id: u._id, 
-    name: u.name, 
-    email: u.email, 
-    role: u.role, 
+  res.json({
+    id: u._id,
+    name: u.name,
+    email: u.email,
+    role: u.role,
     universityName: u.universityName,
     universityId: university ? university._id : null,
     universityStatus: university ? university.status : null,
@@ -515,7 +516,7 @@ export const completeOnboarding = async (req, res) => {
     user.role = role;
     if (role === 'university') {
       user.universityName = universityName;
-      
+
       const isInstitutional = user.email.endsWith('.edu') || user.email.endsWith('.ac.in');
       await University.create({
         name: universityName,
