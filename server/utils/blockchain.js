@@ -54,10 +54,13 @@ async function initializeContract() {
     if (!CONTRACT_ADDRESS) missing.push('CONTRACT_ADDRESS');
     if (!PRIVATE_KEY) missing.push('PRIVATE_KEY');
     if (!RPC_URL) missing.push('RPC_URL');
-    
+
     console.error(`❌ [BLOCKCHAIN]: Missing critical configuration: ${missing.join(', ')}`);
+
+    // Updated: Graceful fallback for missing config in production
     if (isProduction) {
-      throw new Error('Blockchain configuration missing in production environment.');
+      console.log("⚠️ Missing blockchain config — running in OFFLINE mode");
+      return;
     }
     return;
   }
@@ -79,19 +82,21 @@ async function initializeContract() {
     runtimeMode = 'LIVE';
     console.log('✅ [BLOCKCHAIN]: Authoritative ledger connected at', CONTRACT_ADDRESS);
   } catch (error) {
-    try { tempProvider.destroy(); } catch {}
+    try { tempProvider.destroy(); } catch { }
     provider = null;
     wallet = null;
     eduCredContract = null;
     runtimeMode = 'OFFLINE';
-    
+
     console.error('❌ [BLOCKCHAIN_CRITICAL]: Failed to connect to ledger -', error.message);
+
+    // Updated: Graceful fallback for connection failure in production
     if (isProduction) {
-      throw new Error('Production ledger connection failed. System halted for integrity.');
+      console.log("⚠️ Blockchain not connected in production — running in OFFLINE mode");
+      return;
     }
   }
 }
-
 
 await initializeContract();
 
@@ -170,4 +175,3 @@ export async function revokeHashOnChain(certificateHash, reasonCode = 0) {
   const tx = await eduCredContract.revokeHash(normalizeHash(certificateHash), reasonCode);
   return tx.wait();
 }
-
