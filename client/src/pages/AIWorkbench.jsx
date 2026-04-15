@@ -7,10 +7,10 @@ import {
   Layout, Code2, AlertTriangle, RefreshCcw, Search,
   X, Check, Copy, ExternalLink, HardDrive
 } from 'lucide-react';
-import api from '../../services/api';
-import { useAuth } from '../../context/AuthContext';
-import BlockchainBackground from '../../components/BlockchainBackground';
-import { useToast } from '../../components/Toast';
+import api from '../services/api';
+import { useAuth } from '../context/AuthContext';
+import BlockchainBackground from '../components/BlockchainBackground';
+import { useToast } from '../components/Toast';
 
 // 💠 SAPPHIRE ANIMATION PROTOCOL
 const containerTransition = {
