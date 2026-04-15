@@ -310,6 +310,7 @@ export default function Verifier() {
                     <DetailRow label="Course" value={result.metadata?.course || result.metadata?.programName} />
                     <DetailRow label="Issuer" value={result.metadata?.issuer || result.metadata?.universityName} />
                     <DetailRow label="Verification source" value={result.verificationSource || 'Unknown'} />
+                    <DetailRow label="IPFS Storage" value={result.metadata?.ipfsCid ? 'Decentralized (Pinned)' : 'Local Registry'} />
                     <DetailRow label="Blockchain mode" value={result.blockchainMode} />
                     <DetailRow label="Certificate ID" value={result.metadata?.certificateId} />
                   </div>

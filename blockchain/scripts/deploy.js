@@ -7,7 +7,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const DEFAULT_RPC_URL = process.env.RPC_URL || 'http://127.0.0.1:8545';
-// Hardhat/Ganache deterministic mnemonic account 0 private key
+// Hardhat local node deterministic account 0 private key
 const DEFAULT_DEV_PRIVATE_KEY =
   process.env.PRIVATE_KEY ||
   '0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80';
@@ -26,8 +26,6 @@ async function main() {
 
   const artifact = JSON.parse(fs.readFileSync(artifactPath, 'utf8'));
 
-  // StaticJsonRpcProvider forces legacy (non-EIP-1559) transactions
-  // which are compatible with Ganache v7
   const provider = new ethers.JsonRpcProvider(DEFAULT_RPC_URL);
   const wallet = new ethers.Wallet(DEFAULT_DEV_PRIVATE_KEY, provider);
   const network = await provider.getNetwork();
@@ -39,10 +37,9 @@ async function main() {
   console.log(`[deploy] Account balance: ${ethers.formatEther(balance)} ETH`);
 
   if (balance === 0n) {
-    throw new Error('Deployer wallet has 0 ETH. Ganache may not have loaded the mnemonic correctly.');
+    throw new Error('Deployer wallet has 0 ETH. The local blockchain may not have loaded the expected dev account.');
   }
 
-  // Get current gas price and use legacy tx type for Ganache compatibility
   const feeData = await provider.getFeeData();
   const gasPrice = feeData.gasPrice ?? ethers.parseUnits('20', 'gwei');
 
@@ -65,7 +62,6 @@ async function main() {
     rpcUrl: DEFAULT_RPC_URL,
     chainId: Number(network.chainId),
     deployedAt: new Date().toISOString(),
-    privateKey: DEFAULT_DEV_PRIVATE_KEY,
   };
 
   for (const outputPath of outputPaths) {

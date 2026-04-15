@@ -9,9 +9,6 @@ dotenv.config();
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const isProduction = process.env.NODE_ENV === 'production';
-const DEFAULT_RPC_URL = 'http://127.0.0.1:8545';
-const DEFAULT_DEV_PRIVATE_KEY =
-  '0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80';
 
 function loadContractMetadata() {
   const metadataPath = path.join(__dirname, 'EduCred.json');
@@ -28,17 +25,15 @@ function loadContractMetadata() {
 }
 
 const contractMetadata = loadContractMetadata();
-const RPC_URL = process.env.RPC_URL || contractMetadata?.rpcUrl || DEFAULT_RPC_URL;
-const CONTRACT_ADDRESS = process.env.CONTRACT_ADDRESS || contractMetadata?.contractAddress || null;
-const PRIVATE_KEY =
-  process.env.PRIVATE_KEY ||
-  (!isProduction && CONTRACT_ADDRESS ? DEFAULT_DEV_PRIVATE_KEY : null);
+const RPC_URL = process.env.RPC_URL || contractMetadata?.rpcUrl;
+const CONTRACT_ADDRESS = process.env.CONTRACT_ADDRESS || contractMetadata?.contractAddress;
+const PRIVATE_KEY = process.env.PRIVATE_KEY;
 const CONTRACT_ABI = contractMetadata?.abi || null;
 
 let provider = null;
 let wallet = null;
 let eduCredContract = null;
-let runtimeMode = 'SIMULATION';
+let runtimeMode = 'OFFLINE';
 
 function normalizeHash(certificateHash) {
   if (!certificateHash) {
@@ -55,20 +50,26 @@ function normalizeHash(certificateHash) {
 
 async function initializeContract() {
   if (!CONTRACT_ADDRESS || !CONTRACT_ABI || !PRIVATE_KEY || !RPC_URL) {
-    console.warn('⚠️  [BLOCKCHAIN]: Missing config. Running in SIMULATION mode.');
+    const missing = [];
+    if (!CONTRACT_ADDRESS) missing.push('CONTRACT_ADDRESS');
+    if (!PRIVATE_KEY) missing.push('PRIVATE_KEY');
+    if (!RPC_URL) missing.push('RPC_URL');
+    
+    console.error(`❌ [BLOCKCHAIN]: Missing critical configuration: ${missing.join(', ')}`);
+    if (isProduction) {
+      throw new Error('Blockchain configuration missing in production environment.');
+    }
     return;
   }
 
   const tempProvider = new ethers.JsonRpcProvider(RPC_URL);
 
   try {
-    // Race the connection check against a 3s timeout.
-    // If Ganache isn't running, we fail fast and destroy the provider
-    // to stop the ethers v6 internal "retry in 1s" polling loop.
+    // Connection check with 5s timeout
     await Promise.race([
       tempProvider.getBlockNumber(),
       new Promise((_, reject) =>
-        setTimeout(() => reject(new Error('Connection timeout — Ganache not running')), 3000)
+        setTimeout(() => reject(new Error('Connection timeout — blockchain node unreachable')), 5000)
       ),
     ]);
 
@@ -76,17 +77,18 @@ async function initializeContract() {
     eduCredContract = new ethers.Contract(CONTRACT_ADDRESS, CONTRACT_ABI, wallet);
     provider = tempProvider;
     runtimeMode = 'LIVE';
-    console.log('✅ [BLOCKCHAIN]: Live contract connected at', CONTRACT_ADDRESS);
+    console.log('✅ [BLOCKCHAIN]: Authoritative ledger connected at', CONTRACT_ADDRESS);
   } catch (error) {
-    // CRITICAL: destroy() stops the internal ethers polling loop
-    // that would otherwise spam "retry in 1s" to the console forever.
     try { tempProvider.destroy(); } catch {}
     provider = null;
     wallet = null;
     eduCredContract = null;
-    runtimeMode = 'SIMULATION';
-    console.warn('⚠️  [BLOCKCHAIN]: Ganache not reachable — running in SIMULATION mode.');
-    console.warn('    To enable LIVE mode: start Ganache on', RPC_URL);
+    runtimeMode = 'OFFLINE';
+    
+    console.error('❌ [BLOCKCHAIN_CRITICAL]: Failed to connect to ledger -', error.message);
+    if (isProduction) {
+      throw new Error('Production ledger connection failed. System halted for integrity.');
+    }
   }
 }
 
@@ -106,10 +108,7 @@ export function getBlockchainRuntimeInfo() {
 
 export async function storeHashOnChain(certificateHash) {
   if (!eduCredContract) {
-    return {
-      hash: `0xSIMULATED_${certificateHash.replace(/^0x/, '').slice(0, 20)}`,
-      simulated: true,
-    };
+    throw new Error('Blockchain service is offline. Transaction aborted.');
   }
 
   const hashBytes = normalizeHash(certificateHash);
@@ -119,11 +118,7 @@ export async function storeHashOnChain(certificateHash) {
 
 export async function issueCertificateOnChain(certificateId, certificateHash, certType = 0) {
   if (!eduCredContract) {
-    return {
-      hash: `0xSIMULATED_${certificateHash.replace(/^0x/, '').slice(0, 20)}`,
-      simulated: true,
-      certificateId,
-    };
+    throw new Error('Blockchain service is offline. Issuance aborted.');
   }
 
   const hashBytes = normalizeHash(certificateHash);
@@ -135,20 +130,20 @@ export async function issueCertificateOnChain(certificateId, certificateHash, ce
 
 export async function verifyHashOnChain(certificateHash) {
   if (!eduCredContract) {
-    return null;
+    throw new Error('Blockchain service is offline. Verification impossible.');
   }
 
   try {
     return await eduCredContract.verifyHash(normalizeHash(certificateHash));
   } catch (error) {
     console.error('❌ [BLOCKCHAIN]: Verify failed -', error.message);
-    return null;
+    throw error;
   }
 }
 
 export async function verifyHashDetailsOnChain(certificateHash) {
   if (!eduCredContract || typeof eduCredContract.verifyHashFull !== 'function') {
-    return null;
+    throw new Error('Blockchain service is offline or contract incompatible.');
   }
 
   try {
@@ -163,15 +158,16 @@ export async function verifyHashDetailsOnChain(certificateHash) {
     };
   } catch (error) {
     console.error('❌ [BLOCKCHAIN]: Full verification failed -', error.message);
-    return null;
+    throw error;
   }
 }
 
 export async function revokeHashOnChain(certificateHash, reasonCode = 0) {
   if (!eduCredContract || typeof eduCredContract.revokeHash !== 'function') {
-    return null;
+    throw new Error('Blockchain service is offline or revocation not supported.');
   }
 
   const tx = await eduCredContract.revokeHash(normalizeHash(certificateHash), reasonCode);
   return tx.wait();
 }
+

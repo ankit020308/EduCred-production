@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "description": "Unified Identity Node Controller",
   "main": "index.js",
+  "type": "module",
   "scripts": {
     "dev": "node start.js",
     "blockchain": "cd blockchain && npm run node",
@@ -10,6 +11,7 @@
     "deploy:contracts": "cd blockchain && npm run deploy",
     "server": "cd server && npm start",
     "client": "cd client && npm run dev",
+    "system:reset": "cd server && node scripts/reset-system.js",
     "build": "npm run build:client && npm run build:server",
     "build:client": "cd client && npm install && npm run build",
     "build:server": "cd server && npm install",
@@ -17,6 +19,6 @@
     "install:all": "npm install && cd server && npm install && cd ../client && npm install && cd ../blockchain && npm install"
   },
   "dependencies": {
-    "concurrently": "^8.2.2"
+    "concurrently": "^9.2.1"
   }
 }

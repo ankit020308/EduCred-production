@@ -31,6 +31,7 @@ import session from 'express-session';
 import User from './models/User.js';
 import University from './models/University.js';
 import { getAllowedOrigins, isProduction, sessionSecret, validateServerEnv, requireEnv } from './utils/runtimeConfig.js';
+import { isPinataConfigured, testPinataConnection } from './utils/ipfsService.js';
 
 dotenv.config();
 validateServerEnv();
@@ -157,11 +158,12 @@ app.use('/api/requests', requestRoutes);
 app.use('/api/ledger', ledgerRoutes);
 
 // ─── Health Check ─────────────────────────────────────
-app.get('/api/health', (req, res) => {
+app.get('/api/health', async (req, res) => {
   res.status(200).json({
     status: 'Online',
     timestamp: new Date().toISOString(),
     db: mongoose.connection.readyState === 1 ? 'Connected' : 'Disconnected',
+    ipfs: isPinataConfigured() ? 'Configured' : 'Unconfigured',
     uptime: process.uptime()
   });
 });
@@ -229,11 +231,24 @@ let server;
 connectDB()
   .then(async () => {
     await seedSystem();
-    server = httpServer.listen(PORT, '0.0.0.0', () => {
+    server = httpServer.listen(PORT, '0.0.0.0', async () => {
       console.log(`\n🚀 EduCred Node Active`);
       console.log(`📡 Local:   http://localhost:${PORT}`);
       console.log(`🌐 Network: http://0.0.0.0:${PORT}`);
-      console.log(`⚡ Socket.io enabled\n`);
+      console.log(`⚡ Socket.io enabled`);
+
+      // ─── IPFS Connectivity Diagnostic ───
+      if (isPinataConfigured()) {
+        console.log(`📦 IPFS: Detected Pinata configuration. Testing connectivity...`);
+        const isIpfsReady = await testPinataConnection();
+        if (isIpfsReady) {
+          console.log(`✅ IPFS: Decentralized storage layer active.\n`);
+        } else {
+          console.log(`⚠️ IPFS: Configuration detected but authentication failed.\n`);
+        }
+      } else {
+        console.log(`💡 IPFS: Service not configured. Using local storage fallback.\n`);
+      }
     });
   })
   .catch(err => {

@@ -65,7 +65,12 @@ async function saveFileLocally(buffer, filename) {
  * ─── EduCred: Master Issuance Pipeline (Non-Blocking) ───
  * Authenticate -> Binary Hashing -> Cloud/IPFS Stream -> DB Pend -> Immediate Response -> Background Anchor
  */
+/**
+ * ─── EduCred: Master Issuance Pipeline (Synchronous Sync) ───
+ * Authenticate -> Binary Hashing -> Hash Uniqueness Check -> Cloud/IPFS Stream -> DB Pend -> Blockchain Anchor -> confirmation
+ */
 export const issueCertificate = async (req, res) => {
+    let tempPath = req.file?.path;
     try {
         let { 
           certificateType, studentName, studentEmail,
@@ -73,9 +78,7 @@ export const issueCertificate = async (req, res) => {
           branch, graduationYear, cgpa, mediumOfInstruction, dateOfIssue, additionalNotes
         } = req.body;
         
-        // Accept both 'programName' (advanced form) and 'course' (simple form)
         const programName = req.body.programName || req.body.course || 'General Degree';
-        // Default to 'UPLOAD' if not specified (simple form doesn't send this)
         const issuanceMode = req.body.issuanceMode || (req.file ? 'UPLOAD' : 'GENERATE');
         const file = req.file;
 
@@ -89,8 +92,9 @@ export const issueCertificate = async (req, res) => {
         if (!studentName) {
             return res.status(400).json({ error: 'Student name is required.' });
         }
-        if (issuanceMode === 'UPLOAD' && !file) {
-            return res.status(400).json({ error: 'Certificate file is required for upload mode.' });
+        if (issuanceMode === 'UPLOAD') {
+            if (!file) return res.status(400).json({ error: 'Certificate file is required for upload mode.' });
+            if (file.size === 0) return res.status(400).json({ error: 'Cannot process zero-byte certificate files.' });
         }
 
         // 1. Authorization: Verify Institutional Node Status
@@ -118,20 +122,21 @@ export const issueCertificate = async (req, res) => {
                 certificateId
             });
         } else {
-            fileBuffer = file.buffer;
+            fileBuffer = fs.readFileSync(file.path);
         }
 
         // 2. Cryptographic Fingerprinting (SHA-256)
-        console.log(`[DEBUG] ISSUANCE: Processing ${file ? 'uploaded binary' : 'generated PDF'}`);
-        if (file) {
-            console.log(`[DEBUG] ISSUANCE: Original Filename: ${file.originalname}`);
-            console.log(`[DEBUG] ISSUANCE: Buffer Length: ${file.buffer.length} bytes`);
-        } else {
-            console.log(`[DEBUG] ISSUANCE: Generated Buffer Length: ${fileBuffer.length} bytes`);
-        }
-        
         const fileHash = generateBinaryHash(fileBuffer);
-        console.log(`[DEBUG] ISSUANCE: Computed Binary SHA-256: ${fileHash}`);
+
+        // 🚨 Integrity Check: Prevent duplicate issuance of the same credential
+        const existingCert = await Certificate.findOne({ certificateHash: fileHash });
+        if (existingCert) {
+            return res.status(409).json({ 
+                error: 'Duplicate Credential Detected', 
+                message: 'A certificate with this exact content has already been anchored on the ledger.',
+                existingCertificateId: existingCert.certificateId
+            });
+        }
 
         // 3. Storage — IPFS via Pinata (falls back to local disk if not configured)
         let fileUrl;
@@ -148,17 +153,15 @@ export const issueCertificate = async (req, res) => {
                 });
                 ipfsCid = ipfsResult.cid;
                 fileUrl = ipfsResult.url;
-                console.log(`[📦 IPFS_ANCHOR] CID: ${ipfsCid} | URL: ${fileUrl}`);
             } catch (ipfsErr) {
                 console.error('❌ [IPFS]: Upload failed, falling back to local disk:', ipfsErr.message);
                 fileUrl = await saveFileLocally(fileBuffer, filename);
             }
         } else {
-            console.warn('⚠️  [IPFS]: Pinata not configured — storing file locally. Add PINATA_API_KEY and PINATA_API_SECRET to server/.env');
             fileUrl = await saveFileLocally(fileBuffer, filename);
         }
 
-        // 4. Resolve student record for linking (non-blocking lookup)
+        // 4. Resolve student record for linking
         let studentId = undefined;
         try {
             const studentUser = await User.findOne({ email: studentEmail });
@@ -166,11 +169,9 @@ export const issueCertificate = async (req, res) => {
                 const studentRecord = await Student.findOne({ userId: studentUser._id });
                 if (studentRecord) studentId = studentRecord._id;
             }
-        } catch (lookupErr) { 
-            console.warn(`⚠️ [ISSUANCE] Student linking failure for ${studentEmail}:`, lookupErr.message);
-        }
+        } catch (_) {}
 
-        // 5. Persistence Registry
+        // 5. Creation in Registry (Status: PENDING)
         const cert = await Certificate.create({
             certificateId,
             studentName,
@@ -191,74 +192,84 @@ export const issueCertificate = async (req, res) => {
             workflowLog: [{ stage: 'Academic Record Verified', actorId: req.user._id, actorName: req.user.name, timestamp: new Date() }]
         });
 
-        // 6. Generate QR AFTER we have the real cert._id
-        let certQR = null;
-        try { certQR = await generateVerificationQR(cert._id); } catch (_) {}
+        // 6. Mandatory Blockchain Anchor (Sync Pattern for Production)
+        try {
+            const io = req.app.get('io');
+            
+            const receipt = await issueCertificateOnChain(
+                cert._id.toString(),
+                fileHash,
+                CERTIFICATE_TYPE_CODES[cert.certificateType] ?? 0
+            );
+            
+            cert.blockchainTxHash = receipt.hash;
+            cert.status = 'CONFIRMED';
+            cert.workflowStatus = 'ISSUED';
+            await cert.save();
 
-        // 7. Non-blocking blockchain anchor
-        setImmediate(async () => {
-            try {
-                const receipt = await issueCertificateOnChain(
-                    cert._id.toString(),
-                    fileHash,
-                    CERTIFICATE_TYPE_CODES[cert.certificateType] ?? 0
-                );
-                cert.blockchainTxHash = receipt.hash;
-                cert.status = 'CONFIRMED';
-                cert.workflowStatus = 'ISSUED';
-                await cert.save();
-                await Ledger.create({
-                    type: 'ISSUE',
-                    studentName: cert.studentName,
-                    universityName: university.name,
-                    certificateId: cert._id,
-                    txHash: receipt.hash,
-                    status: 'SUCCESS',
-                    metadata: { certificateType: cert.certificateType }
-                });
-                req.app.get('io')?.to(`university_${university._id}`)?.emit('certificateIssued', { universityId: university._id, universityName: university.name, certificateType: cert.certificateType, timestamp: new Date() });
-                if (cert.issuedBy) {
-                    req.app.get('io')?.to(`user_${cert.issuedBy}`)?.emit('newCertificate', { certId: cert._id, type: cert.certificateType });
-                }
-                // Also try to find a user with this email to notify them
-                const studentUser = await User.findOne({ email: cert.studentEmail });
-                if (studentUser) {
-                    req.app.get('io')?.to(`user_${studentUser._id}`)?.emit('newCertificate', { certId: cert._id, type: cert.certificateType });
-                }
-            } catch (e) {
-                console.error('❌ [LEDGER] Anchor failed:', e.message);
-                cert.status = 'FAILED';
-                await cert.save();
-                await Ledger.create({
-                    type: 'ISSUE',
-                    studentName: cert.studentName,
-                    universityName: university.name,
-                    certificateId: cert._id,
-                    status: 'FAILED',
-                    metadata: { error: e.message, certificateType: cert.certificateType }
-                });
+            await Ledger.create({
+                type: 'ISSUE',
+                studentName: cert.studentName,
+                universityName: university.name,
+                certificateId: cert._id,
+                txHash: receipt.hash,
+                status: 'SUCCESS',
+                metadata: { certificateType: cert.certificateType }
+            });
+
+            // Signal success via Socket.io
+            io?.to(`university_${university._id}`)?.emit('certificateConfirmed', { certificateId: cert.certificateId, status: 'CONFIRMED', txHash: receipt.hash });
+            
+            const studentUser = await User.findOne({ email: cert.studentEmail });
+            if (studentUser) {
+                io?.to(`user_${studentUser._id}`)?.emit('newCertificate', { certId: cert._id, type: cert.certificateType });
             }
-        });
 
-        await logAudit(req, 'ISSUANCE_INITIATED', 'SUCCESS', `Certificate issued for ${studentName}.`, { certId: cert._id, hash: fileHash });
+            await logAudit(req, 'ISSUANCE_ANCHORED', 'SUCCESS', `Certificate anchored for ${studentName}.`, { certId: cert._id, hash: fileHash, tx: receipt.hash });
 
-        res.status(202).json({
-            success: true,
-            message: 'Certificate issued successfully. Blockchain anchoring in progress.',
-            certificateId: cert.certificateId,
-            hash: fileHash,
-            qrPreview: certQR,
-            fileUrl,
-            ipfsCid,
-            ipfsUrl: ipfsCid ? getIPFSUrl(ipfsCid) : null,
-            storageType: ipfsCid ? 'ipfs' : 'local',
-            certDbId: cert._id
-        });
+            res.status(201).json({
+                success: true,
+                message: 'Certificate anchored successfully on the authoritative ledger.',
+                certificateId: cert.certificateId,
+                hash: fileHash,
+                txHash: receipt.hash,
+                fileUrl,
+                ipfsCid,
+                certDbId: cert._id
+            });
+
+        } catch (anchorErr) {
+            console.error('❌ [LEDGER] Anchor failed:', anchorErr.message);
+            cert.status = 'FAILED';
+            await cert.save();
+            
+            await Ledger.create({
+                type: 'ISSUE',
+                studentName: cert.studentName,
+                universityName: university.name,
+                certificateId: cert._id,
+                status: 'FAILED',
+                metadata: { error: anchorErr.message, certificateType: cert.certificateType }
+            });
+
+            return res.status(502).json({ 
+                error: 'Blockchain Anchor Failed', 
+                message: 'The registry entry was created but anchoring failed. Identity record set to FAILED.', 
+                details: anchorErr.message 
+            });
+        }
 
     } catch (err) {
         console.error('🚀 Issuance Pipeline CRASH:', err);
         res.status(500).json({ error: 'Certificate issuance failed.', details: err.message });
+    } finally {
+        // Cleanup temp file
+        if (tempPath && fs.existsSync(tempPath)) {
+            fs.unlinkSync(tempPath);
+        }
     }
+};
+
 };
 
 export const confirmIssuance = async (req, res) => {
@@ -400,108 +411,80 @@ export const batchIssue = async (req, res) => {
 };
 
 /**
- * ─── EduCred: Verification Flow (Section 2.6) ───
+ * ─── EduCred: Verification Flow (Synchronous Strict) ───
  * Option 1: File OR Option 2: Certificate ID
+ * NO SIMULATION FALLBACK ALLOWED IN PRODUCTION.
  */
 export const verifyCertificate = async (req, res) => {
+    let tempPath = req.file?.path;
     try {
-        console.log('--- 🛡️ INITIATING VERIFICATION PROTOCOL ---');
+        console.log('--- 🛡️ INITIATING STRICT VERIFICATION PROTOCOL ---');
         const { certificateId } = req.body;
         const file = req.file;
 
         let verificationMethod = file ? 'upload' : 'id';
-        
         let hashToVerify = '';
         let metadata = null;
 
         if (file) {
-            // Option 1: File Verification (Section 2.6 Option 2)
-            console.log(`🚀 Step 1: Extracting Byte-Fingerprint from Uploaded Binary...`);
-            console.log(`[DEBUG] VERIFY: Uploaded Filename: ${file.originalname}`);
-            console.log(`[DEBUG] VERIFY: Buffer Length: ${file.buffer.length} bytes`);
-            
-            hashToVerify = generateBinaryHash(file.buffer);
-            console.log(`[DEBUG] VERIFY: Computed Binary SHA-256: ${hashToVerify}`);
-            console.log(`✅ RE-COMPUTED HASH: ${hashToVerify}`);
-            
-            // Check if we have additional metadata in our registry
+            if (file.size === 0) return res.status(400).json({ error: 'Invalid file: size is 0 bytes.' });
+            const buffer = fs.readFileSync(file.path);
+            hashToVerify = generateBinaryHash(buffer);
             metadata = await Certificate.findOne({ certificateHash: hashToVerify });
         } else if (certificateId) {
-            // Option 2: ID Verification — supports both MongoDB _id and custom certificateId strings
-            console.log(`🚀 Step 1: Resolving Metadata for Reference ID: ${certificateId}...`);
             const isMongoId = /^[0-9a-fA-F]{24}$/.test(certificateId);
             const cert = isMongoId
                 ? await Certificate.findOne({ $or: [{ _id: certificateId }, { certificateId }] })
                 : await Certificate.findOne({ certificateId });
+            
             if (!cert) {
-                console.log('❌ RESOLUTION ERROR: ID not found.');
                 return res.status(404).json({ valid: false, message: 'Certificate ID not found on registry.' });
             }
             hashToVerify = cert.certificateHash;
             metadata = cert;
-            console.log(`✅ FINGERPRINT FOUND: ${hashToVerify}`);
         } else {
             return res.status(400).json({ error: 'Input Required: Provide File or ID.' });
         }
 
         // Blockchain Query — The Absolute Source of Truth
-        // null = blockchain not configured (simulation mode) → fall back to DB
-        // false = hash not found on-chain → FAKE/TAMPERED
-        // true = hash confirmed on blockchain → AUTHENTIC
         console.log('🔍 [VERIFY]: Querying ledger for hash anchor...');
-        const onChainDetails = await verifyHashDetailsOnChain(hashToVerify);
-        const onChainResult = onChainDetails?.exists ?? await verifyHashOnChain(hashToVerify);
+        let isOnLedger = false;
+        let onChainDetails = null;
 
-        let isOnLedger;
-
-        if (onChainResult === null) {
-            // SIMULATION MODE: blockchain not configured
-            // Fall back to DB existence as the verification source of truth
-            const dbRecord = metadata || await Certificate.findOne({ certificateHash: hashToVerify });
-            isOnLedger = !!(dbRecord && dbRecord.status === 'CONFIRMED');
-            console.log(`🔵 [SIMULATION]: DB-based verification: ${isOnLedger ? 'VALID' : 'NOT FOUND'}`);
-        } else {
-            isOnLedger = onChainResult;
-            console.log(`⛓️  [BLOCKCHAIN]: On-chain result: ${isOnLedger ? 'VERIFIED' : 'NOT FOUND'}`);
+        try {
+            onChainDetails = await verifyHashDetailsOnChain(hashToVerify);
+            isOnLedger = onChainDetails?.exists === true;
+        } catch (ledgerErr) {
+            console.error('❌ [BLOCKCHAIN_UNREACHABLE]: Verification halted.', ledgerErr.message);
+            return res.status(503).json({ 
+                error: 'Verification Service Offline', 
+                message: 'Authoritative ledger is currently unreachable. Integrity cannot be verified.' 
+            });
         }
         
-        // Log verification
+        // Log verification attempt
         const reqIp = req.ip || req.connection.remoteAddress;
         await VerificationLog.create({
             certificateId: metadata ? metadata.certificateId : null,
             verificationMethod,
             result: isOnLedger ? (metadata && metadata.isRevoked ? 'revoked' : 'valid') : 'fake',
             verifierIp: reqIp,
-            verifierUserAgent: req.headers['user-agent'],
             submittedHash: hashToVerify
         });
 
         if (!isOnLedger) {
             await logAudit(req, 'CERTIFICATE_VERIFICATION', 'FAILURE', 'Tampered or unregistered credential detected.', { hash: hashToVerify });
             
-            // Pattern 1: Hash Mismatch on Verification
             await FraudAlert.create({
                 alertType: 'HASH_MISMATCH',
-                severity: 'MEDIUM',
-                description: 'Uploaded file hash does not match any blockchain record',
-                relatedIp: reqIp,
-                context: { submittedHash: hashToVerify }
+                severity: 'HIGH',
+                description: 'Verification attempt for unregistered or tampered hash.',
+                context: { submittedHash: hashToVerify, method: verificationMethod }
             });
 
-            await Ledger.create({
-                type: 'TAMPER',
-                studentName: metadata?.studentName || 'Unknown',
-                universityName: metadata?.issuer || 'Unknown',
-                certificateId: metadata?._id || null,
-                status: 'FAILED',
-                metadata: { submittedHash: hashToVerify, verificationMethod }
-            });
-            
             return res.status(404).json({
                 valid: false,
-                message: blockchainMode === 'LIVE'
-                    ? 'No matching on-chain certificate anchor was found.'
-                    : 'No matching confirmed certificate record was found in the registry.',
+                message: 'No matching on-chain certificate anchor was found. This credential is not authentic.',
                 submittedHash: hashToVerify
             });
         }
@@ -511,75 +494,36 @@ export const verifyCertificate = async (req, res) => {
                 valid: false,
                 isRevoked: true,
                 message: '⚠️ REVOKED: This certificate has been revoked by the issuing institution.',
-                metadata: {
-                    certificateId: metadata.certificateId,
-                    studentName: metadata.studentName,
-                    course: metadata.course,
-                    issuer: metadata.issuer,
-                    issuedAt: metadata.issuedAt,
-                    revocationTimestamp: metadata.revocationTimestamp,
-                    revocationReason: metadata.revocationReason,
-                    revocationReasonCode: metadata.revocationReasonCode,
-                    blockchainTxHash: metadata.blockchainTxHash
-                }
+                metadata: metadata ? buildPublicCertificatePayload(metadata) : null
             });
         }
 
-        // 🛡️ Deep Ledger Consensus: Verify Transaction Mined Status
-        let ledgerProof = null;
-        if (metadata && metadata.blockchainTxHash) {
-            try {
-                ledgerProof = {
-                    transactionHash: metadata.blockchainTxHash,
-                    status: 'PERMANENTLY_MINTED',
-                    confirmations: 'AUTHENTICATED_ON_CHAIN',
-                    issuer: onChainDetails?.issuer || null,
-                    anchoredAt: onChainDetails?.timestamp
-                        ? new Date(onChainDetails.timestamp * 1000).toISOString()
-                        : null
-                };
-            } catch (e) {
-                console.warn("⚠️ Ledger Proof Detail Extraction Failed:", e.message);
-            }
-        }
+        const proof = {
+            transactionHash: metadata?.blockchainTxHash || 'Anchored on External Node',
+            status: 'PERMANENTLY_MINTED',
+            issuer: onChainDetails?.issuer,
+            anchoredAt: onChainDetails?.timestamp ? new Date(onChainDetails.timestamp * 1000).toISOString() : null
+        };
 
         await logAudit(req, 'CERTIFICATE_VERIFICATION', 'SUCCESS', 'Identity verified against ledger.', { hash: hashToVerify });
-        await Ledger.create({
-            type: 'VERIFY',
-            studentName: metadata?.studentName || 'Unknown',
-            universityName: metadata?.issuer || 'Unknown',
-            certificateId: metadata?._id || null,
-            txHash: metadata?.blockchainTxHash || null,
-            status: 'SUCCESS',
-            metadata: { verificationMethod, blockchainMode }
-        });
+        
         res.json({
             valid: true,
-            onChainConsensus: onChainResult === true,
-            verificationSource: blockchainMode === 'LIVE' ? 'blockchain' : 'registry',
-            blockchainMode,
-            message: blockchainMode === 'LIVE'
-                ? 'Certificate verified against a live blockchain anchor.'
-                : 'Certificate verified against a confirmed registry record. Blockchain is not configured in this environment.',
+            onChainConsensus: true,
+            verificationSource: 'blockchain',
+            message: 'Certificate verified against the authoritative blockchain ledger.',
             hash: hashToVerify,
-            ledgerProof: blockchainMode === 'LIVE' ? ledgerProof : null,
-            qrCode: await generateVerificationQR(metadata ? metadata._id : 'PUBLIC_LEDGER'),
-            metadata: metadata ? {
-                certificateId: metadata.certificateId,
-                studentName: metadata.studentName,
-                course: metadata.course,
-                issuer: metadata.issuer,
-                issuedAt: metadata.issuedAt,
-                universityName: metadata.issuer, // Assuming issuer is univ name from earlier mapping
-                programName: metadata.course,
-                specialization: metadata.metadata?.branch || metadata.course,
-                graduationYear: metadata.metadata?.graduationYear || 'N/A'
-            } : { message: 'Anchor exists on blockchain, but identity record is not in this node.' }
+            ledgerProof: proof,
+            metadata: metadata ? buildPublicCertificatePayload(metadata) : { message: 'Anchor exists on blockchain, but local metadata is missing.' }
         });
 
     } catch (err) {
         console.error('🚀 Verification Failure:', err);
         res.status(500).json({ error: 'Verification vector failure.' });
+    } finally {
+        if (tempPath && fs.existsSync(tempPath)) {
+            fs.unlinkSync(tempPath);
+        }
     }
 };
 

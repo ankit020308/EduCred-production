@@ -11,17 +11,12 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "@nivo/core": "^0.88.0",
-    "@nivo/geo": "^0.88.0",
-    "@nivo/line": "^0.88.0",
-    "@nivo/pie": "^0.88.0",
     "@react-oauth/google": "^0.13.4",
     "@react-three/drei": "^9.122.0",
     "@react-three/fiber": "^8.17.14",
     "@react-three/postprocessing": "^2.19.1",
-    "axios": "^1.14.0",
+    "axios": "^1.15.0",
     "clsx": "^2.1.1",
-    "d3-geo": "^3.1.1",
     "ethers": "^6.13.5",
     "framer-motion": "^11.18.2",
     "lucide-react": "^1.7.0",
@@ -29,11 +24,9 @@
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "react-router-dom": "^7.13.2",
-    "react-simple-maps": "^3.0.0",
     "socket.io-client": "^4.8.3",
     "tailwind-merge": "^3.5.0",
-    "three": "^0.168.0",
-    "topojson-client": "^3.1.0"
+    "three": "^0.168.0"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4.2.2",

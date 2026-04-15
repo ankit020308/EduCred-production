@@ -317,7 +317,14 @@ function AdminDashboard() {
                           <span className="text-slate-400 text-[10px] font-bold uppercase tracking-widest">{cert.course}</span>
                         </td>
                         <td className="px-8 py-5">
-                          <StatusBadge status={cert.status} />
+                          <div className="flex items-center gap-3">
+                            <StatusBadge status={cert.status} />
+                            {cert.ipfsCid && (
+                              <div className="flex items-center gap-1 px-2 py-0.5 bg-sky-500/10 border border-sky-500/20 rounded-md">
+                                <span className="text-[8px] font-black text-sky-400 uppercase tracking-tighter">IPFS</span>
+                              </div>
+                            )}
+                          </div>
                         </td>
                         <td className="px-8 py-5">
                           <button

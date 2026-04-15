@@ -200,6 +200,12 @@ export default function StudentDashboard() {
                       </div>
                     </div>
                     <div className="flex items-center gap-3 shrink-0">
+                      {/* IPFS Badge */}
+                      {cert.ipfsCid && (
+                        <div className="flex items-center gap-1 px-2 py-0.5 bg-sky-500/10 border border-sky-500/20 rounded-md">
+                          <span className="text-[8px] font-black text-sky-400 uppercase tracking-tighter">IPFS</span>
+                        </div>
+                      )}
                       {/* Status badge */}
                       <span className={`hidden sm:inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[9px] font-bold uppercase tracking-widest border
                         ${cert.status === 'CONFIRMED' ? 'bg-blue-500/10 text-blue-400 border-blue-500/20' :

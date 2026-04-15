@@ -10,6 +10,7 @@ This document provides a comprehensive update on the **EduCred** project's new a
 |---|---|---|
 | **Smart Contract** | **OVERHAULED** | Switched from internal IDs to `bytes32` hash mappings & `ApplicationRecord` structs. |
 | **Backend** | **INTEGRATED** | Deterministic JSON sorting + SHA-256 pipeline implemented. |
+| **Storage (IPFS)**| **DEPLOYED** | Integrated Pinata v2 SDK for decentralized file pinning (IPFS) with local fallback. |
 | **Frontend** | **REAL-TIME** | Ethers.js event listeners (Status & Issuance) integrated for live graph updates. |
 
 ---
@@ -17,10 +18,11 @@ This document provides a comprehensive update on the **EduCred** project's new a
 ## 🛠️ Exact Technical Flow
 
 ### 1. Issuance (Academic Credentialing)
-1.  **Home Univ Admin**: Inputs student data in the frontend and uploads the certificate file.
-2.  **Cryptographic Fingerprinting**: The backend computes a **SHA-256 hash of the raw binary file content**, ensuring absolute integrity of the issued document.
-3.  **On-Chain Anchoring**: ONLY the resulting file hash is anchored to the smart contract (`issueCertificate(bytes32 _hash)`).
-4.  **Credential Retrieval**: The full JSON file is provided to the student as their **Digital Credential**.
+1.  **Home Univ Admin**: Inputs student data and uploads the certificate file.
+2.  **Cryptographic Fingerprinting**: Backend computes a **SHA-256 hash of the raw binary file content**.
+3.  **Decentralized Pinning**: The file is streamed to **IPFS via Pinata**. The resulting **CID** (Content Identifier) is recorded.
+4.  **On-Chain Anchoring**: ONLY the file hash is anchored to the Ganache smart contract (`issueCertificate`).
+5.  **Credential Retrieval**: The student accesses their certificate via a permanent IPFS gateway link.
 
 ### 2. Application (Student-to-Verifier)
 1.  **Student**: Submits their JSON credential directly to a Foreign University off-chain.

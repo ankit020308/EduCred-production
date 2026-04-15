@@ -1,46 +1,49 @@
 /**
- * ─── EduCred: IPFS Service (Pinata) ─────────────────────────────────────────
+ * ─── EduCred: IPFS Service (Pinata v2 SDK) ──────────────────────────────────
  *
  * Provides decentralized, content-addressed file storage via Pinata.
  *
  * Architecture:
  *   - Certificate files (PDFs) are pinned to IPFS via Pinata
  *   - Each upload returns a CID (Content Identifier) — the permanent address
- *   - Only the SHA-256 hash of the file goes on-chain (the CID is metadata)
+ *   - Only the SHA-256 hash of the file goes on-chain (the CID is off-chain metadata)
  *   - Files are publicly retrievable via any IPFS gateway
  *
  * Environment Variables Required:
- *   PINATA_API_KEY     — from Pinata dashboard
- *   PINATA_API_SECRET  — from Pinata dashboard
- *   IPFS_GATEWAY_URL   — defaults to https://gateway.pinata.cloud/ipfs
+ *   PINATA_JWT          — JWT token from Pinata dashboard (API Keys → New Key)
+ *   PINATA_GATEWAY      — Your dedicated gateway domain (e.g. "teal-blank-condor-239.mypinata.cloud")
+ *                          OR leave blank to use the public gateway
  */
 
-import PinataSDK from '@pinata/sdk';
-import { Readable } from 'stream';
+import { PinataSDK } from 'pinata';
 import dotenv from 'dotenv';
 
 dotenv.config();
 
-const PINATA_API_KEY = process.env.PINATA_API_KEY;
-const PINATA_API_SECRET = process.env.PINATA_API_SECRET;
-const IPFS_GATEWAY = process.env.IPFS_GATEWAY_URL || 'https://gateway.pinata.cloud/ipfs';
+const PINATA_JWT     = process.env.PINATA_JWT;
+const PINATA_GATEWAY = process.env.PINATA_GATEWAY || 'gateway.pinata.cloud';
 
-// ─── Singleton Pinata Client ─────────────────────────────────────────────────
+// ─── Singleton Pinata Client ──────────────────────────────────────────────────
 
 let _pinataClient = null;
 
 function getPinataClient() {
   if (_pinataClient) return _pinataClient;
-  if (!PINATA_API_KEY || !PINATA_API_SECRET) return null;
-  _pinataClient = new PinataSDK(PINATA_API_KEY, PINATA_API_SECRET);
+  if (!PINATA_JWT) return null;
+  _pinataClient = new PinataSDK({
+    pinataJwt:     PINATA_JWT,
+    pinataGateway: PINATA_GATEWAY,
+  });
   return _pinataClient;
 }
+
+// ─── Public API ───────────────────────────────────────────────────────────────
 
 /**
  * @returns {boolean} Whether Pinata is configured and available
  */
 export function isPinataConfigured() {
-  return !!(PINATA_API_KEY && PINATA_API_SECRET);
+  return !!PINATA_JWT;
 }
 
 /**
@@ -48,7 +51,7 @@ export function isPinataConfigured() {
  */
 export function getIPFSUrl(cid) {
   if (!cid) return null;
-  return `${IPFS_GATEWAY}/${cid}`;
+  return `https://${PINATA_GATEWAY}/ipfs/${cid}`;
 }
 
 /**
@@ -62,32 +65,30 @@ export function getIPFSUrl(cid) {
 export async function uploadFileToPinata(buffer, filename, keyvalueMetadata = {}) {
   const pinata = getPinataClient();
   if (!pinata) {
-    throw new Error('[IPFS]: Pinata is not configured. Add PINATA_API_KEY and PINATA_API_SECRET to server/.env');
+    throw new Error(
+      '[IPFS]: Pinata is not configured. Add PINATA_JWT to server/.env'
+    );
   }
 
-  // Convert Buffer to a Readable stream — required by Pinata SDK
-  const readableStream = Readable.from(buffer);
-  // Pinata needs a filename so it can identify the stream
-  readableStream.path = filename;
-
-  const options = {
-    pinataMetadata: {
-      name: filename,
-      keyvalues: {
-        source: 'EduCred',
-        uploadedAt: new Date().toISOString(),
-        ...keyvalueMetadata,
-      },
-    },
-    pinataOptions: {
-      cidVersion: 1, // CIDv1 — base32 encoded, more portable
-    },
-  };
+  // The new Pinata SDK accepts a Web-API File object (or Blob)
+  const blob = new Blob([buffer], { type: 'application/pdf' });
+  const file = new File([blob], filename, { type: 'application/pdf' });
 
   console.log(`[📦 IPFS_UPLOAD] Pinning "${filename}" to IPFS via Pinata...`);
-  const result = await pinata.pinFileToIPFS(readableStream, options);
 
-  const cid = result.IpfsHash;
+  // Correct API for Pinata v2 SDK:
+  // .upload.public.file(file).name(filename).keyvalues(metadata)
+  const result = await pinata.upload.public.file(file)
+    .name(filename)
+    .keyvalues({
+      source: 'EduCred',
+      uploadedAt: new Date().toISOString(),
+      ...Object.fromEntries(
+        Object.entries(keyvalueMetadata).map(([k, v]) => [k, String(v)])
+      ),
+    });
+
+  const cid = result.cid;
   const url = getIPFSUrl(cid);
 
   console.log(`[✅ IPFS_SUCCESS] File pinned. CID: ${cid}`);
@@ -107,27 +108,22 @@ export async function uploadFileToPinata(buffer, filename, keyvalueMetadata = {}
 export async function uploadJSONToPinata(jsonData, pinName) {
   const pinata = getPinataClient();
   if (!pinata) {
-    throw new Error('[IPFS]: Pinata is not configured. Add PINATA_API_KEY and PINATA_API_SECRET to server/.env');
+    throw new Error(
+      '[IPFS]: Pinata is not configured. Add PINATA_JWT to server/.env'
+    );
   }
 
-  const options = {
-    pinataMetadata: {
-      name: pinName || 'EduCred-Metadata',
-      keyvalues: {
-        source: 'EduCred',
-        type: 'certificate-metadata',
-        uploadedAt: new Date().toISOString(),
-      },
-    },
-    pinataOptions: {
-      cidVersion: 1,
-    },
-  };
-
   console.log(`[📦 IPFS_JSON_UPLOAD] Pinning metadata JSON: "${pinName}"...`);
-  const result = await pinata.pinJSONToIPFS(jsonData, options);
 
-  const cid = result.IpfsHash;
+  const result = await pinata.upload.public.json(jsonData)
+    .name(pinName || 'EduCred-Metadata')
+    .keyvalues({
+      source:    'EduCred',
+      type:      'certificate-metadata',
+      uploadedAt: new Date().toISOString(),
+    });
+
+  const cid = result.cid;
   const url = getIPFSUrl(cid);
 
   console.log(`[✅ IPFS_JSON_SUCCESS] Metadata pinned. CID: ${cid}`);
@@ -135,7 +131,7 @@ export async function uploadJSONToPinata(jsonData, pinName) {
 }
 
 /**
- * Tests the Pinata connection using authentication check.
+ * Tests the Pinata connection using the native testAuthentication method.
  * @returns {Promise<boolean>}
  */
 export async function testPinataConnection() {

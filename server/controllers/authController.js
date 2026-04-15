@@ -1,16 +1,32 @@
-import { sendOTP } from '../utils/emailService.js';
-import { sendPhoneOTP } from '../utils/smsService.js';
-import { logAudit } from '../utils/logger.js';
-import { registerSchema, loginSchema, otpSchema } from '../utils/validation.js';
-import { OAuth2Client } from 'google-auth-library';
-import jwt from 'jsonwebtoken';
-import crypto from 'crypto';
+import Blacklist from '../models/Blacklist.js';
 
-
-import User from '../models/User.js';
-import University from '../models/University.js';
-import Student from '../models/Student.js';
-import { jwtSecret, refreshSecret, requireEnv } from '../utils/runtimeConfig.js';
+/**
+ * 🚪 Logout
+ * Revokes the session context by blacklisting the active token.
+ */
+export const logout = async (req, res) => {
+  try {
+    const authHeader = req.headers.authorization;
+    if (authHeader?.startsWith('Bearer ')) {
+      const token = authHeader.split(' ')[1];
+      const decoded = jwt.decode(token);
+      
+      // Blacklist the token until its original expiry
+      if (decoded && decoded.exp) {
+        await Blacklist.create({
+          token,
+          expiresAt: new Date(decoded.exp * 1000)
+        });
+      }
+    }
+    
+    await logAudit(req, 'NODE_LOGOUT', 'SUCCESS', 'Identity node session terminated.', { userId: req.user?._id });
+    res.status(200).json({ message: 'Identity node session terminated and token revoked.' });
+  } catch (err) {
+    console.error('Logout error:', err);
+    res.status(500).json({ error: 'Logout failed.' });
+  }
+};
 
 const googleClient = new OAuth2Client(requireEnv('GOOGLE_CLIENT_ID'));
 
@@ -417,16 +433,6 @@ export const verifyPhoneOTP = async (req, res) => {
     console.error('Phone OTP verify error:', err);
     res.status(500).json({ error: 'Mobile verification failed.' });
   }
-};
-
-/**
- * 🚪 Logout
- * Revokes the session context. In a production state, this would involve token blacklisting.
- */
-export const logout = async (req, res) => {
-  // Client should delete tokens on their end. 
-  // Future implementation: Add token to blacklist in Redis.
-  res.status(200).json({ message: 'Identity node session terminated.' });
 };
 
 export const getMe = async (req, res) => {

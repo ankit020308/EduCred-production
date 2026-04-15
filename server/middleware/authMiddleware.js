@@ -1,6 +1,4 @@
-import jwt from 'jsonwebtoken';
-import User from '../models/User.js';
-import { jwtSecret } from '../utils/runtimeConfig.js';
+import Blacklist from '../models/Blacklist.js';
 
 export const protect = async (req, res, next) => {
   try {
@@ -10,6 +8,13 @@ export const protect = async (req, res, next) => {
     }
 
     const token = authHeader.split(' ')[1];
+
+    // Check if token is blacklisted
+    const isBlacklisted = await Blacklist.findOne({ token });
+    if (isBlacklisted) {
+      return res.status(401).json({ error: 'Security token revoked. Please login again.' });
+    }
+
     const decoded = jwt.verify(token, jwtSecret);
 
     const user = await User.findById(decoded.id).select('-passwordHash');

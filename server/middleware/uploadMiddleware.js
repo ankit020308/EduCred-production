@@ -1,11 +1,27 @@
 import multer from 'multer';
-import { cloudinary } from '../utils/cloudinary.js';
-import streamifier from 'streamifier';
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
 
-// 📂 PRODUCTION CONFIG: Multer Memory Storage
-// Serverless environments (Vercel/Lambda) cannot write to local disk.
-// We keep the file in a temporary buffer for hashing and immediate streaming.
-const storage = multer.memoryStorage();
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+// Ensure temporary uploads directory exists
+const UPLOAD_TEMP_DIR = path.join(__dirname, '../../uploads/temp');
+if (!fs.existsSync(UPLOAD_TEMP_DIR)) {
+    fs.mkdirSync(UPLOAD_TEMP_DIR, { recursive: true });
+}
+
+const storage = multer.diskStorage({
+    destination: (req, file, cb) => {
+        cb(null, UPLOAD_TEMP_DIR);
+    },
+    filename: (req, file, cb) => {
+        const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+        cb(null, file.fieldname + '-' + uniqueSuffix + path.extname(file.originalname));
+    }
+});
+
 const ALLOWED_MIME_TYPES = new Set([
     'application/pdf',
     'image/png',
@@ -15,7 +31,9 @@ const ALLOWED_MIME_TYPES = new Set([
 
 export const upload = multer({ 
     storage,
-    limits: { fileSize: 10 * 1024 * 1024 }, // 10MB Limit
+    limits: { 
+        fileSize: 20 * 1024 * 1024, // 20MB Limit
+    },
     fileFilter: (req, file, cb) => {
         if (!ALLOWED_MIME_TYPES.has(file.mimetype)) {
             cb(new Error('Only PDF, PNG, and JPEG certificate files are allowed.'));
@@ -24,27 +42,3 @@ export const upload = multer({
         cb(null, true);
     }
 });
-
-/**
- * ⚡ CLOUD STREAMER: Buffer-to-Cloudinary
- * Directly streams the file from memory to the cloud without local persistence.
- * @param {Buffer} buffer - File buffer from req.file
- * @param {string} folder - Destination folder on Cloudinary
- * @returns {Promise<Object>} Cloudinary upload result
- */
-export const streamToCloudinary = (buffer, folder = 'educred_certificates') => {
-    return new Promise((resolve, reject) => {
-        const stream = cloudinary.uploader.upload_stream(
-            { 
-                folder,
-                resource_type: 'auto',
-                access_mode: 'public'
-            },
-            (error, result) => {
-                if (error) reject(error);
-                else resolve(result);
-            }
-        );
-        streamifier.createReadStream(buffer).pipe(stream);
-    });
-};

@@ -36,7 +36,7 @@ async function waitForRpc(targetHost, targetPort, timeoutMs = 20000) {
     await wait(500);
   }
 
-  throw new Error(`Ganache RPC did not become ready on ${targetHost}:${targetPort}`);
+  throw new Error(`Local blockchain RPC did not become ready on ${targetHost}:${targetPort}`);
 }
 
 function runDeploy() {
@@ -60,20 +60,19 @@ function runDeploy() {
 
 async function main() {
   const alreadyRunning = await isPortOpen(host, port);
-  let ganacheProcess = null;
+  let nodeProcess = null;
 
   if (!alreadyRunning) {
-    // Use local node_modules/.bin/ganache — works without global install
-    const ganacheBin = path.join(projectRoot, 'node_modules', '.bin', 'ganache');
+    const hardhatBin = path.join(projectRoot, 'node_modules', '.bin', 'hardhat');
 
-    ganacheProcess = spawn(
-      process.platform === 'win32' ? `${ganacheBin}.cmd` : ganacheBin,
+    nodeProcess = spawn(
+      process.execPath,
       [
-        '--server.port', String(port),
-        '--chain.chainId', '1337',
-        '--wallet.mnemonic', 'test test test test test test test test test test test junk',
-        '--wallet.totalAccounts', '10',
-        '--wallet.defaultBalance', '1000',
+        process.platform === 'win32' ? `${hardhatBin}.cmd` : hardhatBin,
+        'node',
+        '--hostname', host,
+        '--port', String(port),
+        '--chain-id', '1337',
       ],
       {
         cwd: projectRoot,
@@ -82,29 +81,29 @@ async function main() {
       },
     );
 
-    ganacheProcess.on('error', (err) => {
-      console.error('[chain] Failed to start Ganache:', err.message);
+    nodeProcess.on('error', (err) => {
+      console.error('[chain] Failed to start local blockchain node:', err.message);
       process.exit(1);
     });
   } else {
-    console.log(`[chain] Reusing running Ganache at ${host}:${port}`);
+    console.log(`[chain] Reusing running local blockchain at ${host}:${port}`);
   }
 
   await waitForRpc(host, port);
   await runDeploy();
 
-  if (!ganacheProcess) {
+  if (!nodeProcess) {
     return;
   }
 
   const shutdown = (signal) => {
-    ganacheProcess.kill(signal);
+    nodeProcess.kill(signal);
   };
 
   process.on('SIGINT', () => shutdown('SIGINT'));
   process.on('SIGTERM', () => shutdown('SIGTERM'));
 
-  ganacheProcess.on('exit', (code) => {
+  nodeProcess.on('exit', (code) => {
     process.exit(code ?? 0);
   });
 }

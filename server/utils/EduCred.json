@@ -427,6 +427,5 @@
   ],
   "rpcUrl": "http://127.0.0.1:8545",
   "chainId": 1337,
-  "deployedAt": "2026-04-12T20:12:08.810Z",
-  "privateKey": "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80"
+  "deployedAt": "2026-04-13T07:01:27.232Z"
 }

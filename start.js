@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
  * EduCred Full-Stack Launcher
- * Starts: Ganache → deploys contract → starts backend server → starts frontend dev server
+ * Starts: local blockchain node → deploys contract → starts backend server → starts frontend dev server
  *
  * Usage: node start.js
  */
@@ -20,15 +20,16 @@ const BC_DIR   = path.join(ROOT, 'blockchain');
 const SRV_DIR  = path.join(ROOT, 'server');
 const CLT_DIR  = path.join(ROOT, 'client');
 
-const GANACHE_PORT = 8545;
-const SERVER_PORT  = 5001;
+const BLOCKCHAIN_PORT = 8545;
+const SERVER_PORT   = 5001;
+const FRONTEND_PORT = 3000;
 
 // ─── Resolve Node binary ────────────────────────────────────────────────────
 function findNode() {
   const candidates = [
+    process.execPath,
     '/opt/homebrew/bin/node',
     '/usr/local/bin/node',
-    process.execPath,
   ];
   for (const c of candidates) {
     if (fs.existsSync(c)) return c;
@@ -74,25 +75,35 @@ function spawn_(cmd, args, cwd, label) {
 // ─── Main ─────────────────────────────────────────────────────────────────────
 async function main() {
   console.log('\n🚀 EduCred Full-Stack Launcher\n');
+  
+  // ── 0. Cleanup ──────────────────────────────────────────────────────────────
+  console.log('🧹 Cleaning up old processes...');
+  try {
+    // Kill any processes on 3000, 5001, 8545
+    const portsToKill = [BLOCKCHAIN_PORT, SERVER_PORT, FRONTEND_PORT];
+    for (const port of portsToKill) {
+      try { execSync(`lsof -ti :${port} | xargs kill -9`, { stdio: 'ignore' }); } catch (e) {}
+    }
+    await wait(1000);
+  } catch (err) {}
+
   const procs = [];
 
-  // ── 1. Ganache ──────────────────────────────────────────────────────────────
-  const ganacheAlreadyRunning = await isPortOpen('127.0.0.1', GANACHE_PORT);
-  if (!ganacheAlreadyRunning) {
-    console.log('⛓️  Starting Ganache local blockchain...');
-    const ganacheBin = path.join(BC_DIR, 'node_modules', '.bin', 'ganache');
-    const ganache = spawn_(NODE, [
-      ganacheBin,
-      '--server.port', String(GANACHE_PORT),
-      '--chain.chainId', '1337',
-      '--wallet.mnemonic', 'test test test test test test test test test test test junk',
-      '--wallet.totalAccounts', '10',
-      '--wallet.defaultBalance', '1000',
-    ], BC_DIR, 'ganache');
-    procs.push(ganache);
-    await waitForPort('127.0.0.1', GANACHE_PORT, 'Ganache');
+  // ── 1. Local blockchain node ────────────────────────────────────────────────
+  const blockchainAlreadyRunning = await isPortOpen('127.0.0.1', BLOCKCHAIN_PORT);
+  if (!blockchainAlreadyRunning) {
+    console.log('⛓️  Starting local blockchain node...');
+    const hardhatBin = path.join(BC_DIR, 'node_modules', '.bin', 'hardhat');
+    const nodeProcess = spawn_(
+      NODE,
+      [(process.platform === 'win32' ? `${hardhatBin}.cmd` : hardhatBin), 'node', '--hostname', '127.0.0.1', '--port', String(BLOCKCHAIN_PORT), '--chain-id', '1337'],
+      BC_DIR,
+      'hardhat-node'
+    );
+    procs.push(nodeProcess);
+    await waitForPort('127.0.0.1', BLOCKCHAIN_PORT, 'Local blockchain');
   } else {
-    console.log('⛓️  Ganache already running on port', GANACHE_PORT);
+    console.log('⛓️  Local blockchain already running on port', BLOCKCHAIN_PORT);
   }
 
   // ── 2. Deploy contract ──────────────────────────────────────────────────────
@@ -128,12 +139,13 @@ async function main() {
     path.join(CLT_DIR, 'node_modules', '.bin', 'vite'),
   ], CLT_DIR, 'vite');
   procs.push(vite);
+  await waitForPort('127.0.0.1', FRONTEND_PORT, 'Frontend UI');
 
   // ── 5. Summary ───────────────────────────────────────────────────────────────
   await wait(2000);
   console.log('\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
   console.log('✅  EduCred is running!\n');
-  console.log('   🌐 Frontend:   http://localhost:5173  (or check vite output)');
+  console.log('   🌐 Frontend:   http://localhost:3000  (or check vite output)');
   console.log('   🖥️  Backend:    http://localhost:5001');
   console.log('   ⛓️  Blockchain: http://127.0.0.1:8545');
   console.log('\n   Press Ctrl+C to stop all services.');

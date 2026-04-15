@@ -5,7 +5,7 @@
   "main": "index.js",
   "type": "module",
   "scripts": {
-    "chain": "ganache --server.port 8545 --chain.chainId 1337 --wallet.mnemonic \"test test test test test test test test test test test junk\" --wallet.totalAccounts 10",
+    "chain": "hardhat node --hostname 127.0.0.1 --port 8545 --chain-id 1337",
     "node": "node ./scripts/start-local.js",
     "compile": "hardhat compile",
     "deploy": "node ./scripts/deploy.js",
@@ -14,12 +14,8 @@
   "keywords": [],
   "author": "",
   "license": "ISC",
-  "dependencies": {
-    "ganache": "^7.9.2"
-  },
   "devDependencies": {
     "@nomicfoundation/hardhat-ethers": "^4.0.6",
-    "@nomicfoundation/hardhat-toolbox": "^6.1.2",
     "ethers": "^6.16.0",
     "hardhat": "^3.2.0"
   }

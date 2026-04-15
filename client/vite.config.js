@@ -10,6 +10,7 @@ export default defineConfig({
   },
   server: {
     port: 3000,
+    strictPort: true,
     // Dev proxy: forwards /api requests to local backend
     // In production, VITE_API_URL is set as a Render env var
     proxy: {
