@@ -38,14 +38,21 @@ services:
       - key: ADMIN_PASSWORD
         sync: false
 
-      # ── Blockchain (Optional — system runs in simulation mode if unset) ─
-      # Leave blank to use DB-based verification (simulation mode).
-      # Set these to anchor hashes on a real blockchain network.
+      # ── Blockchain (Production Identity Anchoring) ───────────────────────
+      # These variables ARE REQUIRED for the system to boot in production.
+      # The system no longer supports simulation mode for authenticated issuance.
       - key: RPC_URL
         sync: false
       - key: PRIVATE_KEY
         sync: false
       - key: CONTRACT_ADDRESS
+        sync: false
+
+      # ── Decentralized Storage (IPFS via Pinata) ──────────────────────────
+      # Highly recommended for production to ensure certificate permanence.
+      - key: PINATA_API_KEY
+        sync: false
+      - key: PINATA_API_SECRET
         sync: false
 
       # ── Notifications (Optional) ───────────────────────────────────────

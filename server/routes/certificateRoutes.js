@@ -14,6 +14,8 @@ import {
 import { protect, requireRole } from '../middleware/authMiddleware.js';
 import { upload } from '../middleware/uploadMiddleware.js';
 
+import { authLimiter } from '../middleware/rateLimiter.js';
+
 const router = express.Router();
 
 /**
@@ -32,10 +34,10 @@ router.get('/:id/file', protect, downloadCertificateFile);
  * 🛡️ Public Verification Portal
  * Keep /verify for existing frontend backward compatibility
  */
-router.post('/verify', upload.single('file'), verifyCertificate);
-router.post('/verify/upload', upload.single('file'), verifyCertificate);
-router.post('/verify/id', verifyCertificate);
-router.post('/verify/enrollment', verifyByEnrollment);
+router.post('/verify', authLimiter, upload.single('file'), verifyCertificate);
+router.post('/verify/upload', authLimiter, upload.single('file'), verifyCertificate);
+router.post('/verify/id', authLimiter, verifyCertificate);
+router.post('/verify/enrollment', authLimiter, verifyByEnrollment);
 
 /**
  * 🎓 Public Certificate Lookup (for student sharing link)

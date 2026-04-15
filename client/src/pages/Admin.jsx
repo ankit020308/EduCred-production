@@ -380,9 +380,9 @@ function AdminDashboard() {
                     <div className="w-20 h-20 bg-blue-500/10 rounded-2xl mx-auto flex items-center justify-center text-blue-400 border border-blue-500/20 shadow-[0_0_40px_rgba(59,130,246,0.2)]">
                       <ShieldCheck size={36} />
                     </div>
-                    <h3 className="text-2xl font-bold text-white tracking-tight">Certificate Issued.</h3>
+                    <h3 className="text-2xl font-bold text-white tracking-tight">Identity Anchored.</h3>
                     <p className="text-slate-400 text-[11px] font-medium uppercase tracking-[0.15em] max-w-xs mx-auto leading-relaxed">
-                      Hash anchored. Blockchain confirmation in progress.
+                      Certificate fingerprint has been permanently committed to the ledger.
                     </p>
                   </div>
 

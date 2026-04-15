@@ -18,16 +18,33 @@ export const approveUniversity = async (req, res) => {
   try {
     const { universityId } = req.body;
     const university = await University.findById(universityId);
-    if (!university) return res.status(404).json({ error: 'University not found' });
+    if (!university) return res.status(404).json({ error: 'University not found.' });
+    if (university.status === 'APPROVED') return res.status(400).json({ error: 'University node is already active.' });
+
+    // 🏥 Security Check: Institutional Integrity
+    const isInstitutional = university.email.endsWith('.edu') || university.email.endsWith('.ac.in');
+    if (university.isFlagged && !isInstitutional) {
+      return res.status(403).json({ 
+        error: 'High Risk Node Detected', 
+        message: 'This node is flagged due to a non-institutional email domain. Manual domain verification required.' 
+      });
+    }
     
     university.status = 'APPROVED';
     university.approvedBy = req.user._id;
     university.approvedAt = new Date();
+    university.isVerified = true;
     await university.save();
+
+    // Update the associated User node status
+    await User.findByIdAndUpdate(university.userId, { 
+      'universityStatus': 'APPROVED',
+      'isEmailVerified': true 
+    });
     
-    res.json({ message: 'University approved successfully', university });
+    res.json({ message: 'University identity node authorized.', university });
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: 'Authorization operation failed.', details: error.message });
   }
 };
 

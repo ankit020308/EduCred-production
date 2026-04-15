@@ -270,8 +270,6 @@ export const issueCertificate = async (req, res) => {
     }
 };
 
-};
-
 export const confirmIssuance = async (req, res) => {
     try {
         const { certDbId } = req.body;
