@@ -1,6 +1,18 @@
 import Blacklist from '../models/Blacklist.js';
 import { OAuth2Client } from 'google-auth-library';
+import jwt from 'jsonwebtoken';
+import crypto from 'crypto';
 
+import User from '../models/User.js';
+import University from '../models/University.js';
+import Student from '../models/Student.js';
+
+import { registerSchema, loginSchema, otpSchema } from '../validators/authValidator.js';
+
+import { sendOTP, sendPhoneOTP } from '../utils/sendOTP.js';
+import { logAudit } from '../utils/auditLogger.js';
+const jwtSecret = process.env.JWT_SECRET || "dev_jwt_secret";
+const refreshSecret = process.env.REFRESH_SECRET || "dev_refresh_secret";
 /**
  * 🚪 Logout
  * Revokes the session context by blacklisting the active token.
