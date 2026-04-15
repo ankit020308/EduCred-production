@@ -31,7 +31,7 @@ function getTransporter() {
 // Verify SMTP connection at startup (non-blocking, non-fatal)
 if (isProduction) {
   // Skip verbose verification logs in production to avoid noise at boot
-} else {
+} else if (process.env.NODE_ENV !== 'test') {
   Promise.resolve().then(async () => {
     try {
       const t = getTransporter();

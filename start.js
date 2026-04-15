@@ -138,7 +138,7 @@ async function main() {
         }
       } catch (e) { /* Port is already free */ }
     }
-    log.success('Ports cleared.');
+    log.success('Ports cleared and stabilized.');
   } catch (err) {
     log.warn('Process cleanup encountered an issue, continuing anyway.');
   }

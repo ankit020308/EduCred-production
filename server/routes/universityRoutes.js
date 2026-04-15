@@ -6,7 +6,7 @@ import {
   rejectUniversity 
 } from '../controllers/universityController.js';
 import { protect, requireRole } from '../middleware/authMiddleware.js';
-import University from '../models/University.js';
+import Registry from '../services/registryService.js';
 
 const router = express.Router();
 
@@ -15,7 +15,10 @@ const router = express.Router();
  */
 router.get('/public', async (req, res) => {
   try {
-    const universities = await University.find({ status: 'APPROVED' }, 'name _id');
+    const universities = Registry.find('universities', { status: 'APPROVED' }).map(u => ({
+      name: u.name,
+      _id: u._id
+    }));
     res.json(universities);
   } catch (err) {
     res.status(500).json({ error: 'Failed to fetch universities.' });

@@ -1,0 +1,13 @@
+{
+  "users": [],
+  "universities": [],
+  "students": [],
+  "certificates": [],
+  "ledger": [],
+  "auditLogs": [],
+  "fraudAlerts": [],
+  "verificationLogs": [],
+  "requests": [],
+  "blacklistedTokens": [],
+  "test_collection": []
+}

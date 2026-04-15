@@ -1,35 +1,55 @@
-import mongoose from 'mongoose';
+// server/models/AuditLog.js
+import { DataTypes } from 'sequelize';
+import sequelize from '../config/database.js';
 
 /**
- * 📜 System Audit Node
- * Tracks high-stakes operations across the EduCred protocol for security auditing.
+ * 🕵️ Audit Log Model
+ * Tracks critical system events for compliance and security auditing.
  */
-const AuditLogSchema = new mongoose.Schema({
-    action: {
-        type: String,
-        required: true,
-        index: true
+const AuditLog = sequelize.define('AuditLog', {
+    id: {
+        type: DataTypes.UUID,
+        defaultValue: DataTypes.UUIDV4,
+        primaryKey: true
     },
     userId: {
-        type: mongoose.Schema.Types.ObjectId,
-        ref: 'User',
-        required: false,
-        index: true
+        type: DataTypes.UUID,
+        allowNull: true,
+        references: {
+            model: 'User',
+            key: 'id'
+        }
     },
-    details: {
-        type: String
-    },
-    ipAddress: {
-        type: String
+    action: {
+        type: DataTypes.STRING,
+        allowNull: false
     },
     status: {
-        type: String,
-        enum: ['SUCCESS', 'FAILURE'],
-        default: 'SUCCESS'
+        type: DataTypes.STRING,
+        allowNull: false
+    },
+    detail: {
+        type: DataTypes.TEXT,
+        allowNull: true
+    },
+    ip: {
+        type: DataTypes.STRING,
+        allowNull: true
+    },
+    userAgent: {
+        type: DataTypes.STRING,
+        allowNull: true
     },
     metadata: {
-        type: Object
+        type: DataTypes.JSONB,
+        defaultValue: {}
     }
-}, { timestamps: true });
+}, {
+    indexes: [
+        { fields: ['userId'] },
+        { fields: ['action'] },
+        { fields: ['createdAt'] }
+    ]
+});
 
-export default mongoose.model('AuditLog', AuditLogSchema);
+export default AuditLog;

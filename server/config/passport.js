@@ -1,7 +1,6 @@
 import passport from 'passport';
 import { Strategy as GoogleStrategy } from 'passport-google-oauth20';
-import User from '../models/User.js';
-import University from '../models/University.js';
+import Registry from '../services/registryService.js';
 import crypto from 'crypto';
 import { requireEnv } from '../utils/runtimeConfig.js';
 
@@ -18,7 +17,8 @@ export const configurePassport = () => {
         return done(new Error('Google profile has no email'), null);
       }
 
-      let user = await User.findOne({ email });
+      // 🛡️ All Registry calls MUST be awaited for the SQL adapter
+      let user = await Registry.findOne('users', { email });
 
       // 🚀 AUTO-SIGNUP LOGIC: Create user if they don't exist
       if (!user) {
@@ -29,14 +29,14 @@ export const configurePassport = () => {
         let linkedUniversityId = null;
 
         // Check if domain matches any approved university
-        const matchedUniversity = await University.findOne({ officialDomain: domain, status: 'APPROVED' });
+        const matchedUniversity = await Registry.findOne('universities', { officialDomain: domain, status: 'APPROVED' });
         if (matchedUniversity) {
           console.log(`[🏛️ AUTH_AFFILIATION] Domain ${domain} verified. Linking to university node: ${matchedUniversity.name}`);
           role = 'university';
-          linkedUniversityId = matchedUniversity._id;
+          linkedUniversityId = matchedUniversity.id; // Using .id for SQL consistency
         }
 
-        user = await User.create({
+        user = await Registry.insert('users', {
           name: profile.displayName || email.split('@')[0],
           displayName: profile.displayName,
           email,
@@ -54,15 +54,16 @@ export const configurePassport = () => {
         console.log(`[✅ AUTH_SUCCESS] Account provisioned for: ${user.email} with role: ${user.role}`);
       } else {
         // 🔄 LINKAGE LOGIC: Update existing user with Google details if they've switched auth providers
-        let updated = false;
-        if (!user.googleId) { user.googleId = profile.id; updated = true; }
-        if (!user.isGoogleUser) { user.isGoogleUser = true; updated = true; }
-        if (user.provider !== 'google') { user.provider = 'google'; updated = true; }
-        if (!user.isEmailVerified) { user.isEmailVerified = true; updated = true; }
+        const update = {};
+        if (!user.googleId) update.googleId = profile.id;
+        if (!user.isGoogleUser) update.isGoogleUser = true;
+        if (user.provider !== 'google') update.provider = 'google';
+        if (!user.isEmailVerified) update.isEmailVerified = true;
         
-        if (updated) {
+        if (Object.keys(update).length > 0) {
           console.log(`[🔄 AUTH_LINKAGE] Mapping Google identity to existing user: ${email}`);
-          await user.save();
+          await Registry.update('users', { id: user.id }, update); // Using id for SQL consistency
+          user = await Registry.findById('users', user.id);
         }
       }
 
@@ -72,11 +73,11 @@ export const configurePassport = () => {
     }
   }));
 
-  // Not strictly using sessions since we're using JWTs mostly, but good practice
+  // Standard serialization logic
   passport.serializeUser((user, done) => done(null, user.id));
   passport.deserializeUser(async (id, done) => {
     try {
-      const user = await User.findById(id);
+      const user = await Registry.findById('users', id);
       done(null, user);
     } catch (err) {
       done(err, null);

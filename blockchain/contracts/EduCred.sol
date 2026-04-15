@@ -1,11 +1,13 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
+import "@openzeppelin/contracts/access/Ownable.sol";
+
 /**
  * @title EduCred - Authoritative Academic Ledger
  * @dev Single source of truth for certificate authenticity via hashes.
  */
-contract EduCred {
+contract EduCred is Ownable {
     
     // Mapping of SHA-256 certificate hashes to their validity status
     mapping(bytes32 => bool) public validCertificates;
@@ -43,16 +45,8 @@ contract EduCred {
     event IssuerAuthorized(address indexed issuer);
     event IssuerRemoved(address indexed issuer);
 
-    address public owner;
-
-    constructor() {
-        owner = msg.sender;
+    constructor() Ownable(msg.sender) {
         authorizedIssuers[msg.sender] = true;
-    }
-
-    modifier onlyOwner() {
-        require(msg.sender == owner, "Only owner can call this");
-        _;
     }
 
     modifier onlyAuthorizedIssuer() {
@@ -117,7 +111,7 @@ contract EduCred {
 
     function revokeHash(bytes32 hash, uint8 reasonCode) public {
         require(validCertificates[hash], "Hash not found");
-        require(certificates[hash].issuer == msg.sender || msg.sender == owner, "Not authorized to revoke");
+        require(certificates[hash].issuer == msg.sender || msg.sender == owner(), "Not authorized to revoke");
         require(!certificates[hash].revoked, "Already revoked");
         
         certificates[hash].revoked = true;

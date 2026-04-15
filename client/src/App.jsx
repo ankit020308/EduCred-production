@@ -1,6 +1,6 @@
 import { BrowserRouter as Router, Routes, Route, Navigate, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { AnimatePresence } from 'framer-motion';
-import { Suspense, lazy, useEffect } from 'react';
+import { Suspense, lazy, useEffect, useRef } from 'react';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { BlockchainProvider } from './context/BlockchainContext';
 import { ToastProvider, useToast } from './components/Toast';
@@ -24,6 +24,7 @@ const AuthError = lazy(() => import('./pages/AuthError'));
 // Dashboards
 const Admin = lazy(() => import('./pages/Admin')); // University Dashboard
 const SystemAdmin = lazy(() => import('./pages/SystemAdmin')); // Global Admin Approval Panel
+const AIWorkbench = lazy(() => import('./pages/AIWorkbench'));
 const Onboarding = lazy(() => import('./pages/Onboarding'));
 const VerifyOTP = lazy(() => import('./pages/VerifyOTP'));
 const Profile = lazy(() => import('./pages/Profile'));
@@ -65,22 +66,20 @@ function OAuthSuccess() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const { setSessionFromOAuth, logout } = useAuth();
+  const hasInitialized = useRef(false);
 
   useEffect(() => {
+    if (hasInitialized.current) return;
+
     const initSession = async () => {
+      hasInitialized.current = true;
       const access = searchParams.get('accessToken');
       const refresh = searchParams.get('refreshToken');
       const role = searchParams.get('role');
       const name = searchParams.get('name');
 
-      if (!access) {
-        console.error('[🚫 OAUTH_CLIENT_ERROR] No access token found in redirect URL.');
-        // If we hit this without a token, something went wrong in the redirect.
-        // Clear anything potentially stale and go back to login.
-        logout(); 
-        return navigate('/login', { replace: true });
-      }
-
+      // In the new decentralized architecture, tokens are securely held in httpOnly cookies.
+      // We no longer expect them in the URL query string.
       try {
         await setSessionFromOAuth(access, refresh, { role: role || 'student', name: name || 'User' });
         
@@ -186,6 +185,15 @@ const NavigationWrapper = () => {
                 element={
                   <ProtectedRoute roles={['admin', 'super_admin']}>
                     <ErrorBoundary><SystemAdmin /></ErrorBoundary>
+                  </ProtectedRoute>
+                }
+              />
+
+              <Route
+                path="/sys-admin/workbench"
+                element={
+                  <ProtectedRoute roles={['super_admin']}>
+                    <ErrorBoundary><AIWorkbench /></ErrorBoundary>
                   </ProtectedRoute>
                 }
               />

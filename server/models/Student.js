@@ -1,83 +1,33 @@
-import mongoose from 'mongoose';
+// server/models/Student.js
+import { DataTypes } from 'sequelize';
+import sequelize from '../config/database.js';
 
-const StudentSchema = new mongoose.Schema({
-  userId: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'User',
-    required: true,
-  },
-  name: {
-    type: String,
-    required: true,
-  },
-  regNo: {
-    type: String,
-    default: '',
-  },
-  degree: {
-    type: String,
-    default: '',
-  },
-  branch: {
-    type: String,
-    default: '',
-  },
-  fullName: {
-    type: String,
-  },
-  enrollmentNumber: {
-    type: String,
-  },
-  dateOfBirth: {
-    type: Date,
-  },
-  email: {
-    type: String,
-    unique: true,
-    sparse: true,
-    lowercase: true,
-  },
-  passwordHash: {
-    type: String,
-  },
-  googleId: {
-    type: String,
-  },
-  googleAccessToken: {
-    type: String,
-  },
-  profilePhoto: {
-    type: String,
-  },
-  linkedUniversityId: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'University',
-  },
-  program: {
-    type: String,
-  },
-  batchYear: {
-    type: Number,
-  },
-  phone: {
-    type: String,
-  },
-  digilockerAccessToken: {
-    type: String,
-  },
-  digilockerRefreshToken: {
-    type: String,
-  },
-  digilockerConnected: {
-    type: Boolean,
-    default: false,
-  },
-  digilockerUsername: {
-    type: String,
-  },
-  lastLoginAt: {
-    type: Date,
-  }
-}, { timestamps: true });
+/**
+ * 👤 Student Model
+ * Links user identities to credential histories.
+ */
+const Student = sequelize.define('Student', {
+    id: {
+        type: DataTypes.UUID,
+        defaultValue: DataTypes.UUIDV4,
+        primaryKey: true
+    },
+    name: {
+        type: DataTypes.STRING,
+        allowNull: false
+    },
+    userId: {
+        type: DataTypes.UUID,
+        allowNull: false,
+        references: {
+            model: 'User',
+            key: 'id'
+        }
+    }
+}, {
+    indexes: [
+        { fields: ['userId'] }
+    ]
+});
 
-export default mongoose.model('Student', StudentSchema);
+export default Student;

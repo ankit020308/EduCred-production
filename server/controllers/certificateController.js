@@ -1,20 +1,15 @@
-import Certificate from '../models/Certificate.js';
-import University from '../models/University.js';
-import Student from '../models/Student.js';
-import User from '../models/User.js';
-import Ledger from '../models/Ledger.js';
+import Registry from '../services/registryService.js';
 import { issueCertificateOnChain, revokeHashOnChain, verifyHashDetailsOnChain, verifyHashOnChain, blockchainMode } from '../utils/blockchain.js';
 import { generateBinaryHash } from '../utils/hashing.js';
 import { logAudit } from '../utils/logger.js';
-import { uploadFileToPinata, isPinataConfigured, getIPFSUrl } from '../utils/ipfsService.js';
+import { uploadFileToPinata, uploadJSONToPinata, isPinataConfigured, getIPFSUrl } from '../utils/ipfsService.js';
 import { generateVerificationQR } from '../utils/qrGenerator.js';
 import { sendCertificateNotification } from '../utils/notificationService.js';
 import { generateCertificatePDF } from '../utils/pdfService.js';
-import FraudAlert from '../models/FraudAlert.js';
-import VerificationLog from '../models/VerificationLog.js';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { certificateIssuanceSchema } from '../validators/joiSchemas.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -72,33 +67,32 @@ async function saveFileLocally(buffer, filename) {
 export const issueCertificate = async (req, res) => {
     let tempPath = req.file?.path;
     try {
-        let { 
-          certificateType, studentName, studentEmail,
-          studentEnrollmentNumber, studentDateOfBirth, 
-          branch, graduationYear, cgpa, mediumOfInstruction, dateOfIssue, additionalNotes
-        } = req.body;
-        
-        const programName = req.body.programName || req.body.course || 'General Degree';
-        const issuanceMode = req.body.issuanceMode || (req.file ? 'UPLOAD' : 'GENERATE');
+        // 0. Input Sanitization & Basic Validation
+        const { error, value } = certificateIssuanceSchema.validate(req.body, { abortEarly: false });
+        if (error) {
+            return res.status(400).json({
+                error: 'Validation Failed',
+                details: error.details.map(d => d.message)
+            });
+        }
+
+        const {
+            certificateType, studentName, studentEmail,
+            studentEnrollmentNumber, studentDateOfBirth,
+            branch, graduationYear, cgpa, mediumOfInstruction, dateOfIssue, additionalNotes
+        } = value;
+
+        const programName = value.programName || value.course || 'General Degree';
+        const issuanceMode = value.issuanceMode || (req.file ? 'UPLOAD' : 'GENERATE');
         const file = req.file;
 
-        // 0. Input Sanitization & Basic Validation
-        studentEmail = studentEmail?.trim().toLowerCase();
-        studentName = studentName?.trim();
-        
-        if (!studentEmail || !/^\S+@\S+\.\S+$/.test(studentEmail)) {
-            return res.status(400).json({ error: 'Valid student email is required for authoritative issuance.' });
-        }
-        if (!studentName) {
-            return res.status(400).json({ error: 'Student name is required.' });
-        }
         if (issuanceMode === 'UPLOAD') {
             if (!file) return res.status(400).json({ error: 'Certificate file is required for upload mode.' });
             if (file.size === 0) return res.status(400).json({ error: 'Cannot process zero-byte certificate files.' });
         }
 
         // 1. Authorization: Verify Institutional Node Status
-        const university = await University.findOne({ userId: req.user._id });
+        const university = await Registry.findOne('universities', { userId: req.user.id });
         if (!university || university.status !== 'APPROVED') {
             return res.status(403).json({ error: 'Institution not yet approved. Contact system administrator.' });
         }
@@ -129,10 +123,10 @@ export const issueCertificate = async (req, res) => {
         const fileHash = generateBinaryHash(fileBuffer);
 
         // 🚨 Integrity Check: Prevent duplicate issuance of the same credential
-        const existingCert = await Certificate.findOne({ certificateHash: fileHash });
+        const existingCert = await Registry.findOne('certificates', { certificateHash: fileHash });
         if (existingCert) {
-            return res.status(409).json({ 
-                error: 'Duplicate Credential Detected', 
+            return res.status(409).json({
+                error: 'Duplicate Credential Detected',
                 message: 'A certificate with this exact content has already been anchored on the ledger.',
                 existingCertificateId: existingCert.certificateId
             });
@@ -162,21 +156,21 @@ export const issueCertificate = async (req, res) => {
         }
 
         // 4. Resolve student record for linking
-        let studentId = undefined;
+        let studentId = null;
         try {
-            const studentUser = await User.findOne({ email: studentEmail });
+            const studentUser = await Registry.findOne('users', { email: studentEmail });
             if (studentUser) {
-                const studentRecord = await Student.findOne({ userId: studentUser._id });
-                if (studentRecord) studentId = studentRecord._id;
+                const studentRecord = await Registry.findOne('students', { userId: studentUser.id });
+                if (studentRecord) studentId = studentRecord.id;
             }
-        } catch (_) {}
+        } catch (_) { }
 
         // 5. Creation in Registry (Status: PENDING)
-        const cert = await Certificate.create({
+        const certData = {
             certificateId,
             studentName,
             studentEmail,
-            studentPhone: req.body.studentPhone || '0000000000',
+            studentPhone: studentPhone || '0000000000',
             studentId,
             course: programName,
             issuer: university.name,
@@ -185,44 +179,58 @@ export const issueCertificate = async (req, res) => {
             certificateHash: fileHash,
             status: 'PENDING',
             workflowStatus: 'STAGE2',
-            issuedBy: req.user._id,
-            universityId: university._id,
+            issuedBy: req.user.id,
+            universityId: university.id,
             certificateType: certificateType || 'Degree Certificate',
             metadata: { studentEnrollmentNumber, studentDateOfBirth, branch, graduationYear, cgpa, mediumOfInstruction, dateOfIssue, additionalNotes },
-            workflowLog: [{ stage: 'Academic Record Verified', actorId: req.user._id, actorName: req.user.name, timestamp: new Date() }]
-        });
+            workflowLog: [{ stage: 'Academic Record Verified', actorId: req.user.id, actorName: req.user.name, timestamp: new Date() }]
+        };
+
+        // NEW: Mandatory Metadata upload to IPFS for persistence
+        if (isPinataConfigured()) {
+            try {
+                const metaResult = await uploadJSONToPinata(certData, `META_${certificateId}`);
+                certData.metadataIpfsCid = metaResult.cid;
+            } catch (err) {
+                console.warn('⚠️ [IPFS]: Metadata upload failed, proceeding with registry only.');
+            }
+        }
+
+        const cert = Registry.insert('certificates', certData);
 
         // 6. Mandatory Blockchain Anchor (Sync Pattern for Production)
         try {
             const io = req.app.get('io');
-            
+
             const receipt = await issueCertificateOnChain(
-                cert._id.toString(),
+                cert.id.toString(),
                 fileHash,
                 CERTIFICATE_TYPE_CODES[cert.certificateType] ?? 0
             );
-            
-            cert.blockchainTxHash = receipt.hash;
-            cert.status = 'CONFIRMED';
-            cert.workflowStatus = 'ISSUED';
-            await cert.save();
 
-            await Ledger.create({
+            const update = {
+                blockchainTxHash: receipt.hash,
+                status: 'CONFIRMED',
+                workflowStatus: 'ISSUED'
+            };
+            await Registry.update('certificates', { id: cert.id }, update);
+
+            await Registry.insert('ledger', {
                 type: 'ISSUE',
                 studentName: cert.studentName,
                 universityName: university.name,
-                certificateId: cert._id,
+                certificateId: cert.id,
                 txHash: receipt.hash,
                 status: 'SUCCESS',
                 metadata: { certificateType: cert.certificateType }
             });
 
             // Signal success via Socket.io
-            io?.to(`university_${university._id}`)?.emit('certificateConfirmed', { certificateId: cert.certificateId, status: 'CONFIRMED', txHash: receipt.hash });
-            
-            const studentUser = await User.findOne({ email: cert.studentEmail });
+            io?.to(`university_${university.id}`)?.emit('certificateConfirmed', { certificateId: cert.certificateId, status: 'CONFIRMED', txHash: receipt.hash });
+
+            const studentUser = await Registry.findOne('users', { email: cert.studentEmail });
             if (studentUser) {
-                io?.to(`user_${studentUser._id}`)?.emit('newCertificate', { certId: cert._id, type: cert.certificateType });
+                io?.to(`user_${studentUser.id}`)?.emit('newCertificate', { certId: cert.id, type: cert.certificateType });
             }
 
             await logAudit(req, 'ISSUANCE_ANCHORED', 'SUCCESS', `Certificate anchored for ${studentName}.`, { certId: cert._id, hash: fileHash, tx: receipt.hash });
@@ -240,10 +248,9 @@ export const issueCertificate = async (req, res) => {
 
         } catch (anchorErr) {
             console.error('❌ [LEDGER] Anchor failed:', anchorErr.message);
-            cert.status = 'FAILED';
-            await cert.save();
-            
-            await Ledger.create({
+            Registry.update('certificates', { _id: cert._id }, { status: 'FAILED' });
+
+            Registry.insert('ledger', {
                 type: 'ISSUE',
                 studentName: cert.studentName,
                 universityName: university.name,
@@ -252,10 +259,10 @@ export const issueCertificate = async (req, res) => {
                 metadata: { error: anchorErr.message, certificateType: cert.certificateType }
             });
 
-            return res.status(502).json({ 
-                error: 'Blockchain Anchor Failed', 
-                message: 'The registry entry was created but anchoring failed. Identity record set to FAILED.', 
-                details: anchorErr.message 
+            return res.status(502).json({
+                error: 'Blockchain Anchor Failed',
+                message: 'The registry entry was created but anchoring failed. Identity record set to FAILED.',
+                details: anchorErr.message
             });
         }
 
@@ -273,7 +280,7 @@ export const issueCertificate = async (req, res) => {
 export const confirmIssuance = async (req, res) => {
     try {
         const { certDbId } = req.body;
-        const certificate = await Certificate.findById(certDbId);
+        const certificate = Registry.findById('certificates', certDbId);
         if (!certificate) return res.status(404).json({ error: 'Certificate not found' });
         if (certificate.status === 'CONFIRMED' || certificate.blockchainTxHash) {
             return res.json({
@@ -283,12 +290,16 @@ export const confirmIssuance = async (req, res) => {
                 txHash: certificate.blockchainTxHash || null
             });
         }
-        
-        const university = await University.findOne({ userId: req.user._id });
 
-        certificate.workflowLog.push({ stage: 'Registrar Authorization', actorId: req.user._id, actorName: req.user.name, timestamp: new Date() });
-        certificate.workflowStatus = 'ISSUED';
-        await certificate.save();
+        const university = Registry.findOne('universities', { userId: req.user._id });
+
+        Registry.update('certificates', { _id: certificate._id }, {
+            workflowStatus: 'ISSUED',
+            workflowLog: [
+                ...(certificate.workflowLog || []),
+                { stage: 'Registrar Authorization', actorId: req.user._id, actorName: req.user.name, timestamp: new Date() }
+            ]
+        });
 
         // 7. Asynchronous Ledger Anchoring (Non-Blocking)
         const anchorToLedger = async (certificate, hash, retryCount = 0) => {
@@ -299,66 +310,70 @@ export const confirmIssuance = async (req, res) => {
                     hash,
                     CERTIFICATE_TYPE_CODES[certificate.certificateType] ?? 0
                 );
-                
-                certificate.blockchainTxHash = receipt.hash;
-                certificate.status = 'CONFIRMED';
-                certificate.workflowLog.push({ stage: 'Anchoring to Blockchain', actorId: req.user._id, actorName: 'Smart Contract', timestamp: new Date() });
-                await certificate.save();
-                await Ledger.create({
-                   type: 'ISSUE',
-                   studentName: certificate.studentName,
-                   universityName: university.name,
-                   certificateId: certificate._id,
-                   txHash: receipt.hash,
-                   status: 'SUCCESS',
-                   metadata: { certificateType: certificate.certificateType, source: 'confirmIssuance' }
+
+                Registry.update('certificates', { _id: certificate._id }, {
+                    blockchainTxHash: receipt.hash,
+                    status: 'CONFIRMED',
+                    workflowLog: [
+                        ...(certificate.workflowLog || []),
+                        { stage: 'Anchoring to Blockchain', actorId: req.user._id, actorName: 'Smart Contract', timestamp: new Date() }
+                    ]
+                });
+
+                Registry.insert('ledger', {
+                    type: 'ISSUE',
+                    studentName: certificate.studentName,
+                    universityName: university.name,
+                    certificateId: certificate._id,
+                    txHash: receipt.hash,
+                    status: 'SUCCESS',
+                    metadata: { certificateType: certificate.certificateType, source: 'confirmIssuance' }
                 });
 
                 req.app.get('io')?.to(`university_${university._id}`)?.emit('certificateIssued', {
-                   universityId: university._id,
-                   universityName: university.name,
-                   certificateType: certificate.certificateType,
-                   timestamp: new Date()
+                    universityId: university._id,
+                    universityName: university.name,
+                    certificateType: certificate.certificateType,
+                    timestamp: new Date()
                 });
-                
-                req.app.get('io')?.to(`university_${university._id}`)?.emit('certificateConfirmed', { 
-                   certificateId: certificate.certificateId,
-                   status: 'CONFIRMED',
-                   txHash: receipt.hash
+
+                req.app.get('io')?.to(`university_${university._id}`)?.emit('certificateConfirmed', {
+                    certificateId: certificate.certificateId,
+                    status: 'CONFIRMED',
+                    txHash: receipt.hash
                 });
 
                 // Notify student user room if found
-                const studentUser = await User.findOne({ email: certificate.studentEmail });
+                const studentUser = Registry.findOne('users', { email: certificate.studentEmail });
                 if (studentUser) {
-                    req.app.get('io')?.to(`user_${studentUser._id}`)?.emit('certificateConfirmed', { 
-                       certificateId: certificate.certificateId,
-                       status: 'CONFIRMED'
+                    req.app.get('io')?.to(`user_${studentUser._id}`)?.emit('certificateConfirmed', {
+                        certificateId: certificate.certificateId,
+                        status: 'CONFIRMED'
                     });
                 }
-                
+
             } catch (error) {
                 console.error(`❌ [LEDGER] Anchor Failure:`, error.message);
                 if (retryCount < MAX_RETRIES) {
                     setTimeout(() => anchorToLedger(certificate, hash, retryCount + 1), Math.pow(2, retryCount) * 1000);
                 } else {
-                    certificate.status = 'FAILED';
-                    await certificate.save();
-                    await Ledger.create({
-                       type: 'ISSUE',
-                       studentName: certificate.studentName,
-                       universityName: university.name,
-                       certificateId: certificate._id,
-                       status: 'FAILED',
-                       metadata: { error: error.message, source: 'confirmIssuance' }
+                    Registry.update('certificates', { _id: certificate._id }, { status: 'FAILED' });
+                    Registry.insert('ledger', {
+                        type: 'ISSUE',
+                        studentName: certificate.studentName,
+                        universityName: university.name,
+                        certificateId: certificate._id,
+                        status: 'FAILED',
+                        metadata: { error: error.message, source: 'confirmIssuance' }
                     });
                 }
             }
         };
 
         setImmediate(() => anchorToLedger(certificate, certificate.certificateHash));
-        
+
         res.json({ success: true, message: 'Confirmed and anchoring started' });
-    } catch(err) {
+    } catch (err) {
         res.status(500).json({ error: err.message });
     }
 }
@@ -366,37 +381,38 @@ export const confirmIssuance = async (req, res) => {
 export const revokeCertificate = async (req, res) => {
     try {
         const { certificateId, reasonCode, reasonNotes } = req.body;
-        const cert = await Certificate.findOne({ certificateId });
+        const cert = Registry.findOne('certificates', { certificateId });
         if (!cert) return res.status(404).json({ error: 'Not found' });
-        
-        cert.isRevoked = true;
-        cert.revocationReason = reasonNotes;
-        cert.revocationReasonCode = reasonCode || 0;
-        cert.revocationTimestamp = new Date();
-        cert.revokedByStaffName = req.user.name;
-        cert.workflowStatus = 'REVOKED';
-        await cert.save();
-        
+
+        Registry.update('certificates', { _id: cert._id }, {
+            isRevoked: true,
+            revocationReason: reasonNotes,
+            revocationReasonCode: reasonCode || 0,
+            revocationTimestamp: new Date(),
+            revokedByStaffName: req.user.name,
+            workflowStatus: 'REVOKED'
+        });
+
         try {
             await revokeHashOnChain(cert.certificateHash, reasonCode || 0);
         } catch (blockchainError) {
             console.warn('⚠️ [LEDGER]: Revocation on blockchain failed:', blockchainError.message);
         }
 
-        await Ledger.create({
+        Registry.insert('ledger', {
             type: 'TAMPER',
             studentName: cert.studentName,
             universityName: cert.issuer,
             certificateId: cert._id,
             status: 'SUCCESS',
-            metadata: { reasonCode: cert.revocationReasonCode, revocationReason: cert.revocationReason }
+            metadata: { reasonCode: reasonCode || 0, revocationReason: reasonNotes }
         });
-        
-        req.app.get('io')?.to(`university_${cert.universityId}`)?.emit('certificateRevoked', { 
-            certificateId: cert.certificateId, 
-            studentEmail: cert.studentEmail 
+
+        req.app.get('io')?.to(`university_${cert.universityId}`)?.emit('certificateRevoked', {
+            certificateId: cert.certificateId,
+            studentEmail: cert.studentEmail
         });
-        
+
         res.json({ message: 'Certificate revoked' });
     } catch (err) {
         res.status(500).json({ error: err.message });
@@ -405,7 +421,7 @@ export const revokeCertificate = async (req, res) => {
 
 export const batchIssue = async (req, res) => {
     // Process CSV, generate PDFs, compute merkletree root and Anchor it
-    res.status(200).json({ message: 'Batch issuance initialized' }); 
+    res.status(200).json({ message: 'Batch issuance initialized' });
 };
 
 /**
@@ -428,13 +444,13 @@ export const verifyCertificate = async (req, res) => {
             if (file.size === 0) return res.status(400).json({ error: 'Invalid file: size is 0 bytes.' });
             const buffer = fs.readFileSync(file.path);
             hashToVerify = generateBinaryHash(buffer);
-            metadata = await Certificate.findOne({ certificateHash: hashToVerify });
+            metadata = Registry.findOne('certificates', { certificateHash: hashToVerify });
         } else if (certificateId) {
-            const isMongoId = /^[0-9a-fA-F]{24}$/.test(certificateId);
-            const cert = isMongoId
-                ? await Certificate.findOne({ $or: [{ _id: certificateId }, { certificateId }] })
-                : await Certificate.findOne({ certificateId });
-            
+            const isUUID = /^[0-9a-fA-F-]{36}$/.test(certificateId);
+            const cert = isUUID
+                ? Registry.findById('certificates', certificateId)
+                : Registry.findOne('certificates', { certificateId });
+
             if (!cert) {
                 return res.status(404).json({ valid: false, message: 'Certificate ID not found on registry.' });
             }
@@ -454,15 +470,15 @@ export const verifyCertificate = async (req, res) => {
             isOnLedger = onChainDetails?.exists === true;
         } catch (ledgerErr) {
             console.error('❌ [BLOCKCHAIN_UNREACHABLE]: Verification halted.', ledgerErr.message);
-            return res.status(503).json({ 
-                error: 'Verification Service Offline', 
-                message: 'Authoritative ledger is currently unreachable. Integrity cannot be verified.' 
+            return res.status(503).json({
+                error: 'Verification Service Offline',
+                message: 'Authoritative ledger is currently unreachable. Integrity cannot be verified.'
             });
         }
-        
+
         // Log verification attempt
         const reqIp = req.ip || req.connection.remoteAddress;
-        await VerificationLog.create({
+        Registry.insert('verificationLogs', {
             certificateId: metadata ? metadata.certificateId : null,
             verificationMethod,
             result: isOnLedger ? (metadata && metadata.isRevoked ? 'revoked' : 'valid') : 'fake',
@@ -472,8 +488,8 @@ export const verifyCertificate = async (req, res) => {
 
         if (!isOnLedger) {
             await logAudit(req, 'CERTIFICATE_VERIFICATION', 'FAILURE', 'Tampered or unregistered credential detected.', { hash: hashToVerify });
-            
-            await FraudAlert.create({
+
+            Registry.insert('fraudAlerts', {
                 alertType: 'HASH_MISMATCH',
                 severity: 'HIGH',
                 description: 'Verification attempt for unregistered or tampered hash.',
@@ -486,7 +502,7 @@ export const verifyCertificate = async (req, res) => {
                 submittedHash: hashToVerify
             });
         }
-        
+
         if ((metadata && metadata.isRevoked) || onChainDetails?.revoked) {
             return res.status(403).json({
                 valid: false,
@@ -504,7 +520,7 @@ export const verifyCertificate = async (req, res) => {
         };
 
         await logAudit(req, 'CERTIFICATE_VERIFICATION', 'SUCCESS', 'Identity verified against ledger.', { hash: hashToVerify });
-        
+
         res.json({
             valid: true,
             onChainConsensus: true,
@@ -531,12 +547,12 @@ export const verifyByEnrollment = async (req, res) => {
         if (!enrollmentNumber || !universityName) {
             return res.status(400).json({ error: 'Enrollment number and university name are required.' });
         }
-        
-        const certs = await Certificate.find({
+
+        const certs = Registry.find('certificates', {
             issuer: universityName,
             'metadata.studentEnrollmentNumber': enrollmentNumber
-        }).select('certificateType course studentName issuedAt certificateId isRevoked');
-        
+        });
+
         res.json({ data: certs });
     } catch (error) {
         res.status(500).json({ error: 'Search failed.' });
@@ -548,7 +564,7 @@ export const verifyByEnrollment = async (req, res) => {
  */
 export const getCertificates = async (req, res) => {
     try {
-        const certs = await Certificate.find({ issuedBy: req.user._id }).sort({ createdAt: -1 });
+        const certs = Registry.find('certificates', { issuedBy: req.user._id });
         res.json({ data: certs });
     } catch (err) {
         res.status(500).json({ error: 'Failed to fetch certificates.' });
@@ -560,12 +576,11 @@ export const getCertificates = async (req, res) => {
  */
 export const getStats = async (req, res) => {
     try {
-        const [total, confirmed, pending, failed] = await Promise.all([
-            Certificate.countDocuments({ issuedBy: req.user._id }),
-            Certificate.countDocuments({ issuedBy: req.user._id, status: 'CONFIRMED' }),
-            Certificate.countDocuments({ issuedBy: req.user._id, status: 'PENDING' }),
-            Certificate.countDocuments({ issuedBy: req.user._id, status: 'FAILED' }),
-        ]);
+        const total = Registry.count('certificates', { issuedBy: req.user._id });
+        const confirmed = Registry.count('certificates', { issuedBy: req.user._id, status: 'CONFIRMED' });
+        const pending = Registry.count('certificates', { issuedBy: req.user._id, status: 'PENDING' });
+        const failed = Registry.count('certificates', { issuedBy: req.user._id, status: 'FAILED' });
+
         res.json({ total, confirmed, pending, failed });
     } catch (err) {
         res.status(500).json({ error: 'Failed to fetch statistics.' });
@@ -578,17 +593,15 @@ export const getStats = async (req, res) => {
 export const getCertificateById = async (req, res) => {
     try {
         const { id } = req.params;
-        const cert = await Certificate.findOne({
-            $or: [
-                { _id: id.match(/^[0-9a-fA-F]{24}$/) ? id : null },
-                { certificateId: id }
-            ]
-        }).lean();
-        
+        const isUUID = /^[0-9a-fA-F-]{36}$/.test(id);
+        const cert = isUUID
+            ? Registry.findById('certificates', id)
+            : Registry.findOne('certificates', { certificateId: id });
+
         if (!cert) {
             return res.status(404).json({ error: 'Certificate not found.' });
         }
-        
+
         res.json(buildPublicCertificatePayload(cert));
     } catch (err) {
         res.status(500).json({ error: 'Failed to fetch certificate.' });
@@ -597,7 +610,7 @@ export const getCertificateById = async (req, res) => {
 
 export const downloadCertificateFile = async (req, res) => {
     try {
-        const cert = await Certificate.findById(req.params.id);
+        const cert = Registry.findById('certificates', req.params.id);
         if (!cert) {
             return res.status(404).json({ error: 'Certificate not found.' });
         }

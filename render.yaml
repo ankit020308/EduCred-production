@@ -1,86 +1,22 @@
 services:
   - type: web
     name: educred-backend
-    runtime: node
-    rootDir: server
-    buildCommand: "npm install"
-    startCommand: "node index.js"
+    env: node
+    plan: free
+    buildCommand: cd server && npm install
+    startCommand: cd server && npm start
     envVars:
       - key: NODE_ENV
         value: production
+      - key: DATABASE_URL
+        fromDatabase:
+          name: educred-db
+          property: connectionString
+      - key: CLIENT_URL
+        value: https://educred.in
       - key: PORT
         value: 10000
-      - key: MONGO_URI
-        sync: false
-      - key: JWT_SECRET
-        generateValue: true
-      - key: REFRESH_SECRET
-        generateValue: true
-      - key: CLIENT_URL
-        sync: false
 
-      # ── Cloudinary (File Storage) ──────────────────────────────────────
-      # Required for certificate PDF/image uploads. Set in Render dashboard.
-      - key: CLOUDINARY_NAME
-        sync: false
-      - key: CLOUDINARY_API_KEY
-        sync: false
-      - key: CLOUDINARY_API_SECRET
-        sync: false
-
-      # ── Google OAuth ───────────────────────────────────────────────────
-      - key: GOOGLE_CLIENT_ID
-        sync: false
-
-      # ── Admin Seed Account ─────────────────────────────────────────────
-      - key: ADMIN_EMAIL
-        sync: false
-      - key: ADMIN_PASSWORD
-        sync: false
-
-      # ── Blockchain (Production Identity Anchoring) ───────────────────────
-      # These variables ARE REQUIRED for the system to boot in production.
-      # The system no longer supports simulation mode for authenticated issuance.
-      - key: RPC_URL
-        sync: false
-      - key: PRIVATE_KEY
-        sync: false
-      - key: CONTRACT_ADDRESS
-        sync: false
-
-      # ── Decentralized Storage (IPFS via Pinata) ──────────────────────────
-      # Highly recommended for production to ensure certificate permanence.
-      - key: PINATA_API_KEY
-        sync: false
-      - key: PINATA_API_SECRET
-        sync: false
-
-      # ── Notifications (Optional) ───────────────────────────────────────
-      - key: EMAIL_USER
-        sync: false
-      - key: EMAIL_PASS
-        sync: false
-      - key: TWILIO_ACCOUNT_SID
-        sync: false
-      - key: TWILIO_AUTH_TOKEN
-        sync: false
-      - key: TWILIO_PHONE_FROM
-        sync: false
-
-  - type: static
-    name: educred-frontend
-    rootDir: client
-    buildCommand: "npm install && npm run build"
-    staticPublishPath: "./dist"
-    envVars:
-      - key: VITE_API_URL
-        fromService:
-          name: educred-backend
-          type: web
-          property: host
-      - key: VITE_GOOGLE_CLIENT_ID
-        sync: false
-    routes:
-      - type: rewrite
-        source: /*
-        destination: /index.html
+databases:
+  - name: educred-db
+    plan: free

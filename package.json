@@ -15,11 +15,16 @@
     "build": "npm run build:client && npm run build:server",
     "build:client": "cd client && npm install && npm run build",
     "build:server": "cd server && npm install",
-    "start": "concurrently \"npm run blockchain\" \"npm run server\" \"npm run client\"",
+    "start": "node start.js",
+    "all": "node start.js",
     "install:all": "npm install && cd server && npm install && cd ../client && npm install && cd ../blockchain && npm install"
   },
   "dependencies": {
     "concurrently": "^9.2.1",
     "google-auth-library": "^10.6.2"
+  },
+  "devDependencies": {
+    "jest": "^30.3.0",
+    "supertest": "^7.2.2"
   }
 }

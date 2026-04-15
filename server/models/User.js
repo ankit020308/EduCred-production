@@ -1,116 +1,84 @@
-import mongoose from 'mongoose';
-import bcrypt from 'bcryptjs';
+// server/models/User.js
+import { DataTypes } from 'sequelize';
+import sequelize from '../config/database.js';
 
-const UserSchema = new mongoose.Schema({
-  name: {
-    type: String,
-    required: true,
-    trim: true,
-  },
-  email: {
-    type: String,
-    required: true,
-    unique: true,
-    lowercase: true,
-  },
-  passwordHash: {
-    type: String,
-    required: true,
-  },
-  role: {
-    type: String,
-    enum: ['student', 'university', 'admin', 'super_admin', 'verifier', 'pending', 'STUDENT', 'UNIVERSITY', 'SUPER_ADMIN'],
-    default: 'pending'
-  },
-  universityName: {
-    type: String,
-    trim: true,
-  },
-  phoneNumber: {
-    type: String,
-    trim: true,
-  },
-  bio: {
-    type: String,
-    trim: true,
-    maxLength: 500,
-  },
-  isEmailVerified: {
-    type: Boolean,
-    default: false,
-  },
-  isPhoneVerified: {
-    type: Boolean,
-    default: false,
-  },
-  avatar: {
-    type: String,
-  },
-  otp: {
-    type: String, // Hashed OTP
-    select: false,
-  },
-  otpExpires: {
-    type: Date,
-    select: false,
-  },
-  otpAttempts: {
-    type: Number,
-    default: 0,
-    select: false,
-  },
-  lastOtpResend: {
-    type: Date,
-    select: false,
-  },
-  googleId: {
-    type: String,
-    unique: true,
-    sparse: true,
-    select: false,
-  },
-  isGoogleUser: {
-    type: Boolean,
-    default: false,
-  },
-  provider: {
-    type: String,
-    enum: ['local', 'google'],
-    default: 'local',
-  },
-  displayName: {
-    type: String,
-  },
-  profilePhoto: {
-    type: String,
-  },
-  linkedUniversityId: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'University',
-  },
-  lastLoginAt: {
-    type: Date,
-  },
-  loginAttempts: {
-    type: Number,
-    default: 0,
-    select: false,
-  },
-  lockUntil: {
-    type: Date,
-    select: false,
-  }
-}, { timestamps: true });
-
-// Hash password before saving
-UserSchema.pre('save', async function () {
-  if (!this.isModified('passwordHash')) return;
-  this.passwordHash = await bcrypt.hash(this.passwordHash, 10);
+/**
+ * 👤 Identity Node Model
+ * Represents the primary authentication and role-based access layer.
+ */
+const User = sequelize.define('User', {
+    id: {
+        type: DataTypes.UUID,
+        defaultValue: DataTypes.UUIDV4,
+        primaryKey: true
+    },
+    name: {
+        type: DataTypes.STRING,
+        allowNull: false
+    },
+    email: {
+        type: DataTypes.STRING,
+        allowNull: false,
+        unique: true,
+        validate: { isEmail: true }
+    },
+    passwordHash: {
+        type: DataTypes.STRING,
+        allowNull: false
+    },
+    role: {
+        type: DataTypes.ENUM('pending', 'student', 'university', 'admin', 'super_admin', 'verifier'),
+        defaultValue: 'pending'
+    },
+    universityName: {
+        type: DataTypes.STRING,
+        allowNull: true
+    },
+    phoneNumber: {
+        type: DataTypes.STRING,
+        allowNull: true
+    },
+    isPhoneVerified: {
+        type: DataTypes.BOOLEAN,
+        defaultValue: false
+    },
+    isEmailVerified: {
+        type: DataTypes.BOOLEAN,
+        defaultValue: false
+    },
+    isGoogleUser: {
+        type: DataTypes.BOOLEAN,
+        defaultValue: false
+    },
+    googleId: {
+        type: DataTypes.STRING,
+        allowNull: true
+    },
+    avatar: {
+        type: DataTypes.STRING,
+        allowNull: true
+    },
+    otp: {
+        type: DataTypes.STRING,
+        allowNull: true
+    },
+    otpExpires: {
+        type: DataTypes.DATE,
+        allowNull: true
+    },
+    otpAttempts: {
+        type: DataTypes.INTEGER,
+        defaultValue: 0
+    },
+    lastOtpResend: {
+        type: DataTypes.DATE,
+        allowNull: true
+    }
+}, {
+    indexes: [
+        { unique: true, fields: ['email'] },
+        { fields: ['role'] }
+    ]
 });
 
-// Compare password
-UserSchema.methods.comparePassword = async function (plain) {
-  return bcrypt.compare(plain, this.passwordHash);
-};
-
-export default mongoose.model('User', UserSchema);
+export default User;

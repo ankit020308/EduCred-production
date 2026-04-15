@@ -1,38 +1,44 @@
-import Request from '../models/Request.js';
-import Ledger from '../models/Ledger.js';
-import Certificate from '../models/Certificate.js';
-import Student from '../models/Student.js';
-import University from '../models/University.js';
-import User from '../models/User.js';
+// server/controllers/requestController.js
+import Registry from '../services/registryService.js';
 import { issueCertificateOnChain } from '../utils/blockchain.js';
 import { logAudit } from '../utils/logger.js';
 import { generateHash } from '../utils/hashing.js';
+import { requestFulfillmentSchema } from '../validators/joiSchemas.js';
 
 export const createRequest = async (req, res) => {
   try {
-    const { universityId, transcriptData } = req.body;
-    const student = await Student.findOne({ userId: req.user._id });
+    const { error, value } = requestFulfillmentSchema.validate(req.body, { abortEarly: false });
+    if (error) {
+      return res.status(400).json({ error: 'Validation Failed', details: error.details.map(d => d.message) });
+    }
+
+    const { universityId, transcriptData } = value;
+    const student = await Registry.findOne('students', { userId: req.user.id });
     if (!student) return res.status(404).json({ error: 'Student profile not found' });
     
     // Update the student profile with the latest metadata
-    if (transcriptData.regNo) student.regNo = transcriptData.regNo;
-    if (transcriptData.degree) student.degree = transcriptData.degree;
-    if (transcriptData.branch) student.branch = transcriptData.branch;
-    if (transcriptData.name) student.name = transcriptData.name;
-    await student.save();
+    const update = {};
+    if (transcriptData.regNo) update.regNo = transcriptData.regNo;
+    if (transcriptData.degree) update.degree = transcriptData.degree;
+    if (transcriptData.branch) update.branch = transcriptData.branch;
+    if (transcriptData.name) update.name = transcriptData.name;
+    if (Object.keys(update).length > 0) {
+      await Registry.update('students', { id: student.id }, update);
+    }
 
     // Create request
-    const newRequest = await Request.create({
-      studentId: student._id,
+    const newRequest = await Registry.insert('requests', {
+      studentId: student.id,
       universityId,
-      transcriptData
+      transcriptData,
+      status: 'pending'
     });
 
     // Standardized log
     await logAudit(req, 'CERTIFICATE_REQUEST', 'SUCCESS', `Transcript request initiated for ${student.name}.`, { 
-      requestId: newRequest._id,
+      requestId: newRequest.id,
       universityId,
-      studentId: student._id
+      studentId: student.id
     });
 
     res.status(201).json(newRequest);
@@ -44,21 +50,17 @@ export const createRequest = async (req, res) => {
 
 export const getRequests = async (req, res) => {
   try {
-    const { role, _id } = req.user;
+    const { role, id } = req.user;
     if (role === 'university') {
-      const university = await University.findOne({ userId: _id });
+      const university = await Registry.findOne('universities', { userId: id });
       if (!university) {
-        console.error(`Admin profile missing for User ID: ${_id}`);
-        return res.status(404).json({ error: 'University profile not found. Please ensure you are registered as a university.' });
+        return res.status(404).json({ error: 'University profile not found.' });
       }
-      // Fetch pending requests for this university
-      const requests = await Request.find({ universityId: university._id, status: 'pending' })
-        .populate('studentId', 'name regNo degree branch');
+      const requests = await Registry.find('requests', { universityId: university.id, status: 'pending' });
       return res.json(requests);
     } else {
-      const student = await Student.findOne({ userId: _id });
-      const requests = await Request.find({ studentId: student._id })
-        .populate('universityId', 'name');
+      const student = await Registry.findOne('students', { userId: id });
+      const requests = await Registry.find('requests', { studentId: student.id });
       return res.json(requests);
     }
   } catch (err) {
@@ -69,17 +71,16 @@ export const getRequests = async (req, res) => {
 export const approveRequest = async (req, res) => {
   try {
     const { id } = req.params;
-    const request = await Request.findById(id).populate('studentId').populate('universityId');
+    const request = await Registry.findById('requests', id);
     
     if (!request || request.status !== 'pending') return res.status(400).json({ error: 'Invalid request' });
 
     // Mark request approved
-    request.status = 'approved';
-    await request.save();
+    await Registry.update('requests', { id }, { status: 'approved' });
 
-    const student = request.studentId;
-    const university = request.universityId;
-    const studentUser = await User.findById(student.userId).select('email');
+    const student = await Registry.findById('students', request.studentId);
+    const university = await Registry.findById('universities', request.universityId);
+    const studentUser = await Registry.findById('users', student.userId);
 
     // 1. Generate a deterministic transcript hash
     const payloadForHash = {
@@ -92,71 +93,72 @@ export const approveRequest = async (req, res) => {
     const certificateHash = generateHash(payloadForHash);
 
     // 2. Create certificate record aligned with the live schema
-    const newCert = await Certificate.create({
+    const newCert = await Registry.insert('certificates', {
       studentName: student.name,
-      studentEmail: studentUser?.email || student.email || `${student._id}@educred.local`,
+      studentEmail: studentUser?.email || student.email || `${student.id}@educred.local`,
       studentPhone: student.phone || '0000000000',
       course: student.degree || 'Academic Transcript',
       issuer: university.name,
-      fileUrl: `/api/requests/${request._id}`,
-      studentId: student._id,
-      universityId: university._id,
+      fileUrl: `/api/requests/${request.id}`,
+      studentId: student.id,
+      universityId: university.id,
       certificateHash,
-      certificateId: `REQ-${new Date().getFullYear()}-${request._id.toString().slice(-6).toUpperCase()}`,
+      certificateId: `REQ-${new Date().getFullYear()}-${request.id.toString().slice(-6).toUpperCase()}`,
       certificateType: 'Consolidated Marks Sheet',
       metadata: {
-        requestId: request._id,
+        requestId: request.id,
         regNo: student.regNo,
         branch: student.branch,
         transcriptData: request.transcriptData,
       },
       status: 'PENDING',
-      issuedBy: req.user._id,
+      issuedBy: req.user.id,
       workflowStatus: 'STAGE2',
-      workflowLog: [{ stage: 'Request approved and transcript hashed', actorId: req.user._id, actorName: req.user.name, timestamp: new Date() }]
+      workflowLog: [{ stage: 'Request approved and transcript hashed', actorId: req.user.id, actorName: req.user.name, timestamp: new Date() }]
     });
 
     // Standardized log
     await logAudit(req, 'CERTIFICATE_APPROVE', 'SUCCESS', `Credential approval and anchor generation for ${student.name}.`, { 
-      certificateId: newCert._id,
+      certificateId: newCert.id,
       requestId: id
     });
 
     // 3. Send to Blockchain
     try {
-      const receipt = await issueCertificateOnChain(newCert._id.toString(), certificateHash);
+      const receipt = await issueCertificateOnChain(newCert.id.toString(), certificateHash);
       
-      newCert.blockchainTxHash = receipt.hash;
-      newCert.status = 'CONFIRMED';
-      newCert.workflowStatus = 'ISSUED';
-      await newCert.save();
+      await Registry.update('certificates', { id: newCert.id }, {
+          blockchainTxHash: receipt.hash,
+          status: 'CONFIRMED',
+          workflowStatus: 'ISSUED'
+      });
 
-      await Ledger.create({
+      await Registry.insert('ledger', {
         type: 'APPROVE',
         studentName: student.name,
         universityName: university.name,
-        certificateId: newCert._id,
+        certificateId: newCert.id,
         txHash: receipt.hash,
         status: 'SUCCESS',
-        metadata: { requestId: request._id }
+        metadata: { requestId: request.id }
       });
 
       // Standardized log
       await logAudit(req, 'CERTIFICATE_ISSUE', 'SUCCESS', `Credential successfully anchored for ${student.name}.`, { 
-        certificateId: newCert._id,
+        certificateId: newCert.id,
         txHash: receipt.hash
       });
 
       res.json({ message: 'Request approved and certificate anchored', certificate: newCert });
     } catch (bcError) {
       console.error(bcError);
-      await Ledger.create({
+      await Registry.insert('ledger', {
         type: 'APPROVE',
         studentName: student.name,
         universityName: university.name,
-        certificateId: newCert._id,
+        certificateId: newCert.id,
         status: 'FAILED',
-        metadata: { requestId: request._id, error: bcError.message }
+        metadata: { requestId: request.id, error: bcError.message }
       });
 
       res.status(500).json({ error: 'Failed to anchor the certificate on blockchain.', certificate: newCert });
@@ -171,22 +173,24 @@ export const approveRequest = async (req, res) => {
 export const rejectRequest = async (req, res) => {
   try {
     const { id } = req.params;
-    const request = await Request.findById(id).populate('studentId').populate('universityId');
+    const request = await Registry.findById('requests', id);
     if (!request) return res.status(404).json({ error: 'Request not found' });
 
-    request.status = 'rejected';
-    await request.save();
+    await Registry.update('requests', { id }, { status: 'rejected' });
+    
+    const student = await Registry.findById('students', request.studentId);
+    const university = await Registry.findById('universities', request.universityId);
 
-    await logAudit(req, 'CERTIFICATE_REJECT', 'SUCCESS', `Credential request rejected for ${request.studentId.name}.`, { 
-      requestId: request._id 
+    await logAudit(req, 'CERTIFICATE_REJECT', 'SUCCESS', `Credential request rejected for ${student.name}.`, { 
+      requestId: request.id 
     });
 
-    await Ledger.create({
+    await Registry.insert('ledger', {
       type: 'REJECT',
-      studentName: request.studentId.name,
-      universityName: request.universityId.name,
+      studentName: student.name,
+      universityName: university.name,
       status: 'SUCCESS',
-      metadata: { requestId: request._id }
+      metadata: { requestId: request.id }
     });
 
     res.json({ message: 'Request rejected' });

@@ -1,16 +1,14 @@
-import Blacklist from '../models/Blacklist.js';
+import Registry from '../services/registryService.js';
 import { OAuth2Client } from 'google-auth-library';
 import jwt from 'jsonwebtoken';
 import crypto from 'crypto';
+import bcrypt from 'bcryptjs';
 
-import User from '../models/User.js';
-import University from '../models/University.js';
-import Student from '../models/Student.js';
+import { registrationSchema, loginSchema } from '../validators/joiSchemas.js';
 
-import { registerSchema, loginSchema, otpSchema } from '../validators/authValidator.js';
-
-import { sendOTP, sendPhoneOTP } from '../utils/sendOTP.js';
-import { logAudit } from '../utils/auditLogger.js';
+import { sendOTP } from '../utils/emailService.js';
+import { sendPhoneOTP } from '../utils/smsService.js';
+import { logAudit } from '../utils/logger.js';
 const jwtSecret = process.env.JWT_SECRET || "dev_jwt_secret";
 const refreshSecret = process.env.REFRESH_SECRET || "dev_refresh_secret";
 /**
@@ -26,7 +24,7 @@ export const logout = async (req, res) => {
 
       // Blacklist the token until its original expiry
       if (decoded && decoded.exp) {
-        await Blacklist.create({
+        await Registry.insert('blacklistedTokens', {
           token,
           expiresAt: new Date(decoded.exp * 1000)
         });
@@ -34,6 +32,10 @@ export const logout = async (req, res) => {
     }
 
     await logAudit(req, 'NODE_LOGOUT', 'SUCCESS', 'Identity node session terminated.', { userId: req.user?._id });
+    
+    res.clearCookie('accessToken');
+    res.clearCookie('refreshToken');
+    
     res.status(200).json({ message: 'Identity node session terminated and token revoked.' });
   } catch (err) {
     console.error('Logout error:', err);
@@ -46,8 +48,21 @@ const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 const JWT_EXPIRES = '1h'; // Short-lived access token
 const REFRESH_EXPIRES = '7d'; // Long-lived refresh token
 
-const signToken = (id) => jwt.sign({ id }, jwtSecret, { expiresIn: JWT_EXPIRES });
-const signRefreshToken = (id) => jwt.sign({ id }, refreshSecret, { expiresIn: REFRESH_EXPIRES });
+export const signToken = (id) => jwt.sign({ id }, jwtSecret, { expiresIn: JWT_EXPIRES });
+export const signRefreshToken = (id) => jwt.sign({ id }, refreshSecret, { expiresIn: REFRESH_EXPIRES });
+
+export const setCookies = (res, accessToken, refreshToken) => {
+  const isProd = process.env.NODE_ENV === 'production';
+  const cookieOptions = {
+    httpOnly: true,
+    secure: isProd,
+    sameSite: isProd ? 'none' : 'lax', // 'none' for cross-domain prod, 'lax' for local dev
+    maxAge: 7 * 24 * 60 * 60 * 1000 // 7 days (match refresh token)
+  };
+
+  res.cookie('accessToken', accessToken, { ...cookieOptions, maxAge: 60 * 60 * 1000 }); // 1h
+  res.cookie('refreshToken', refreshToken, cookieOptions);
+};
 const generateOTP = () => Math.floor(100000 + Math.random() * 900000).toString();
 const hashOTP = (otp) => crypto.createHash('sha256').update(otp).digest('hex');
 
@@ -58,7 +73,7 @@ export const register = async (req, res) => {
 
     const { name, email, password, role, universityName } = req.body;
 
-    const existing = await User.findOne({ email });
+    const existing = await Registry.findOne('users', { email });
     if (existing) {
       return res.status(400).json({ error: 'An account with this email already exists.' });
     }
@@ -68,29 +83,32 @@ export const register = async (req, res) => {
       console.log(`\n🔑 [DEV_AUTH]: Activation Code for ${email} is: ${otp}\n`);
     }
     const hashedOtp = hashOTP(otp);
+    const hashedPassword = await bcrypt.hash(password, 10);
 
-    const user = await User.create({
+    const user = await Registry.insert('users', {
       name,
       email,
-      passwordHash: password,
+      passwordHash: hashedPassword,
       role,
       universityName: role === 'university' ? universityName : undefined,
       otp: hashedOtp,
       otpExpires: Date.now() + 10 * 60 * 1000, // 10 minutes
       otpAttempts: 0,
-      lastOtpResend: new Date()
+      lastOtpResend: new Date(),
+      isEmailVerified: false
     });
 
     if (role === 'university') {
       const { documents, description } = req.body;
       const isInstitutional = email.endsWith('.edu') || email.endsWith('.ac.in');
-      await University.create({
+      await Registry.insert('universities', {
         name: universityName,
         email,
-        userId: user._id,
+        userId: user.id, // Sequelize uses .id by default in my model
         documents: documents || [],
         description: description || '',
-        isFlagged: !isInstitutional
+        isFlagged: !isInstitutional,
+        status: 'PENDING'
       });
 
       req.app.get('io')?.to('admin_room')?.emit('universityRegistered', {
@@ -99,19 +117,19 @@ export const register = async (req, res) => {
         timestamp: new Date()
       });
     } else {
-      await Student.create({ name, userId: user._id });
+      await Registry.insert('students', { name, userId: user.id });
     }
 
     try {
       await sendOTP(email, otp);
     } catch (error) {
-      await University.deleteOne({ userId: user._id });
-      await Student.deleteOne({ userId: user._id });
-      await User.deleteOne({ _id: user._id });
+      await Registry.delete('universities', { userId: user.id });
+      await Registry.delete('students', { userId: user.id });
+      await Registry.delete('users', { id: user.id });
       return res.status(502).json({ error: 'OTP email delivery failed. Check SMTP settings and try again.' });
     }
 
-    await logAudit(req, 'NODE_REGISTRATION', 'SUCCESS', 'New identity node provisioned.', { userId: user._id, role: user.role });
+    await logAudit(req, 'NODE_REGISTRATION', 'SUCCESS', 'New identity node provisioned.', { userId: user.id, role: user.role });
 
     res.status(201).json({
       message: 'Initial identity node created. Verify your email to activate.',
@@ -131,9 +149,9 @@ export const login = async (req, res) => {
     if (error) return res.status(400).json({ error: error.details[0].message });
 
     const { email, password } = req.body;
-    const user = await User.findOne({ email }).select('+passwordHash +isEmailVerified +loginAttempts +lockUntil');
+    const user = await Registry.findOne('users', { email });
 
-    if (!user || !(await user.comparePassword(password))) {
+    if (!user || !(await bcrypt.compare(password, user.passwordHash))) {
       return res.status(401).json({ error: 'Invalid credentials.' });
     }
 
@@ -144,27 +162,23 @@ export const login = async (req, res) => {
       });
     }
 
-    const university = user.role === 'university' ? await University.findOne({ userId: user._id }) : null;
+    const university = user.role === 'university' ? await Registry.findOne('universities', { userId: user.id }) : null;
 
-    const accessToken = signToken(user._id);
-    const refreshToken = signRefreshToken(user._id);
+    const accessToken = signToken(user.id);
+    const refreshToken = signRefreshToken(user.id);
 
-    await logAudit(req, 'NODE_LOGIN', 'SUCCESS', 'Identity session established.', { userId: user._id });
+    setCookies(res, accessToken, refreshToken);
+
+    await logAudit(req, 'NODE_LOGIN', 'SUCCESS', 'Identity session established.', { userId: user.id });
 
     res.json({
-      accessToken,
-      refreshToken,
       user: {
-        id: user._id,
+        id: user.id,
         name: user.name,
         email: user.email,
         role: user.role,
-        universityName: user.universityName,
-        universityId: university ? university._id : null,
-        universityStatus: university ? university.status : null,
-        isVerified: university ? university.isVerified : false,
-        createdAt: user.createdAt
       },
+      university: university || null
     });
   } catch (err) {
     console.error('Login error:', err);
@@ -179,12 +193,11 @@ export const login = async (req, res) => {
  */
 export const verifyOTP = async (req, res) => {
   try {
-    const { error } = otpSchema.validate(req.body);
-    if (error) return res.status(400).json({ error: error.details[0].message });
-
+    // Basic validation for OTP
     const { email, otp } = req.body;
-    // Always include otpAttempts in search to prevent race conditions or missed resets
-    const user = await User.findOne({ email }).select('+otp +otpExpires +otpAttempts');
+    if (!email || !otp) return res.status(400).json({ error: 'Email and security key are required.' });
+
+    const user = await Registry.findOne('users', { email });
 
     if (!user) {
       return res.status(404).json({ error: 'Identity node not found.' });
@@ -202,8 +215,8 @@ export const verifyOTP = async (req, res) => {
 
     // 3. Compare hashed OTP
     if (user.otp !== hashOTP(otp)) {
-      user.otpAttempts += 1;
-      await user.save();
+      user.otpAttempts = (user.otpAttempts || 0) + 1;
+      await Registry.update('users', { id: user.id }, { otpAttempts: user.otpAttempts });
       const remaining = 3 - user.otpAttempts;
       await logAudit(req, 'OTP_VERIFICATION', 'FAILURE', `Invalid security key. Attempts: ${user.otpAttempts}`, { email, attempts: user.otpAttempts });
       return res.status(400).json({
@@ -213,23 +226,24 @@ export const verifyOTP = async (req, res) => {
     }
 
     // 4. Activate node
-    user.isEmailVerified = true;
-    user.otp = undefined;
-    user.otpExpires = undefined;
-    user.otpAttempts = 0;
-    await user.save();
+    await Registry.update('users', { id: user.id }, {
+      isEmailVerified: true,
+      otp: null,
+      otpExpires: null,
+      otpAttempts: 0
+    });
 
-    await logAudit(req, 'OTP_VERIFICATION', 'SUCCESS', 'Identity node activated via security key.', { userId: user._id });
+    await logAudit(req, 'OTP_VERIFICATION', 'SUCCESS', 'Identity node activated via security key.', { userId: user.id });
 
-    const accessToken = signToken(user._id);
-    const refreshToken = signRefreshToken(user._id);
+    const accessToken = signToken(user.id);
+    const refreshToken = signRefreshToken(user.id);
+
+    setCookies(res, accessToken, refreshToken);
 
     res.status(200).json({
       message: 'Identity node activated successfully.',
-      accessToken,
-      refreshToken,
       user: {
-        id: user._id,
+        id: user.id,
         name: user.name,
         email: user.email,
         role: user.role,
@@ -252,7 +266,7 @@ export const resendOTP = async (req, res) => {
     const { email } = req.body;
     if (!email) return res.status(400).json({ error: 'Email is required.' });
 
-    const user = await User.findOne({ email }).select('+lastOtpResend');
+    const user = await Registry.findOne('users', { email });
     if (!user) return res.status(404).json({ error: 'User not found.' });
 
     // 1. Check cooldown (60s)
@@ -263,11 +277,12 @@ export const resendOTP = async (req, res) => {
     }
 
     const otp = generateOTP();
-    user.otp = hashOTP(otp);
-    user.otpExpires = Date.now() + 10 * 60 * 1000;
-    user.otpAttempts = 0; // Reset attempts on resend
-    user.lastOtpResend = now;
-    await user.save();
+    await Registry.update('users', { id: user.id }, {
+      otp: hashOTP(otp),
+      otpExpires: Date.now() + 10 * 60 * 1000,
+      otpAttempts: 0,
+      lastOtpResend: now
+    });
 
     try {
       await sendOTP(email, otp);
@@ -297,12 +312,15 @@ export const refreshToken = async (req, res) => {
     if (!token) return res.status(401).json({ error: 'Refresh proof required.' });
 
     const decoded = jwt.verify(token, refreshSecret);
-    const user = await User.findById(decoded.id);
+    const user = await Registry.findById('users', decoded.id);
 
     if (!user) return res.status(401).json({ error: 'Identity node no longer exists.' });
 
-    const accessToken = signToken(user._id);
-    res.status(200).json({ accessToken });
+    const accessToken = signToken(user.id);
+    // Refresh tokens can also be rotated here if desired
+    setCookies(res, accessToken, token); 
+
+    res.status(200).json({ success: true });
 
   } catch (err) {
     res.status(401).json({ error: 'Invalid or expired refresh token.' });
@@ -333,11 +351,11 @@ export const googleLogin = async (req, res) => {
 
     const { name, email, picture, sub: googleId } = payload;
 
-    let user = await User.findOne({ email });
+    let user = await Registry.findOne('users', { email });
 
     if (!user) {
       // Auto-provision new node if it doesn't exist
-      user = await User.create({
+      user = Registry.insert('users', {
         name,
         email,
         passwordHash: crypto.randomBytes(16).toString('hex'), // Randomized password for social-only nodes
@@ -349,24 +367,15 @@ export const googleLogin = async (req, res) => {
       });
     } else {
       // If user exists, link account securely
-      let updated = false;
-      if (!user.googleId) {
-        user.googleId = googleId;
-        updated = true;
+      const update = {};
+      if (!user.googleId) update.googleId = googleId;
+      if (!user.isGoogleUser) update.isGoogleUser = true;
+      if (!user.isEmailVerified) update.isEmailVerified = true;
+      if (!user.avatar && picture) update.avatar = picture;
+      
+      if (Object.keys(update).length > 0) {
+        await Registry.update('users', { id: user.id }, update);
       }
-      if (!user.isGoogleUser) {
-        user.isGoogleUser = true;
-        updated = true;
-      }
-      if (!user.isEmailVerified) {
-        user.isEmailVerified = true;
-        updated = true;
-      }
-      if (!user.avatar && picture) {
-        user.avatar = picture;
-        updated = true;
-      }
-      if (updated) await user.save();
     }
 
     const accessToken = signToken(user._id);
@@ -399,13 +408,14 @@ export const sendPhoneVerification = async (req, res) => {
     const { phoneNumber } = req.body;
     if (!phoneNumber) return res.status(400).json({ error: 'Mobile number required.' });
 
-    const user = await User.findById(req.user.id);
+    const user = await Registry.findById('users', req.user.id);
     const otp = generateOTP();
 
-    user.phoneNumber = phoneNumber;
-    user.otp = hashOTP(otp);
-    user.otpExpires = Date.now() + 5 * 60 * 1000;
-    await user.save();
+    await Registry.update('users', { id: user.id }, {
+      phoneNumber,
+      otp: hashOTP(otp),
+      otpExpires: Date.now() + 5 * 60 * 1000
+    });
 
     await sendPhoneOTP(phoneNumber, otp);
     res.status(200).json({ message: 'Security key dispatched to your mobile device.' });
@@ -425,7 +435,7 @@ export const verifyPhoneOTP = async (req, res) => {
     const { otp } = req.body;
     if (!otp) return res.status(400).json({ error: 'Security key required.' });
 
-    const user = await User.findById(req.user.id).select('+otp +otpExpires');
+    const user = Registry.findById('users', req.user.id);
 
     if (user.otp !== hashOTP(otp)) {
       return res.status(400).json({ error: 'Invalid mobile security key.' });
@@ -435,10 +445,11 @@ export const verifyPhoneOTP = async (req, res) => {
       return res.status(400).json({ error: 'Mobile security key expired.' });
     }
 
-    user.isPhoneVerified = true;
-    user.otp = undefined;
-    user.otpExpires = undefined;
-    await user.save();
+    await Registry.update('users', { id: user.id }, {
+      isPhoneVerified: true,
+      otp: null,
+      otpExpires: null
+    });
 
     res.status(200).json({ message: 'Mobile identity verified successfully.' });
 
@@ -450,15 +461,15 @@ export const verifyPhoneOTP = async (req, res) => {
 
 export const getMe = async (req, res) => {
   const u = req.user;
-  const university = u.role === 'university' ? await University.findOne({ userId: u._id }) : null;
+  const university = u.role === 'university' ? await Registry.findOne('universities', { userId: u.id }) : null;
 
   res.json({
-    id: u._id,
+    id: u.id,
     name: u.name,
     email: u.email,
     role: u.role,
     universityName: u.universityName,
-    universityId: university ? university._id : null,
+    universityId: university ? university.id : null,
     universityStatus: university ? university.status : null,
     isVerified: university ? university.isVerified : false
   });
@@ -480,15 +491,16 @@ export const createAdmin = async (req, res) => {
       return res.status(400).json({ error: 'Invalid administrative role.' });
     }
 
-    const existing = await User.findOne({ email });
+    const existing = await Registry.findOne('users', { email });
     if (existing) {
       return res.status(400).json({ error: 'Account already exists.' });
     }
 
-    const admin = await User.create({
+    const hashedPassword = await bcrypt.hash(password, 10);
+    const admin = await Registry.insert('users', {
       name,
       email,
-      passwordHash: password,
+      passwordHash: hashedPassword,
       role,
       isEmailVerified: true // Admins are provisioned by existing admins — no OTP required
     });
@@ -496,7 +508,7 @@ export const createAdmin = async (req, res) => {
     res.status(201).json({
       message: 'Administrative node provisioned successfully.',
       admin: {
-        id: admin._id,
+        id: admin.id,
         name: admin.name,
         email: admin.email,
         role: admin.role
@@ -525,30 +537,31 @@ export const completeOnboarding = async (req, res) => {
       return res.status(400).json({ error: 'Invalid identity role selected.' });
     }
 
-    user.role = role;
+    const update = { role };
     if (role === 'university') {
-      user.universityName = universityName;
+      update.universityName = universityName;
 
       const isInstitutional = user.email.endsWith('.edu') || user.email.endsWith('.ac.in');
-      await University.create({
+      await Registry.insert('universities', {
         name: universityName,
         email: user.email,
-        userId: user._id,
+        userId: user.id,
         documents: documents || [],
         description: description || '',
-        isFlagged: !isInstitutional
+        isFlagged: !isInstitutional,
+        status: 'PENDING'
       });
     } else {
-      await Student.create({ name: user.name, userId: user._id });
+      await Registry.insert('students', { name: user.name, userId: user.id });
     }
 
-    await user.save();
-    await logAudit(req, 'PROTOCOL_ONBOARDING', 'SUCCESS', `Identity node configured as ${role}.`, { userId: user._id, role });
+    await Registry.update('users', { id: user.id }, update);
+    await logAudit(req, 'PROTOCOL_ONBOARDING', 'SUCCESS', `Identity node configured as ${role}.`, { userId: user.id, role });
 
     res.status(200).json({
       message: 'Identity protocol successfully established.',
       user: {
-        id: user._id,
+        id: user.id,
         name: user.name,
         email: user.email,
         role: user.role

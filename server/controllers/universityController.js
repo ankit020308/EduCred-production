@@ -1,14 +1,17 @@
-import University from '../models/University.js';
-import User from '../models/User.js';
+// server/controllers/universityController.js
+import Registry from '../services/registryService.js';
+
+/**
+ * 🎓 University Controller (Administrative Protocol)
+ * Handles institutional verification and node status management.
+ */
 
 /**
  * Get all pending university applications (Admin Only)
  */
 export const getPendingUniversities = async (req, res) => {
   try {
-    const pending = await University.find({ status: 'PENDING' })
-      .select('name email documents description isFlagged createdAt')
-      .sort({ createdAt: -1 });
+    const pending = await Registry.find('universities', { status: 'PENDING' });
     res.json({ data: pending });
   } catch (err) {
     res.status(500).json({ error: 'Failed to fetch pending applications.' });
@@ -20,9 +23,7 @@ export const getPendingUniversities = async (req, res) => {
  */
 export const getAllUniversities = async (req, res) => {
     try {
-      const universities = await University.find()
-        .select('name email status isVerified isFlagged description documents createdAt')
-        .sort({ createdAt: -1 });
+      const universities = await Registry.find('universities');
       res.json({ data: universities });
     } catch (err) {
       res.status(500).json({ error: 'Failed to fetch universities.' });
@@ -35,22 +36,18 @@ export const getAllUniversities = async (req, res) => {
 export const approveUniversity = async (req, res) => {
   try {
     const { id } = req.params;
-    const university = await University.findById(id);
+    const university = await Registry.findById('universities', id);
 
     if (!university) {
       return res.status(404).json({ error: 'University not found.' });
     }
 
-    university.status = 'APPROVED';
-    university.isVerified = true;
-    university.approvedBy = req.user._id;
-    university.approvedAt = new Date();
-
-    await university.save();
-
-    // Optionally update the associated user record if needed
-    // const user = await User.findById(university.userId);
-    // ...
+    await Registry.update('universities', { id }, {
+        status: 'APPROVED',
+        isVerified: true,
+        approvedBy: req.user.id,
+        approvedAt: new Date()
+    });
 
     res.json({ message: 'University approved successfully.', data: university });
   } catch (err) {
@@ -64,15 +61,16 @@ export const approveUniversity = async (req, res) => {
 export const rejectUniversity = async (req, res) => {
   try {
     const { id } = req.params;
-    const university = await University.findById(id);
+    const university = await Registry.findById('universities', id);
 
     if (!university) {
       return res.status(404).json({ error: 'University not found.' });
     }
 
-    university.status = 'REJECTED';
-    university.isVerified = false;
-    await university.save();
+    await Registry.update('universities', { id }, {
+        status: 'REJECTED',
+        isVerified: false
+    });
 
     res.json({ message: 'University application rejected.', data: university });
   } catch (err) {

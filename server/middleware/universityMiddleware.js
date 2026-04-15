@@ -1,4 +1,4 @@
-import University from '../models/University.js';
+import Registry from '../services/registryService.js';
 
 /**
  * Middleware to check if a university user is APPROVED.
@@ -10,7 +10,7 @@ export const requireApprovedUniversity = async (req, res, next) => {
       return next(); // Skip if not a university role (admins or students might have different paths)
     }
 
-    const university = await University.findOne({ userId: req.user._id });
+    const university = Registry.findOne('universities', { userId: req.user._id });
 
     if (!university) {
       return res.status(403).json({ 

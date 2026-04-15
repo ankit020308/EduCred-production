@@ -5,7 +5,6 @@ import {
   ShieldCheck, Mail, Lock, User, Building2, FileText, Loader2,
   ArrowRight, Hexagon, Zap, Cpu, Network, ChevronLeft, Terminal, Eye, EyeOff
 } from 'lucide-react';
-import { GoogleLogin } from '@react-oauth/google';
 import { useAuth } from '../context/AuthContext';
 import BlockchainBackground from '../components/BlockchainBackground';
 
@@ -69,7 +68,7 @@ const NodeVisualizer = () => {
 
 // ─── Main Component ───────────────────────────────────────────────────────────
 export default function Signup() {
-  const { register, googleLogin } = useAuth();
+  const { register } = useAuth();
   const navigate = useNavigate();
 
   const [authStep, setAuthStep] = useState(0);
@@ -78,6 +77,7 @@ export default function Signup() {
   });
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
+  const [isGoogleRedirecting, setIsGoogleRedirecting] = useState(false);
   const [logs, setLogs] = useState(['PREPARING GENESIS BLOCK...', 'AWAITING NODE SPECIFICATIONS...']);
 
   const addLog = (msg) => setLogs(prev =>
@@ -125,23 +125,12 @@ export default function Signup() {
     }
   };
 
-  const handleGoogleSuccess = async (credentialResponse) => {
-    setAuthStep(3);
-    addLog('INTERCEPTING OAUTH PAYLOAD...');
-    setError('');
-    try {
-      const { isNewUser, user } = await googleLogin(credentialResponse.credential, form.role);
-      addLog('OAUTH VERIFIED.');
-      if (isNewUser || user?.role === 'pending') {
-        navigate('/onboarding');
-      } else {
-        navigate('/dashboard');
-      }
-    } catch {
-      setError('Google sign-in failed. Please try again.');
-      addLog('OAUTH REJECTED.');
-      setAuthStep(0);
-    }
+  const handleGoogleRedirect = () => {
+    if (isGoogleRedirecting) return;
+    setIsGoogleRedirecting(true);
+    addLog('QUERYING IDENTITY HUB...');
+    const backendUrl = import.meta.env.VITE_API_URL || 'http://localhost:5001';
+    window.location.href = `${backendUrl}/api/auth/google`;
   };
 
   const stepTitles = ['Create Account', 'Personal Info', 'Institution', 'Anchoring...'];
@@ -380,7 +369,7 @@ export default function Signup() {
               )}
 
               {/* Google OAuth — Step 0 only */}
-              {authStep === 0 && import.meta.env.VITE_GOOGLE_CLIENT_ID && (
+              {authStep === 0 && (
                 <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="mt-8">
                   <div className="relative my-6">
                     <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-white/[0.06]" /></div>
@@ -389,11 +378,29 @@ export default function Signup() {
                     </div>
                   </div>
                   <div className="flex justify-center">
-                    <GoogleLogin
-                      onSuccess={handleGoogleSuccess}
-                      onError={() => { setError('Google sign-in failed.'); }}
-                      theme="outline" shape="rectangular" width="360" text="signup_with"
-                    />
+                    <button
+                      type="button"
+                      disabled={isGoogleRedirecting}
+                      onClick={handleGoogleRedirect}
+                      className="w-full flex items-center justify-center gap-3 py-3.5 px-6 rounded-2xl bg-[#111111] hover:bg-[#161616] border border-white/[0.06] transition-all group/google disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      {isGoogleRedirecting ? (
+                        <>
+                          <Loader2 className="animate-spin text-blue-500" size={18} />
+                          <span className="text-[11px] font-bold uppercase tracking-widest text-slate-400">Routing to Google...</span>
+                        </>
+                      ) : (
+                        <>
+                          <svg width="18" height="18" viewBox="0 0 48 48" aria-hidden="true" className="opacity-80 group-hover/google:opacity-100 transition-opacity">
+                            <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z" />
+                            <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z" />
+                            <path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24s.92 7.54 2.56 10.78l7.97-6.19z" />
+                            <path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z" />
+                          </svg>
+                          <span className="text-[11px] font-bold uppercase tracking-widest text-white">Join with Google</span>
+                        </>
+                      )}
+                    </button>
                   </div>
                 </motion.div>
               )}

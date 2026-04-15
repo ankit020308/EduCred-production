@@ -2,9 +2,12 @@ import { ethers } from 'ethers';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import * as dotenv from 'dotenv';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+
+dotenv.config({ path: path.resolve(__dirname, "../../.env") });
 
 const DEFAULT_RPC_URL = process.env.RPC_URL || 'http://127.0.0.1:8545';
 // Hardhat local node deterministic account 0 private key
@@ -45,19 +48,36 @@ async function main() {
 
   const factory = new ethers.ContractFactory(artifact.abi, artifact.bytecode, wallet);
 
-  console.log('[deploy] Deploying EduCred contract...');
+  console.log('[DEPLOY] Deploying EduCred contract...');
   const contract = await factory.deploy({
-    type: 0, // Force legacy transaction (Type 0) for Ganache v7 compatibility
+    type: 0, 
     gasPrice,
   });
   await contract.waitForDeployment();
 
   const contractAddress = await contract.getAddress();
-  console.log(`[deploy] ✅ EduCred deployed at: ${contractAddress}`);
+  console.log(`[DEPLOY] Contract deployed at: ${contractAddress}`);
+
+  // 🚀 HARDENING: Auto-authorize the deployer as an issuer
+  console.log(`[DEPLOY] Authorizing deployer (${wallet.address}) as an official issuer...`);
+  
+  // Explicitly fetch latest nonce to guard against "Nonce too low"
+  const latestNonce = await provider.getTransactionCount(wallet.address, 'latest');
+  
+  const authTx = await contract.addIssuer(wallet.address, { nonce: latestNonce });
+  const receipt = await authTx.wait();
+  
+  if (receipt.status === 1) {
+    console.log(`[DEPLOY] ✅ Deployer authorized in block ${receipt.blockNumber}.`);
+  } else {
+    throw new Error('Authorization transaction failed on-chain.');
+  }
 
   const metadata = {
     contractName: 'EduCred',
     contractAddress,
+    ownerAddress: wallet.address,
+    issuerAddress: wallet.address,
     abi: artifact.abi,
     rpcUrl: DEFAULT_RPC_URL,
     chainId: Number(network.chainId),

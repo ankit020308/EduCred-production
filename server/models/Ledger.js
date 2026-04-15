@@ -1,37 +1,55 @@
-import mongoose from 'mongoose';
+// server/models/Ledger.js
+import { DataTypes } from 'sequelize';
+import sequelize from '../config/database.js';
 
-const LedgerSchema = new mongoose.Schema({
-  type: {
-    type: String,
-    enum: ['ISSUE', 'VERIFY', 'REQUEST', 'APPROVE', 'REJECT', 'TAMPER'],
-    required: true,
-  },
-  studentName: {
-    type: String,
-    required: true,
-  },
-  universityName: {
-    type: String,
-    required: true,
-  },
-  certificateId: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'Certificate',
-    default: null,
-  },
-  txHash: {
-    type: String,
-    default: null,
-  },
-  status: {
-    type: String,
-    enum: ['SUCCESS', 'FAILED', 'PENDING'],
-    default: 'SUCCESS',
-  },
-  metadata: {
-    type: Object,
-    default: {},
-  }
-}, { timestamps: true });
+/**
+ * 🔗 Ledger Model
+ * Stores an immutable record of public transaction events.
+ */
+const Ledger = sequelize.define('Ledger', {
+    id: {
+        type: DataTypes.UUID,
+        defaultValue: DataTypes.UUIDV4,
+        primaryKey: true
+    },
+    type: {
+        type: DataTypes.ENUM('ISSUE', 'REVOKE', 'VERIFY', 'TRANSFER'),
+        allowNull: false
+    },
+    studentName: {
+        type: DataTypes.STRING,
+        allowNull: true
+    },
+    universityName: {
+        type: DataTypes.STRING,
+        allowNull: true
+    },
+    certificateId: {
+        type: DataTypes.UUID,
+        allowNull: true,
+        references: {
+            model: 'Certificate',
+            key: 'id'
+        }
+    },
+    txHash: {
+        type: DataTypes.STRING,
+        allowNull: true
+    },
+    status: {
+        type: DataTypes.STRING,
+        allowNull: false
+    },
+    metadata: {
+        type: DataTypes.JSONB,
+        defaultValue: {}
+    }
+}, {
+    indexes: [
+        { fields: ['type'] },
+        { fields: ['txHash'] },
+        { fields: ['createdAt'] }
+    ]
+});
 
-export default mongoose.model('Ledger', LedgerSchema);
+export default Ledger;

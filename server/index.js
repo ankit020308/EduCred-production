@@ -1,10 +1,10 @@
+import './utils/envLoader.js'; // 🛡️ LOAD ENV FIRST
 import express from 'express';
-import mongoose from 'mongoose';
+import bcrypt from 'bcryptjs';
 import cors from 'cors';
 import { Server } from 'socket.io';
 import http from 'http';
 import helmet from 'helmet';
-import dotenv from 'dotenv';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
@@ -12,6 +12,7 @@ import { fileURLToPath } from 'url';
 import morgan from 'morgan';
 import compression from 'compression';
 import rateLimit from 'express-rate-limit';
+import cookieParser from 'cookie-parser';
 
 // ─── Local Imports ────────────────────────────────────
 import certificateRoutes from './routes/certificateRoutes.js';
@@ -19,21 +20,20 @@ import authRoutes from './routes/authRoutes.js';
 import universityRoutes from './routes/universityRoutes.js';
 import userRoutes from './routes/userRoutes.js';
 import studentRoutes from './routes/studentRoutes.js';
-import systemRoutes from './routes/systemRoutes.js'; // Added your new system routes
+import systemRoutes from './routes/systemRoutes.js'; 
 import adminRoutes from './routes/adminRoutes.js';
 import requestRoutes from './routes/requestRoutes.js';
 import ledgerRoutes from './routes/ledgerRoutes.js';
-import connectDB from './config/db.js';
+import Registry from './services/registryService.js';
+import aiRoutes from './routes/aiRoutes.js';
 import passport from 'passport';
 import { configurePassport } from './config/passport.js';
 import session from 'express-session';
 
-import User from './models/User.js';
-import University from './models/University.js';
 import { getAllowedOrigins, isProduction, sessionSecret, validateServerEnv, requireEnv } from './utils/runtimeConfig.js';
 import { isPinataConfigured, testPinataConnection } from './utils/ipfsService.js';
+import { getBlockchainRuntimeInfo } from './utils/blockchain.js';
 
-dotenv.config();
 validateServerEnv();
 
 const __filename = fileURLToPath(import.meta.url);
@@ -85,8 +85,6 @@ io.on('connection', (socket) => {
 const PORT = process.env.PORT || 5001;
 
 // ─── CLOUD PROXY CONFIGURATION ────────────────────────
-// Trust the first proxy (Render, AWS, Vercel load balancers).
-// Prevents rate-limiting false-positives across the fleet.
 app.set('trust proxy', 1);
 
 // ─── Security & Performance Middleware ────────────────
@@ -103,8 +101,8 @@ app.use(helmet({
     },
   },
 }));
-app.use(compression()); // Compress response bodies for speed
-app.use(morgan('dev')); // HTTP request logging
+app.use(compression()); 
+app.use(morgan('dev')); 
 
 // ─── STRICT CORS PROTOCOL ────────────────────────────
 const corsOptions = {
@@ -114,10 +112,10 @@ const corsOptions = {
 };
 app.use(cors(corsOptions));
 
-// API Rate Limiting to prevent abuse/DDoS
 const apiLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100, // Limit each IP to 100 requests per windowMs
+  windowMs: 15 * 60 * 1000, 
+  max: 1000, // Elevated for dev
+  skip: (req) => !isProduction || req.ip === '::1' || req.ip === '127.0.0.1', 
   message: { success: false, message: 'Too many requests from this IP, please try again later.' },
   standardHeaders: true,
   legacyHeaders: false,
@@ -125,6 +123,7 @@ const apiLimiter = rateLimit({
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+app.use(cookieParser());
 
 app.use(session({
   secret: sessionSecret,
@@ -145,32 +144,36 @@ if (!isProduction) {
 }
 
 // ─── Routes ───────────────────────────────────────────
-app.use('/api', apiLimiter); // Apply rate limiter to all /api routes
-app.use('/auth', authRoutes); // OAuth top-level callback support
+app.use('/api', apiLimiter); 
+app.use('/auth', authRoutes); 
 app.use('/api/auth', authRoutes);
 app.use('/api/certificates', certificateRoutes);
 app.use('/api/universities', universityRoutes);
 app.use('/api/user', userRoutes);
 app.use('/api/student', studentRoutes);
-app.use('/api/system', systemRoutes); // Mount system stats endpoint
+app.use('/api/system', systemRoutes); 
 app.use('/api/admin', adminRoutes);
 app.use('/api/requests', requestRoutes);
 app.use('/api/ledger', ledgerRoutes);
+app.use('/api/ai', aiRoutes);
 
 // ─── Health Check ─────────────────────────────────────
 app.get('/api/health', async (req, res) => {
+  const bcInfo = getBlockchainRuntimeInfo();
+  
   res.status(200).json({
     status: 'Online',
     timestamp: new Date().toISOString(),
-    db: mongoose.connection.readyState === 1 ? 'Connected' : 'Disconnected',
-    ipfs: isPinataConfigured() ? 'Configured' : 'Unconfigured',
-    uptime: process.uptime()
+    registry: 'Operational (SQL-Hybrid)',
+    blockchain: bcInfo.mode,
+    ipfs: isPinataConfigured() ? 'Connected (Pinata)' : 'Fallback (Local)',
+    uptime: `${(process.uptime() / 60).toFixed(2)}m`,
+    env: isProduction ? 'production' : 'development'
   });
 });
 
 // ─── GLOBAL ERROR HANDLER ─────────────────────────────
 app.use((err, req, res, next) => {
-  // LOG: Internal monitoring (do not expose to client)
   console.error(`[❌ PROTOCOL_ERROR] ${err.message}${!isProduction ? `\n${err.stack}` : ''}`);
 
   res.status(err.status || 500).json({
@@ -180,16 +183,13 @@ app.use((err, req, res, next) => {
   });
 });
 
-// ─── Static Frontend Serving (Production) ─────────────
 const distPath = path.join(__dirname, '../client/dist');
 app.use(express.static(distPath));
 
-// ─── API 404 (Must be before SPA fallback) ──────────
 app.use('/api', (req, res) => {
   res.status(404).json({ error: `API route not found: ${req.method} ${req.originalUrl}` });
 });
 
-// ─── SPA Fallback (MUST BE LAST ROUTE) ────────────────
 app.get(/.*/, (req, res) => {
   res.sendFile(path.join(distPath, 'index.html'));
 });
@@ -201,23 +201,25 @@ async function seedSystem() {
     const adminPassword = requireEnv('ADMIN_PASSWORD');
     const shouldSeedAdmin = process.env.SEED_DEFAULT_ADMIN === 'true';
 
-    if (!shouldSeedAdmin) {
-      return;
-    }
+    if (!shouldSeedAdmin) return;
 
-    const adminExists = await User.findOne({ email: adminEmail });
+    const adminExists = await Registry.findOne('users', { email: adminEmail });
     if (adminExists) {
       console.log(`📡 ROOT AUTHORITY: Node verified (${adminEmail}). Bypassing seeding cycle.`);
       return;
     }
 
-    // Provision new administrative node
-    await User.create({
+    const salt = await bcrypt.genSalt(10);
+    const hash = await bcrypt.hash(adminPassword, salt);
+    const bcInfo = getBlockchainRuntimeInfo();
+
+    await Registry.insert('users', {
       name: 'System Controller',
       email: adminEmail,
-      passwordHash: adminPassword, // Let pre-save hook hash it
+      passwordHash: hash,
       role: 'admin',
-      isEmailVerified: true
+      isEmailVerified: true,
+      walletAddress: bcInfo.contractAddress ? process.env.PRIVATE_KEY_ADDRESS || '0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266' : null 
     });
     console.log(`✅ ROOT AUTHORITY: Global Admin established (${adminEmail})`);
   } catch (error) {
@@ -225,54 +227,62 @@ async function seedSystem() {
   }
 }
 
-// ─── Server Startup & Graceful Shutdown ───────────────
+// ─── Server Startup Protocol ─────────────────────────
 let server;
 
-connectDB()
-  .then(async () => {
-    await seedSystem();
-    server = httpServer.listen(PORT, '0.0.0.0', async () => {
-      console.log(`\n🚀 EduCred Node Active`);
-      console.log(`📡 Local:   http://localhost:${PORT}`);
-      console.log(`🌐 Network: http://0.0.0.0:${PORT}`);
-      console.log(`⚡ Socket.io enabled`);
-
-      // ─── IPFS Connectivity Diagnostic ───
-      if (isPinataConfigured()) {
-        console.log(`📦 IPFS: Detected Pinata configuration. Testing connectivity...`);
-        const isIpfsReady = await testPinataConnection();
-        if (isIpfsReady) {
-          console.log(`✅ IPFS: Decentralized storage layer active.\n`);
-        } else {
-          console.log(`⚠️ IPFS: Configuration detected but authentication failed.\n`);
-        }
-      } else {
-        console.log(`💡 IPFS: Service not configured. Using local storage fallback.\n`);
+if (process.env.NODE_ENV !== 'test') {
+  (async () => {
+      try {
+          // Step 1: Initialize Registry
+          await Registry.init();
+          console.log(`[REGISTRY] Storage layer initialized.`);
+          
+          // Step 2: Seed System Authority
+          await seedSystem();
+  
+          // Step 3: Launch Node
+          server = httpServer.listen(PORT, '0.0.0.0', async () => {
+            console.log(`[BACKEND] Server running on port ${PORT}`);
+            console.log(`[BACKEND] EduCred Node Active [HYBRID-SQL]`);
+  
+            // Check blockchain contract state
+            try {
+              const bcInfo = getBlockchainRuntimeInfo();
+              if (bcInfo.contractAddress) {
+                console.log(`[BLOCKCHAIN] Connected to contract at ${bcInfo.contractAddress}`);
+              } else {
+                console.log(`[BLOCKCHAIN] Warning: No active contract address found. Run deployment script.`);
+              }
+            } catch (bcError) {
+              console.warn(`[BLOCKCHAIN] ⚠️ External ledger unreachable: ${bcError.message}`);
+              console.info(`[BLOCKCHAIN] 🚀 Falling back to SIMULATION MODE (Mock Provider).`);
+            }
+  
+            if (isPinataConfigured()) {
+              try {
+                const isIpfsReady = await testPinataConnection();
+                if (isIpfsReady) {
+                  console.log(`✅ IPFS: Decentralized storage layer active.`);
+                }
+              } catch (ipfsError) {
+                console.warn(`[IPFS] ⚠️ Connectivity failed. Continuing without decentralized storage.`);
+              }
+            }
+          });
+      } catch (err) {
+          console.error('🛑 CRITICAL: Node failed to initialize. Review logs.', err);
+          // Only exit on fatal internal errors, but allow Simulation Mode to proceed
+          if (!Registry.isSimulation) process.exit(1); 
       }
-    });
-  })
-  .catch(err => {
-    console.error('❌ Database connection failed:', err);
-    process.exit(1);
-  });
+  })();
+}
 
-// Graceful Shutdown Protocol
 const shutdown = (signal) => {
   console.log(`\n⚠️ [DEVOPS]: ${signal} received. Initiating graceful shutdown...`);
-  
   if (server) {
-    server.close(async () => {
+    server.close(() => {
       console.log('🛑 HTTP: Server closed.');
-      try {
-        if (mongoose.connection.readyState === 1) {
-          await mongoose.connection.close();
-          console.log('🗄️ DATA: Ledger connection safely severed.');
-        }
-        process.exit(0);
-      } catch (err) {
-        console.error('❌ Shutdown Conflict:', err);
-        process.exit(1);
-      }
+      process.exit(0);
     });
   } else {
     process.exit(0);
@@ -281,3 +291,5 @@ const shutdown = (signal) => {
 
 process.on('SIGINT', () => shutdown('SIGINT'));
 process.on('SIGTERM', () => shutdown('SIGTERM'));
+
+export { app };

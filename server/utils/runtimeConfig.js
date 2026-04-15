@@ -3,7 +3,7 @@ import dotenv from 'dotenv';
 dotenv.config();
 
 const REQUIRED_SERVER_ENV = [
-  'MONGO_URI',
+  'DATABASE_URL',
   'CLIENT_URL',
   'JWT_SECRET',
   'REFRESH_SECRET',

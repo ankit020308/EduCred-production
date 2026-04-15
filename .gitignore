@@ -1,11 +1,32 @@
-blockchain/ganache_db/
-blockchain/cache/
-blockchain/artifacts/build-info/
+# Root .gitignore for EduCred
 node_modules/
 .env
+.DS_Store
 dist/
 build/
-coverage/
 *.log
-.DS_Store
+.vscode/
+.idea/
 
+# Backend specific
+server/node_modules/
+server/uploads/
+server/.env
+server/diagnostic_audit.js
+server/openai_audit.js
+server/utils/EduCred.json.bak
+
+# Frontend specific
+client/node_modules/
+client/dist/
+client/.env
+client/.env.local
+
+# Blockchain specific
+blockchain/node_modules/
+blockchain/artifacts/
+blockchain/cache/
+blockchain/typechain/
+blockchain/ganache.log
+blockchain/ganache_db/
+blockchain/.env

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
-import { ShieldCheck, Menu, LogOut, LayoutDashboard, Globe, Search, User as UserIcon } from 'lucide-react';
+import { ShieldCheck, Menu, LogOut, LayoutDashboard, Globe, Search, User as UserIcon, Cpu } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
 export default function Navbar() {
@@ -28,6 +28,9 @@ export default function Navbar() {
   const navLinks = [
     { to: '/verify', label: 'Protocol Verification', icon: Search },
     { to: '/ledger', label: 'Genesis Ledger', icon: Globe },
+    ...(user?.role?.toLowerCase() === 'super_admin' ? [
+      { to: '/sys-admin/workbench', label: 'AI Labs', icon: Cpu }
+    ] : [])
   ];
 
   return (

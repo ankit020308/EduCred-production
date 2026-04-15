@@ -1,6 +1,5 @@
 import React, { StrictMode, Suspense } from 'react';
 import { createRoot } from 'react-dom/client';
-import { GoogleOAuthProvider } from '@react-oauth/google';
 import { Loader2, ShieldAlert } from 'lucide-react';
 
 /* ── STYLES ── */
@@ -10,18 +9,7 @@ import './index.css';
 import App from './App.jsx';
 
 /**
- * 🔒 SECURITY PROTOCOL: ENVIRONMENT VALIDATION
- * Ensures the app doesn't attempt to initialize identity bridges without a valid Client ID.
- */
-const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID;
-
-if (!GOOGLE_CLIENT_ID) {
-  throw new Error('Missing VITE_GOOGLE_CLIENT_ID');
-}
-
-/**
  * 🛰️ SYSTEM BOOT LOADER
- * Displayed during initial bundle resolution or route suspension.
  */
 const RootLoader = () => (
   <div className="h-screen w-screen bg-[#000000] flex flex-col items-center justify-center space-y-6 font-sans">
@@ -42,7 +30,6 @@ const RootLoader = () => (
 
 /**
  * 🛡️ EMERGENCY FAILSAFE
- * Catches critical runtime exceptions to maintain UI integrity.
  */
 class GlobalErrorBoundary extends React.Component {
   constructor(props) {
@@ -98,12 +85,7 @@ class GlobalErrorBoundary extends React.Component {
 createRoot(document.getElementById('root')).render(
   <StrictMode>
     <GlobalErrorBoundary>
-      <GoogleOAuthProvider
-        clientId={GOOGLE_CLIENT_ID}
-        onScriptLoadError={() => console.error("Identity Bridge Script Failed to Load.")}
-      >
-        <App />
-      </GoogleOAuthProvider>
+      <App />
     </GlobalErrorBoundary>
   </StrictMode>
 );

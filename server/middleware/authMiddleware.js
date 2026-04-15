@@ -1,23 +1,35 @@
-import Blacklist from '../models/Blacklist.js';
+// server/middleware/authMiddleware.js
+import Registry from '../services/registryService.js';
+import jwt from 'jsonwebtoken';
 
+const jwtSecret = process.env.JWT_SECRET || "dev_jwt_secret";
+
+/**
+ * 🛡️ Security Protocol: JWT Authentication
+ * Verifies the identity token and hydrates req.user from the Registry (SQL).
+ */
 export const protect = async (req, res, next) => {
   try {
-    const authHeader = req.headers.authorization;
-    if (!authHeader?.startsWith('Bearer ')) {
+    let token = req.cookies?.accessToken;
+
+    if (!token && req.headers.authorization?.startsWith('Bearer ')) {
+      token = req.headers.authorization.split(' ')[1];
+    }
+
+    if (!token) {
       return res.status(401).json({ error: 'Identity proof required. No token provided.' });
     }
 
-    const token = authHeader.split(' ')[1];
-
-    // Check if token is blacklisted
-    const isBlacklisted = await Blacklist.findOne({ token });
+    // Check if token is blacklisted (Must AWAIT)
+    const isBlacklisted = await Registry.findOne('blacklistedTokens', { token });
     if (isBlacklisted) {
       return res.status(401).json({ error: 'Security token revoked. Please login again.' });
     }
 
     const decoded = jwt.verify(token, jwtSecret);
 
-    const user = await User.findById(decoded.id).select('-passwordHash');
+    // Hydrate user from SQL (Must AWAIT)
+    const user = await Registry.findById('users', decoded.id);
     if (!user) {
       return res.status(401).json({ error: 'Identity node no longer exists.' });
     }
@@ -38,7 +50,6 @@ export const protect = async (req, res, next) => {
 
 /**
  * Flexible role check — handles both lowercase and uppercase roles
- * e.g. requireRole('admin', 'SUPER_ADMIN', 'university')
  */
 export const requireRole = (...roles) => (req, res, next) => {
   if (!req.user) {
