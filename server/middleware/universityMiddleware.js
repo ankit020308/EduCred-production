@@ -10,7 +10,7 @@ export const requireApprovedUniversity = async (req, res, next) => {
       return next(); // Skip if not a university role (admins or students might have different paths)
     }
 
-    const university = Registry.findOne('universities', { userId: req.user._id });
+    const university = await Registry.findOne('universities', { userId: req.user.id });
 
     if (!university) {
       return res.status(403).json({ 

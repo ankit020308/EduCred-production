@@ -31,7 +31,7 @@ export const sendCertificateNotification = async (studentName, course, universit
     await Promise.allSettled([
         // 1. Email Channel
         sendCertificateEmail(studentEmail, {
-            _id: certId,
+            id: certId,
             studentName,
             course,
             issuer: universityName

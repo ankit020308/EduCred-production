@@ -183,16 +183,7 @@ app.use((err, req, res, next) => {
   });
 });
 
-const distPath = path.join(__dirname, '../client/dist');
-app.use(express.static(distPath));
 
-app.use('/api', (req, res) => {
-  res.status(404).json({ error: `API route not found: ${req.method} ${req.originalUrl}` });
-});
-
-app.get(/.*/, (req, res) => {
-  res.sendFile(path.join(distPath, 'index.html'));
-});
 
 // ─── Seed Data (System Authorization) ────────────────
 async function seedSystem() {

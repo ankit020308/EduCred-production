@@ -31,7 +31,7 @@ export const logout = async (req, res) => {
       }
     }
 
-    await logAudit(req, 'NODE_LOGOUT', 'SUCCESS', 'Identity node session terminated.', { userId: req.user?._id });
+    await logAudit(req, 'NODE_LOGOUT', 'SUCCESS', 'Identity node session terminated.', { userId: req.user?.id });
     
     res.clearCookie('accessToken');
     res.clearCookie('refreshToken');
@@ -68,7 +68,7 @@ const hashOTP = (otp) => crypto.createHash('sha256').update(otp).digest('hex');
 
 export const register = async (req, res) => {
   try {
-    const { error } = registerSchema.validate(req.body);
+
     if (error) return res.status(400).json({ error: error.details[0].message });
 
     const { name, email, password, role, universityName } = req.body;
@@ -355,7 +355,7 @@ export const googleLogin = async (req, res) => {
 
     if (!user) {
       // Auto-provision new node if it doesn't exist
-      user = Registry.insert('users', {
+
         name,
         email,
         passwordHash: crypto.randomBytes(16).toString('hex'), // Randomized password for social-only nodes
@@ -378,15 +378,15 @@ export const googleLogin = async (req, res) => {
       }
     }
 
-    const accessToken = signToken(user._id);
-    const refreshToken = signRefreshToken(user._id);
+    const accessToken = signToken(user.id);
+    const refreshToken = signRefreshToken(user.id);
 
     res.status(200).json({
       accessToken,
       refreshToken,
       isNewUser: user.role === 'pending',
       user: {
-        id: user._id,
+        id: user.id,
         name: user.name,
         email: user.email,
         role: user.role

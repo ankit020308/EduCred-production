@@ -15,9 +15,10 @@ const router = express.Router();
  */
 router.get('/public', async (req, res) => {
   try {
-    const universities = Registry.find('universities', { status: 'APPROVED' }).map(u => ({
+    const unis = await Registry.find('universities', { status: 'APPROVED' });
+    const universities = unis.map(u => ({
       name: u.name,
-      _id: u._id
+      id: u.id
     }));
     res.json(universities);
   } catch (err) {

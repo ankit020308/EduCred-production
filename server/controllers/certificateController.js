@@ -26,7 +26,7 @@ const CERTIFICATE_TYPE_CODES = {
 
 function buildPublicCertificatePayload(cert) {
     return {
-        _id: cert._id,
+        id: cert.id,
         certificateId: cert.certificateId,
         studentName: cert.studentName,
         course: cert.course,
@@ -233,7 +233,7 @@ export const issueCertificate = async (req, res) => {
                 io?.to(`user_${studentUser.id}`)?.emit('newCertificate', { certId: cert.id, type: cert.certificateType });
             }
 
-            await logAudit(req, 'ISSUANCE_ANCHORED', 'SUCCESS', `Certificate anchored for ${studentName}.`, { certId: cert._id, hash: fileHash, tx: receipt.hash });
+            await logAudit(req, 'ISSUANCE_ANCHORED', 'SUCCESS', `Certificate anchored for ${studentName}.`, { certId: cert.id, hash: fileHash, tx: receipt.hash });
 
             res.status(201).json({
                 success: true,
@@ -243,18 +243,18 @@ export const issueCertificate = async (req, res) => {
                 txHash: receipt.hash,
                 fileUrl,
                 ipfsCid,
-                certDbId: cert._id
+                certDbId: cert.id
             });
 
         } catch (anchorErr) {
             console.error('❌ [LEDGER] Anchor failed:', anchorErr.message);
-            Registry.update('certificates', { _id: cert._id }, { status: 'FAILED' });
+            Registry.update('certificates', { id: cert.id }, { status: 'FAILED' });
 
             Registry.insert('ledger', {
                 type: 'ISSUE',
                 studentName: cert.studentName,
                 universityName: university.name,
-                certificateId: cert._id,
+                certificateId: cert.id,
                 status: 'FAILED',
                 metadata: { error: anchorErr.message, certificateType: cert.certificateType }
             });
@@ -291,13 +291,13 @@ export const confirmIssuance = async (req, res) => {
             });
         }
 
-        const university = Registry.findOne('universities', { userId: req.user._id });
+        const university = Registry.findOne('universities', { userId: req.user.id });
 
-        Registry.update('certificates', { _id: certificate._id }, {
+        Registry.update('certificates', { id: certificate.id }, {
             workflowStatus: 'ISSUED',
             workflowLog: [
                 ...(certificate.workflowLog || []),
-                { stage: 'Registrar Authorization', actorId: req.user._id, actorName: req.user.name, timestamp: new Date() }
+                { stage: 'Registrar Authorization', actorId: req.user.id, actorName: req.user.name, timestamp: new Date() }
             ]
         });
 
@@ -306,17 +306,17 @@ export const confirmIssuance = async (req, res) => {
             const MAX_RETRIES = 3;
             try {
                 const receipt = await issueCertificateOnChain(
-                    certificate._id.toString(),
+                    certificate.id.toString(),
                     hash,
                     CERTIFICATE_TYPE_CODES[certificate.certificateType] ?? 0
                 );
 
-                Registry.update('certificates', { _id: certificate._id }, {
+                Registry.update('certificates', { id: certificate.id }, {
                     blockchainTxHash: receipt.hash,
                     status: 'CONFIRMED',
                     workflowLog: [
                         ...(certificate.workflowLog || []),
-                        { stage: 'Anchoring to Blockchain', actorId: req.user._id, actorName: 'Smart Contract', timestamp: new Date() }
+                        { stage: 'Anchoring to Blockchain', actorId: req.user.id, actorName: 'Smart Contract', timestamp: new Date() }
                     ]
                 });
 
@@ -324,20 +324,20 @@ export const confirmIssuance = async (req, res) => {
                     type: 'ISSUE',
                     studentName: certificate.studentName,
                     universityName: university.name,
-                    certificateId: certificate._id,
+                    certificateId: certificate.id,
                     txHash: receipt.hash,
                     status: 'SUCCESS',
                     metadata: { certificateType: certificate.certificateType, source: 'confirmIssuance' }
                 });
 
-                req.app.get('io')?.to(`university_${university._id}`)?.emit('certificateIssued', {
-                    universityId: university._id,
+                req.app.get('io')?.to(`university_${university.id}`)?.emit('certificateIssued', {
+                    universityId: university.id,
                     universityName: university.name,
                     certificateType: certificate.certificateType,
                     timestamp: new Date()
                 });
 
-                req.app.get('io')?.to(`university_${university._id}`)?.emit('certificateConfirmed', {
+                req.app.get('io')?.to(`university_${university.id}`)?.emit('certificateConfirmed', {
                     certificateId: certificate.certificateId,
                     status: 'CONFIRMED',
                     txHash: receipt.hash
@@ -346,7 +346,7 @@ export const confirmIssuance = async (req, res) => {
                 // Notify student user room if found
                 const studentUser = Registry.findOne('users', { email: certificate.studentEmail });
                 if (studentUser) {
-                    req.app.get('io')?.to(`user_${studentUser._id}`)?.emit('certificateConfirmed', {
+                    req.app.get('io')?.to(`user_${studentUser.id}`)?.emit('certificateConfirmed', {
                         certificateId: certificate.certificateId,
                         status: 'CONFIRMED'
                     });
@@ -357,12 +357,12 @@ export const confirmIssuance = async (req, res) => {
                 if (retryCount < MAX_RETRIES) {
                     setTimeout(() => anchorToLedger(certificate, hash, retryCount + 1), Math.pow(2, retryCount) * 1000);
                 } else {
-                    Registry.update('certificates', { _id: certificate._id }, { status: 'FAILED' });
+                    Registry.update('certificates', { id: certificate.id }, { status: 'FAILED' });
                     Registry.insert('ledger', {
                         type: 'ISSUE',
                         studentName: certificate.studentName,
                         universityName: university.name,
-                        certificateId: certificate._id,
+                        certificateId: certificate.id,
                         status: 'FAILED',
                         metadata: { error: error.message, source: 'confirmIssuance' }
                     });
@@ -384,7 +384,7 @@ export const revokeCertificate = async (req, res) => {
         const cert = Registry.findOne('certificates', { certificateId });
         if (!cert) return res.status(404).json({ error: 'Not found' });
 
-        Registry.update('certificates', { _id: cert._id }, {
+        Registry.update('certificates', { id: cert.id }, {
             isRevoked: true,
             revocationReason: reasonNotes,
             revocationReasonCode: reasonCode || 0,
@@ -403,7 +403,7 @@ export const revokeCertificate = async (req, res) => {
             type: 'TAMPER',
             studentName: cert.studentName,
             universityName: cert.issuer,
-            certificateId: cert._id,
+            certificateId: cert.id,
             status: 'SUCCESS',
             metadata: { reasonCode: reasonCode || 0, revocationReason: reasonNotes }
         });
@@ -564,7 +564,7 @@ export const verifyByEnrollment = async (req, res) => {
  */
 export const getCertificates = async (req, res) => {
     try {
-        const certs = Registry.find('certificates', { issuedBy: req.user._id });
+        const certs = Registry.find('certificates', { issuedBy: req.user.id });
         res.json({ data: certs });
     } catch (err) {
         res.status(500).json({ error: 'Failed to fetch certificates.' });
@@ -576,10 +576,10 @@ export const getCertificates = async (req, res) => {
  */
 export const getStats = async (req, res) => {
     try {
-        const total = Registry.count('certificates', { issuedBy: req.user._id });
-        const confirmed = Registry.count('certificates', { issuedBy: req.user._id, status: 'CONFIRMED' });
-        const pending = Registry.count('certificates', { issuedBy: req.user._id, status: 'PENDING' });
-        const failed = Registry.count('certificates', { issuedBy: req.user._id, status: 'FAILED' });
+        const total = Registry.count('certificates', { issuedBy: req.user.id });
+        const confirmed = Registry.count('certificates', { issuedBy: req.user.id, status: 'CONFIRMED' });
+        const pending = Registry.count('certificates', { issuedBy: req.user.id, status: 'PENDING' });
+        const failed = Registry.count('certificates', { issuedBy: req.user.id, status: 'FAILED' });
 
         res.json({ total, confirmed, pending, failed });
     } catch (err) {
@@ -618,8 +618,8 @@ export const downloadCertificateFile = async (req, res) => {
         const canAccess =
             req.user?.role === 'admin' ||
             req.user?.role === 'super_admin' ||
-            String(cert.issuedBy) === String(req.user?._id) ||
-            String(cert.studentId) === String(req.user?._id) ||
+            String(cert.issuedBy) === String(req.user?.id) ||
+            String(cert.studentId) === String(req.user?.id) ||
             cert.studentEmail === req.user?.email;
 
         if (!canAccess) {

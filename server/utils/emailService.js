@@ -48,7 +48,7 @@ function baseMailOptions(to, subject, html) {
 }
 
 export const sendCertificateEmail = async (to, cert) => {
-  const verifyUrl = `${process.env.CLIENT_URL}/verify?id=${cert._id}`;
+  const verifyUrl = `${process.env.CLIENT_URL}/verify?id=${cert.id}`;
   const mailOptions = baseMailOptions(
     to,
     `Certificate issued: ${cert.course}`,
@@ -57,7 +57,7 @@ export const sendCertificateEmail = async (to, cert) => {
         <h2 style="margin:0 0 12px;color:#111827;">Your certificate is ready</h2>
         <p style="color:#4b5563;">Hello <strong>${cert.studentName}</strong>,</p>
         <p style="color:#4b5563;">A new credential has been issued for <strong>${cert.course}</strong>.</p>
-        <p style="color:#4b5563;">Certificate ID: <strong>${cert._id}</strong></p>
+        <p style="color:#4b5563;">Certificate ID: <strong>${cert.id}</strong></p>
         <p style="color:#4b5563;word-break:break-all;">Hash: <strong>${cert.certificateHash}</strong></p>
         <a href="${verifyUrl}" style="display:inline-block;margin-top:16px;padding:12px 18px;background:#111827;color:#fff;text-decoration:none;border-radius:10px;">
           Verify certificate
