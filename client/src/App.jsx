@@ -31,6 +31,10 @@ const Profile = lazy(() => import('./pages/Profile'));
 
 import PixelGridBackground from './components/PixelGridBackground';
 import StudentDashboard from './components/StudentDashboard';
+import HyperCursor from './components/HyperCursor';
+import ProtocolBootSequence from './components/ProtocolBootSequence';
+import BlockchainBackground from './components/BlockchainBackground';
+import { useState } from 'react';
 
 /**
  * Listens for globally intercepted unhandled promise rejections.
@@ -236,18 +240,40 @@ const NavigationWrapper = () => {
 };
 
 function App() {
+  const [hasBooted, setHasBooted] = useState(() => {
+    return sessionStorage.getItem('educred_booted') === 'true';
+  });
+
+  const handleBootComplete = () => {
+    setHasBooted(true);
+    sessionStorage.setItem('educred_booted', 'true');
+  };
+
   return (
     <ToastProvider>
       <BlockchainProvider>
         <AuthProvider>
           <Router>
-            {/* 🌌 GLOBAL PIXEL BACKGROUND */}
-            <PixelGridBackground />
-
-            {/* 🌐 MAIN APP LAYER */}
-            <div className="relative z-10 min-h-screen w-full flex flex-col text-white overflow-x-hidden">
-              <NavigationWrapper />
-            </div>
+            <HyperCursor />
+            {!hasBooted && <ProtocolBootSequence onComplete={handleBootComplete} />}
+            
+            <AnimatePresence>
+              {hasBooted && (
+                <motion.div
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  transition={{ duration: 1 }}
+                >
+                  <div className="fixed inset-0 z-0 opacity-40 mix-blend-screen pointer-events-none">
+                    <BlockchainBackground />
+                  </div>
+                  
+                  <div className="relative z-10 min-h-screen w-full flex flex-col text-white overflow-x-hidden font-sans">
+                    <NavigationWrapper />
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
           </Router>
         </AuthProvider>
       </BlockchainProvider>

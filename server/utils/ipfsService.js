@@ -70,31 +70,40 @@ export async function uploadFileToPinata(buffer, filename, keyvalueMetadata = {}
     );
   }
 
-  // The new Pinata SDK accepts a Web-API File object (or Blob)
-  const blob = new Blob([buffer], { type: 'application/pdf' });
+  // Improved Buffer to Blob conversion for Node environments
+  let blob;
+  try {
+    blob = new Blob([buffer], { type: 'application/pdf' });
+  } catch (err) {
+    // Fallback if Blob constructor is not globally available in older Node
+    const { Blob: NodeBlob } = await import('buffer');
+    blob = new NodeBlob([buffer], { type: 'application/pdf' });
+  }
+
   const file = new File([blob], filename, { type: 'application/pdf' });
 
-  console.log(`[📦 IPFS_UPLOAD] Pinning "${filename}" to IPFS via Pinata...`);
+  console.log(`[📦 IPFS] Pinning "${filename}" (${buffer.length} bytes) to Pinata...`);
 
-  // Correct API for Pinata v2 SDK:
-  // .upload.public.file(file).name(filename).keyvalues(metadata)
-  const result = await pinata.upload.public.file(file)
-    .name(filename)
-    .keyvalues({
-      source: 'EduCred',
-      uploadedAt: new Date().toISOString(),
-      ...Object.fromEntries(
-        Object.entries(keyvalueMetadata).map(([k, v]) => [k, String(v)])
-      ),
-    });
+  try {
+    const result = await pinata.upload.public.file(file)
+      .name(filename)
+      .keyvalues({
+        source: 'EduCred',
+        uploadedAt: new Date().toISOString(),
+        ...Object.fromEntries(
+          Object.entries(keyvalueMetadata).map(([k, v]) => [k, String(v)])
+        ),
+      });
 
-  const cid = result.cid;
-  const url = getIPFSUrl(cid);
+    const cid = result.cid;
+    const url = getIPFSUrl(cid);
 
-  console.log(`[✅ IPFS_SUCCESS] File pinned. CID: ${cid}`);
-  console.log(`[🌐 IPFS_GATEWAY] Accessible at: ${url}`);
-
-  return { cid, url };
+    console.log(`[✅ IPFS] Success. CID: ${cid}`);
+    return { cid, url };
+  } catch (uploadErr) {
+    console.error(`[❌ IPFS_ERROR]: Pinata upload failed - ${uploadErr.message}`);
+    throw uploadErr;
+  }
 }
 
 /**

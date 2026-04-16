@@ -126,7 +126,7 @@ export default function VerifyOTP() {
         <BlockchainBackground />
       </div>
 
-      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-blue-600/10 blur-[150px] rounded-full pointer-events-none mix-blend-screen" />
+      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-blue-400/5 blur-[150px] rounded-full pointer-events-none mix-blend-screen" />
 
       <motion.div
         initial={{ opacity: 0, y: 20, scale: 0.95 }}
@@ -134,25 +134,24 @@ export default function VerifyOTP() {
         transition={{ duration: 0.8, ease: [0.22, 1, 0.36, 1] }}
         className="relative w-full max-w-[500px] z-10"
       >
-        <div className="bg-[#0A0A0A]/80 backdrop-blur-3xl p-10 md:p-14 border border-white/[0.06] rounded-[2.5rem] shadow-[0_0_100px_rgba(0,0,0,0.8)] relative overflow-hidden group">
-          
-          <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-blue-500/50 to-transparent opacity-50 shadow-[0_0_20px_rgba(59,130,246,0.5)]" />
+        <div className="glass-pane p-10 md:p-14 rounded-[2.5rem] shadow-[0_0_100px_rgba(0,0,0,0.8)] scanline-overlay sm:border border-white/10">
+          <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-cyan-400/50 to-transparent opacity-50 shadow-[0_0_20px_rgba(34,211,238,0.5)]" />
 
           {/* HEADER */}
           <div className="text-center mb-10 space-y-5 relative z-10">
-            <div className="w-16 h-16 bg-[#111111] rounded-2xl flex items-center justify-center mx-auto border border-white/[0.08] shadow-[0_0_30px_rgba(59,130,246,0.1)]">
+            <div className="w-16 h-16 bg-[#050505] rounded-2xl flex items-center justify-center mx-auto border border-blue-400/20 shadow-[0_0_30px_rgba(59,130,246,0.1)]">
               {loading ? (
-                <Cpu size={28} className="text-blue-500 animate-pulse" />
+                <Cpu size={28} className="text-blue-400 animate-pulse" />
               ) : (
-                <ShieldCheck size={28} className="text-blue-500" />
+                <ShieldCheck size={28} className="text-blue-400" />
               )}
             </div>
 
             <div className="space-y-2">
-              <h1 className="text-3xl font-extrabold text-white tracking-tighter uppercase">
-                 Node <span className="text-blue-500">Activation</span>
+              <h1 className="text-3xl font-black text-white tracking-tighter uppercase">
+                 Node <span className="text-blue-400">Activation</span>
               </h1>
-              <p className="text-slate-500 text-[10px] font-bold uppercase tracking-[0.2em] leading-relaxed">
+              <p className="text-slate-500 text-[9px] font-black uppercase tracking-[0.4em] leading-relaxed">
                 A cryptographic signature has been dispatched to <br/>
                 <span className="text-blue-400 font-mono tracking-widest">{email}</span>
               </p>
@@ -186,9 +185,9 @@ export default function VerifyOTP() {
                   onChange={e => handleChange(e, index)}
                   onKeyDown={e => handleKeyDown(e, index)}
                   onFocus={() => setActiveInput(index)}
-                  className={`w-12 h-14 sm:w-14 sm:h-16 bg-[#111111] border ${
-                    activeInput === index ? 'border-blue-500 shadow-[0_0_20px_rgba(59,130,246,0.2)]' : 'border-white/[0.06]'
-                  } rounded-xl text-center text-xl font-mono font-black text-white outline-none transition-all duration-300 focus:bg-[#161616]`}
+                  className={`w-12 h-14 sm:w-14 sm:h-16 bg-[#050505] border shadow-inner ${
+                    activeInput === index ? 'border-blue-400 shadow-[0_0_20px_rgba(59,130,246,0.2)]' : 'border-white/10'
+                  } rounded-xl text-center text-xl font-mono font-black text-white outline-none transition-all duration-300 focus:bg-[#080808]`}
                 />
               ))}
             </div>
@@ -197,22 +196,22 @@ export default function VerifyOTP() {
             <button
               type="submit"
               disabled={loading || otp.join('').length < 6}
-              className="w-full bg-white text-black py-4.5 rounded-2xl font-bold text-[11px] uppercase tracking-[0.2em] transition-all hover:scale-[1.02] active:scale-95 disabled:opacity-50 disabled:hover:scale-100 flex items-center justify-center gap-3 shadow-[0_0_30px_rgba(255,255,255,0.1)]"
+              className="btn-command btn-blue w-full"
             >
               {loading ? (
-                <>Establishing Consensus <Loader2 size={16} className="animate-spin ml-2" /></>
+                <>Establishing Consensus <Loader2 size={16} className="animate-spin" /></>
               ) : (
-                <>Verify Signature <ArrowRight size={16} className="text-blue-600 ml-2" /></>
+                <>Verify Signature <ArrowRight size={16} /></>
               )}
             </button>
           </form>
 
           {/* RESEND LOGIC */}
-          <div className="text-center mt-10 pt-6 border-t border-white/[0.06] relative z-10">
+          <div className="text-center mt-10 pt-6 border-t border-white/5 relative z-10">
             <button 
               onClick={handleResend}
               disabled={cooldown > 0}
-              className="flex items-center justify-center gap-2 w-full text-[10px] font-bold uppercase tracking-[0.2em] transition-colors disabled:opacity-50 text-slate-500 hover:text-blue-400"
+              className="flex items-center justify-center gap-2 w-full text-[9px] font-black uppercase tracking-[0.3em] transition-colors disabled:opacity-50 text-slate-500 hover:text-blue-400"
             >
               <RefreshCw size={12} className={cooldown > 0 ? '' : 'animate-spin-slow'} />
               {cooldown > 0 ? `Transmission locked (${cooldown}s)` : 'Request New Signature'}

@@ -51,14 +51,14 @@ export default function Onboarding() {
   };
 
   return (
-    <div className="relative min-h-screen flex flex-col items-center justify-center px-6 overflow-hidden bg-[#010409]">
+    <div className="relative min-h-screen flex flex-col items-center justify-center px-6 overflow-hidden bg-[#000000] text-slate-300 font-sans selection:bg-cyan-500/30">
       
       {/* 🌌 INTERACTIVE BACKGROUND */}
-      <BlockchainBackground />
-
-      <div className="absolute inset-0 z-0 pointer-events-none">
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-indigo-600/10 blur-[140px] rounded-full animate-pulse" />
+      <div className="fixed inset-0 opacity-20 pointer-events-none z-0">
+        <BlockchainBackground />
       </div>
+
+      <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[1000px] h-[500px] bg-cyan-400/5 blur-[150px] rounded-full mix-blend-screen pointer-events-none" />
 
       <motion.div
         initial={{ opacity: 0, scale: 0.98, y: 20 }}
@@ -66,19 +66,21 @@ export default function Onboarding() {
         transition={{ duration: 0.8 }}
         className="relative w-full max-w-[500px] z-10"
       >
-        <div className="glass-card p-10 md:p-12 border border-white/10">
+        <div className="glass-pane p-12 md:p-14 rounded-[2.5rem] border border-white/5 relative overflow-hidden scanline-overlay">
+          <div className="absolute top-0 right-0 w-32 h-32 bg-cyan-400/5 blur-[60px] rounded-full" />
           
-          <div className="text-center mb-10 space-y-4">
-            <div className="w-16 h-16 bg-indigo-600/10 rounded-2xl flex items-center justify-center mx-auto border border-white/5 shadow-indigo-500/10 animate-levitate">
-              <ShieldCheck size={28} className="text-indigo-500" />
+          <div className="text-center mb-12 space-y-8">
+            <div className="w-20 h-20 bg-[#050505] rounded-3xl flex items-center justify-center mx-auto border border-white/10 shadow-2xl relative overflow-hidden group">
+              <div className="absolute inset-0 bg-cyan-400/5 opacity-0 group-hover:opacity-100 transition-opacity" />
+              <ShieldCheck size={32} className="text-cyan-400 relative z-10 animate-pulse" />
             </div>
 
-            <h1 className="text-3xl font-bold text-white tracking-tight text-glow-indigo">
-              Establish <span className="text-indigo-500">Identity</span>
+            <h1 className="text-4xl md:text-5xl font-black text-white tracking-tighter uppercase leading-none">
+              Establish <span className="text-cyan-400">Identity.</span>
             </h1>
 
-            <p className="text-slate-500 text-[10px] font-bold uppercase tracking-[0.4em] opacity-60">
-              Protocol Onboarding Initialized
+            <p className="text-slate-700 text-[10px] font-black uppercase tracking-[0.4em]">
+              Protocol Initialization Sequence
             </p>
           </div>
 
@@ -86,51 +88,52 @@ export default function Onboarding() {
             <motion.div 
               initial={{ opacity: 0, height: 0 }}
               animate={{ opacity: 1, height: 'auto' }}
-              className="bg-rose-500/10 border border-rose-500/20 rounded-2xl p-4 mb-8 text-rose-400 text-[10px] font-bold uppercase tracking-widest text-center"
+              className="bg-rose-500/10 border border-rose-500/20 rounded-2xl p-5 mb-10 text-rose-500 text-[9px] font-black uppercase tracking-[0.3em] text-center"
             >
-              {error}
+              Protocol Error: {error}
             </motion.div>
           )}
 
           <div className="space-y-8">
             {/* ROLE SELECTION CARDS */}
-            <div className="grid grid-cols-2 gap-4">
+            {/* ROLE SELECTION CARDS */}
+            <div className="grid grid-cols-2 gap-6">
               <button
                 onClick={() => setRole('student')}
-                className={`p-6 rounded-2xl border-2 transition-all group ${
+                className={`p-8 rounded-[2rem] border transition-all relative overflow-hidden group shadow-2xl ${
                   role === 'student' 
-                    ? 'border-indigo-500 bg-indigo-500/10' 
-                    : 'border-white/5 bg-white/[0.02] hover:border-white/20'
+                    ? 'border-cyan-400 bg-cyan-400/5 shadow-cyan-400/10' 
+                    : 'border-white/5 bg-[#050505] hover:border-cyan-400/20'
                 }`}
               >
-                <div className={`w-12 h-12 rounded-xl flex items-center justify-center mb-4 transition-colors ${
-                  role === 'student' ? 'bg-indigo-500 text-white' : 'bg-white/5 text-slate-500 group-hover:text-white'
+                <div className={`w-14 h-14 rounded-2xl flex items-center justify-center mb-6 transition-all shadow-inner ${
+                  role === 'student' ? 'bg-cyan-400 text-slate-950 scale-110' : 'bg-[#080808] text-slate-800'
                 }`}>
                   <User size={24} />
                 </div>
-                <h3 className={`text-[10px] font-black uppercase tracking-widest ${
-                  role === 'student' ? 'text-white' : 'text-slate-500'
-                }`}>Student</h3>
-                <p className="text-[8px] text-slate-600 mt-2 leading-relaxed">Proof of education & credentials</p>
+                <h3 className={`text-[10px] font-black uppercase tracking-[0.3em] ${
+                  role === 'student' ? 'text-white' : 'text-slate-800'
+                }`}>Subject Identity</h3>
+                <p className={`text-[8px] font-black uppercase tracking-widest mt-2 leading-relaxed transition-colors ${role === 'student' ? 'text-cyan-400/60' : 'text-slate-900'}`}>Credential Repository</p>
               </button>
 
               <button
                 onClick={() => setRole('university')}
-                className={`p-6 rounded-2xl border-2 transition-all group ${
+                className={`p-8 rounded-[2rem] border transition-all relative overflow-hidden group shadow-2xl ${
                   role === 'university' 
-                    ? 'border-purple-500 bg-purple-500/10' 
-                    : 'border-white/5 bg-white/[0.02] hover:border-white/20'
+                    ? 'border-cyan-400 bg-cyan-400/5 shadow-cyan-400/10' 
+                    : 'border-white/5 bg-[#050505] hover:border-cyan-400/20'
                 }`}
               >
-                <div className={`w-12 h-12 rounded-xl flex items-center justify-center mb-4 transition-colors ${
-                  role === 'university' ? 'bg-purple-500 text-white' : 'bg-white/5 text-slate-500 group-hover:text-white'
+                <div className={`w-14 h-14 rounded-2xl flex items-center justify-center mb-6 transition-all shadow-inner ${
+                  role === 'university' ? 'bg-cyan-400 text-slate-950 scale-110' : 'bg-[#080808] text-slate-800'
                 }`}>
                   <GraduationCap size={24} />
                 </div>
-                <h3 className={`text-[10px] font-black uppercase tracking-widest ${
-                  role === 'university' ? 'text-white' : 'text-slate-500'
-                }`}>University</h3>
-                <p className="text-[8px] text-slate-600 mt-2 leading-relaxed">Authority to issue credentials</p>
+                <h3 className={`text-[10px] font-black uppercase tracking-[0.3em] ${
+                  role === 'university' ? 'text-white' : 'text-slate-800'
+                }`}>Authority Node</h3>
+                <p className={`text-[8px] font-black uppercase tracking-widest mt-2 leading-relaxed transition-colors ${role === 'university' ? 'text-cyan-400/60' : 'text-slate-900'}`}>Issuance Privilege</p>
               </button>
             </div>
 
@@ -140,27 +143,27 @@ export default function Onboarding() {
                   initial={{ opacity: 0, height: 0 }}
                   animate={{ opacity: 1, height: 'auto' }}
                   exit={{ opacity: 0, height: 0 }}
-                  className="space-y-4 pt-4 border-t border-white/5"
+                  className="space-y-6 pt-8 border-t border-white/5"
                 >
-                  <div className="space-y-2">
-                    <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest ml-1">Institutional Name</label>
+                  <div className="space-y-3">
+                    <label className="text-[9px] font-black text-slate-800 uppercase tracking-[0.4em] ml-1">Institutional Identifier</label>
                     <input
                       type="text"
                       required
                       value={form.universityName}
                       onChange={e => setForm({ ...form, universityName: e.target.value.toUpperCase() })}
-                      className="w-full bg-white/[0.02] border border-white/10 rounded-2xl py-4 px-6 text-white text-[11px] font-bold tracking-widest outline-none focus:border-purple-500/30"
-                      placeholder="HARVARD UNIVERSITY"
+                      className="w-full bg-[#050505] border border-white/10 rounded-2xl py-5 px-8 text-white text-[10px] font-black tracking-widest uppercase outline-none focus:border-cyan-400/40 shadow-inner"
+                      placeholder="e.g. UNIVERSITY OF LONDON"
                     />
                   </div>
-                  <div className="space-y-2">
-                    <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest ml-1">Description</label>
+                  <div className="space-y-3">
+                    <label className="text-[9px] font-black text-slate-800 uppercase tracking-[0.4em] ml-1">Institutional Manifest</label>
                     <textarea
                       required
                       value={form.description}
                       onChange={e => setForm({ ...form, description: e.target.value })}
-                      className="w-full bg-white/[0.02] border border-white/10 rounded-2xl py-4 px-6 text-white text-[10px] outline-none focus:border-purple-500/30 h-24 resize-none"
-                      placeholder="A brief history of the protocol..."
+                      className="w-full bg-[#050505] border border-white/10 rounded-2xl py-5 px-8 text-white text-[10px] font-black uppercase tracking-widest outline-none focus:border-cyan-400/40 h-28 resize-none shadow-inner leading-loose"
+                      placeholder="Describe the protocol history..."
                     />
                   </div>
                 </motion.div>
@@ -170,13 +173,13 @@ export default function Onboarding() {
             <button
               onClick={handleSubmit}
               disabled={loading || !role}
-              className="w-full bg-white text-black h-16 rounded-2xl font-bold text-[10px] uppercase tracking-widest flex items-center justify-center gap-3 transition-all active:scale-95 hover:bg-slate-200 disabled:opacity-30 shadow-xl shadow-white/5"
+              className="btn-command btn-blue w-full h-16 shadow-[0_0_30px_rgba(59,130,246,0.3)] disabled:shadow-none"
             >
               {loading ? (
-                <Loader2 size={18} className="animate-spin" />
+                <Loader2 size={24} className="animate-spin" />
               ) : (
                 <>
-                  Lock Identity <ArrowRight size={16} />
+                  Anchor Identity <ArrowRight size={20} />
                 </>
               )}
             </button>

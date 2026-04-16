@@ -11,28 +11,28 @@ const viewTransition = {
 
 export default function Terms() {
   return (
-    <div className="relative min-h-screen bg-[#010409] text-slate-300 overflow-x-hidden selection:bg-indigo-500/30">
+    <div className="relative min-h-screen bg-[#000000] text-slate-300 overflow-x-hidden selection:bg-blue-500/30">
       
       {/* 🌌 INTERACTIVE BACKGROUND */}
       <BlockchainBackground />
 
       {/* AMBIENT GLOW */}
       <div className="absolute inset-0 z-0 pointer-events-none overflow-hidden">
-        <div className="absolute top-0 left-0 w-[800px] h-[800px] bg-indigo-600/5 blur-[200px] rounded-full" />
+        <div className="absolute top-0 left-0 w-[800px] h-[800px] bg-blue-600/5 blur-[200px] rounded-full" />
       </div>
 
       <div className="container max-w-4xl mx-auto px-6 pt-40 pb-24 relative z-10 space-y-16">
         
         {/* HEADER */}
         <motion.div {...viewTransition} className="space-y-6 text-left">
-          <div className="inline-flex items-center gap-3 px-6 py-2.5 rounded-full bg-white/[0.03] border border-white/10 backdrop-blur-md animate-levitate shadow-xl shadow-indigo-500/5">
-            <Gavel className="text-indigo-400" size={16} />
-            <span className="text-[10px] font-bold uppercase tracking-[0.4em] text-indigo-400">Governance Protocol Terms</span>
+          <div className="inline-flex items-center gap-3 px-6 py-2.5 rounded-full bg-white/[0.03] border border-white/10 backdrop-blur-md animate-levitate shadow-xl shadow-blue-500/5">
+            <Gavel className="text-blue-400" size={16} />
+            <span className="text-[10px] font-black uppercase tracking-[0.4em] text-blue-400">Governance Protocol Terms</span>
           </div>
-          <h1 className="text-6xl md:text-[5.5rem] font-bold text-white tracking-tighter leading-none italic uppercase">
-            Protocol <span className="bg-gradient-to-r from-indigo-400 to-purple-400 bg-clip-text text-transparent text-glow-emissive">Governance.</span>
+          <h1 className="text-6xl md:text-[5.5rem] font-bold text-white tracking-tighter leading-none uppercase">
+            Protocol <span className="bg-gradient-to-r from-blue-400 to-white bg-clip-text text-transparent text-glow-emissive">Governance.</span>
           </h1>
-          <p className="text-slate-500 text-sm md:text-base font-medium max-w-xl leading-relaxed">
+          <p className="text-slate-500 text-xs font-bold uppercase tracking-[0.2em] max-w-xl leading-relaxed">
             By synchronizing with the EduCred ecosystem, you agree to abide by the decentralized governance protocols outlined in this manifest.
           </p>
         </motion.div>
@@ -64,21 +64,21 @@ export default function Terms() {
               }
             ].map((section, idx) => (
               <div key={idx} className="space-y-4">
-                <div className="flex items-center gap-4 text-indigo-400">
+                <div className="flex items-center gap-4 text-blue-400">
                   <section.icon size={20} className="opacity-40" />
                   <h2 className="text-[11px] font-black uppercase tracking-[0.3em]">{section.title}</h2>
                 </div>
-                <p className="text-slate-500 text-[11px] font-medium leading-relaxed italic">{section.text}</p>
+                <p className="text-slate-500 text-[10px] font-bold uppercase tracking-[0.2em] leading-relaxed italic">{section.text}</p>
               </div>
             ))}
           </div>
 
           <div className="pt-16 border-t border-white/5 space-y-8">
-            <h2 className="text-2xl font-bold text-white tracking-tighter italic uppercase">Modifications</h2>
-            <p className="text-slate-500 text-[11px] font-medium leading-relaxed italic max-w-2xl">
+            <h2 className="text-2xl font-bold text-white tracking-tighter uppercase">Modifications</h2>
+            <p className="text-slate-500 text-[10px] font-bold uppercase tracking-[0.2em] leading-relaxed italic max-w-2xl">
               The Governance Protocol may be updated as the network evolves. Nodes are responsible for periodically synchronizing with this manifest to ensure compliance with the latest consensus rules.
             </p>
-            <div className="flex items-center gap-4 text-[10px] font-bold text-indigo-500 uppercase tracking-widest cursor-pointer hover:gap-6 transition-all group">
+            <div className="flex items-center gap-4 text-[10px] font-black uppercase tracking-[0.3em] text-blue-500 cursor-pointer hover:gap-6 transition-all group">
                Sync Protocol Version <RefreshCcw size={14} className="group-hover:rotate-180 transition-transform" />
             </div>
           </div>

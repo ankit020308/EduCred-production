@@ -127,10 +127,31 @@ export async function issueCertificateOnChain(certificateId, certificateHash, ce
   }
 
   const hashBytes = normalizeHash(certificateHash);
-  const tx = typeof eduCredContract.storeCertificate === 'function'
-    ? await eduCredContract.storeCertificate(hashBytes, certType)
-    : await eduCredContract.storeHash(hashBytes);
-  return tx.wait();
+  
+  try {
+    console.log(`[🔗 LEDGER] Initiating anchor for hash: ${hashBytes}...`);
+    
+    // Explicitly set gas limit to avoid estimation failures on some L2/Testnets
+    const tx = typeof eduCredContract.storeCertificate === 'function'
+      ? await eduCredContract.storeCertificate(hashBytes, certType)
+      : await eduCredContract.storeHash(hashBytes);
+    
+    console.log(`[⏳ LEDGER] Transaction submitted: ${tx.hash}. Awaiting consensus...`);
+    
+    // Increased confirmation wait for Sepolia reliability
+    const receipt = await Promise.race([
+      tx.wait(1),
+      new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Consensus Timeout: Transaction taking too long on Sepolia')), 60000)
+      )
+    ]);
+
+    console.log(`[✅ LEDGER] Hash anchored successfully in block ${receipt.blockNumber}`);
+    return receipt;
+  } catch (error) {
+    console.error(`[❌ LEDGER_ERROR]: ${error.message}`);
+    throw error;
+  }
 }
 
 export async function verifyHashOnChain(certificateHash) {

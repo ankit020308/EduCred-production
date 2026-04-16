@@ -35,16 +35,16 @@ export default function AuthError() {
         <h1 className="text-3xl font-extrabold text-white tracking-tighter uppercase mb-3">
           Auth Failed
         </h1>
-        <p className="text-[10px] font-bold uppercase tracking-[0.25em] text-slate-500 mb-8">
+        <p className="text-[9px] font-black uppercase tracking-[0.4em] text-slate-500 mb-8">
           Google identity verification was rejected or cancelled
         </p>
 
         {/* Error detail */}
-        <div className="bg-rose-500/[0.08] border border-rose-500/20 rounded-2xl p-5 mb-10 text-left">
-          <p className="text-rose-400 text-[11px] font-mono leading-relaxed">
-            The OAuth handshake could not be completed. This may be due to:
+        <div className="bg-blue-500/[0.08] border border-blue-500/20 rounded-2xl p-5 mb-10 text-left">
+          <p className="text-slate-500 text-[9px] font-black uppercase tracking-[0.4em] leading-relaxed mb-10 max-w-xs mx-auto">
+            The path you're looking for doesn't exist on this protocol.
           </p>
-          <ul className="mt-3 space-y-1.5 text-rose-400/70 text-[10px] font-mono list-disc list-inside">
+          <ul className="mt-3 space-y-1.5 text-blue-400/70 text-[10px] font-mono list-disc list-inside">
             <li>Login was cancelled by user</li>
             <li>Google account not permitted</li>
             <li>OAuth callback URL mismatch</li>
@@ -58,7 +58,7 @@ export default function AuthError() {
             id="retry-google-btn"
             type="button"
             onClick={handleRetry}
-            className="w-full flex items-center justify-center gap-3 bg-white text-black rounded-2xl py-4 px-6 text-[11px] font-bold uppercase tracking-[0.15em] transition-all hover:scale-[1.02] active:scale-95 shadow-[0_0_30px_rgba(255,255,255,0.1)]"
+            className="btn-command btn-blue w-full h-16"
           >
             <RefreshCw size={16} />
             Retry Google Login

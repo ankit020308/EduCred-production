@@ -13,8 +13,10 @@
 
     /* 💎 NEON ACCENT ARCHITECTURE */
     --color-cyan-vivid: #22d3ee;
+    --color-blue-vivid: #3b82f6;
     --color-indigo-vivid: #6366f1;
     --color-border-subtle: rgba(255, 255, 255, 0.04);
+    --color-border-bright: rgba(255, 255, 255, 0.12);
 
     /* 📄 PREMIUM TYPOGRAPHY */
     --font-sans: 'Inter', system-ui, sans-serif;
@@ -121,20 +123,39 @@
   }
 
   .btn-blue {
-    @apply bg-blue-600 text-white hover:bg-blue-500 hover:scale-[1.02] glow-blue border border-blue-400/20;
+    @apply bg-blue-600 text-white hover:bg-blue-500 hover:scale-[1.02] border border-blue-400/20 shadow-[0_0_30px_rgba(59,130,246,0.3)];
   }
 
   .btn-cyan {
-    @apply bg-cyan-600 text-white hover:bg-cyan-500 hover:scale-[1.02] glow-cyan border border-cyan-400/20;
+    @apply bg-cyan-600 text-black font-black hover:bg-cyan-500 hover:scale-[1.02] border border-cyan-400/20 shadow-[0_0_30px_rgba(34,211,238,0.3)];
   }
 
   .btn-outline {
-    @apply border border-white/10 bg-white/[0.02] text-white hover:bg-white hover:text-black hover:border-white;
+    @apply border border-white/10 bg-white/[0.02] text-white hover:bg-white hover:text-black hover:border-white transition-all duration-300;
   }
 
   /* Glass Card variation for Admin & Dashboards */
   .glass-card {
-    @apply bg-[#0A0A0A]/80 backdrop-blur-3xl border border-white/[0.06] rounded-[2rem] p-8 shadow-2xl;
+    @apply bg-[#0A0A0A]/80 backdrop-blur-3xl border border-white/[0.06] rounded-[2.5rem] p-8 shadow-2xl relative overflow-hidden;
+  }
+
+  .scanline-overlay {
+    position: relative;
+    &::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(
+        to bottom,
+        transparent,
+        transparent 50%,
+        rgba(34, 211, 238, 0.03) 50%,
+        rgba(34, 211, 238, 0.03)
+      );
+      background-size: 100% 4px;
+      pointer-events: none;
+      z-index: 10;
+    }
   }
 
 /* ──────────────────────────────────────────────────────────────────────────

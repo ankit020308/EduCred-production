@@ -49,7 +49,7 @@ export default function NotFound() {
           <h1 className="text-2xl font-black text-white tracking-tight mb-3">
             Route Not Found
           </h1>
-          <p className="text-slate-500 text-sm leading-relaxed mb-10 max-w-xs mx-auto">
+          <p className="text-slate-500 text-[9px] font-black uppercase tracking-[0.4em] leading-relaxed mb-10 max-w-xs mx-auto">
             The path you're looking for doesn't exist on this protocol.
           </p>
 
@@ -62,7 +62,7 @@ export default function NotFound() {
             </button>
             <Link
               to="/"
-              className="flex-1 flex items-center justify-center gap-2 py-3.5 bg-blue-600 rounded-2xl text-[11px] font-bold uppercase tracking-widest text-white hover:bg-blue-500 transition-all shadow-[0_0_30px_rgba(59,130,246,0.3)]"
+              className="btn-command btn-blue flex-1 h-14"
             >
               <Home size={14} /> Home
             </Link>

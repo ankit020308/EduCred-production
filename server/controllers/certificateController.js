@@ -170,7 +170,7 @@ export const issueCertificate = async (req, res) => {
             certificateId,
             studentName,
             studentEmail,
-            studentPhone: studentPhone || '0000000000',
+            studentPhone: value.studentPhone || '0000000000',
             studentId,
             course: programName,
             issuer: university.name,
@@ -196,7 +196,7 @@ export const issueCertificate = async (req, res) => {
             }
         }
 
-        const cert = Registry.insert('certificates', certData);
+        const cert = await Registry.insert('certificates', certData);
 
         // 6. Mandatory Blockchain Anchor (Sync Pattern for Production)
         try {
@@ -280,7 +280,7 @@ export const issueCertificate = async (req, res) => {
 export const confirmIssuance = async (req, res) => {
     try {
         const { certDbId } = req.body;
-        const certificate = Registry.findById('certificates', certDbId);
+        const certificate = await Registry.findById('certificates', certDbId);
         if (!certificate) return res.status(404).json({ error: 'Certificate not found' });
         if (certificate.status === 'CONFIRMED' || certificate.blockchainTxHash) {
             return res.json({
@@ -291,9 +291,9 @@ export const confirmIssuance = async (req, res) => {
             });
         }
 
-        const university = Registry.findOne('universities', { userId: req.user.id });
+        const university = await Registry.findOne('universities', { userId: req.user.id });
 
-        Registry.update('certificates', { id: certificate.id }, {
+        await Registry.update('certificates', { id: certificate.id }, {
             workflowStatus: 'ISSUED',
             workflowLog: [
                 ...(certificate.workflowLog || []),
@@ -344,7 +344,7 @@ export const confirmIssuance = async (req, res) => {
                 });
 
                 // Notify student user room if found
-                const studentUser = Registry.findOne('users', { email: certificate.studentEmail });
+                const studentUser = await Registry.findOne('users', { email: certificate.studentEmail });
                 if (studentUser) {
                     req.app.get('io')?.to(`user_${studentUser.id}`)?.emit('certificateConfirmed', {
                         certificateId: certificate.certificateId,
@@ -381,10 +381,10 @@ export const confirmIssuance = async (req, res) => {
 export const revokeCertificate = async (req, res) => {
     try {
         const { certificateId, reasonCode, reasonNotes } = req.body;
-        const cert = Registry.findOne('certificates', { certificateId });
+        const cert = await Registry.findOne('certificates', { certificateId });
         if (!cert) return res.status(404).json({ error: 'Not found' });
 
-        Registry.update('certificates', { id: cert.id }, {
+        await Registry.update('certificates', { id: cert.id }, {
             isRevoked: true,
             revocationReason: reasonNotes,
             revocationReasonCode: reasonCode || 0,
@@ -399,7 +399,7 @@ export const revokeCertificate = async (req, res) => {
             console.warn('⚠️ [LEDGER]: Revocation on blockchain failed:', blockchainError.message);
         }
 
-        Registry.insert('ledger', {
+        await Registry.insert('ledger', {
             type: 'TAMPER',
             studentName: cert.studentName,
             universityName: cert.issuer,
@@ -442,14 +442,13 @@ export const verifyCertificate = async (req, res) => {
 
         if (file) {
             if (file.size === 0) return res.status(400).json({ error: 'Invalid file: size is 0 bytes.' });
-            const buffer = fs.readFileSync(file.path);
             hashToVerify = generateBinaryHash(buffer);
-            metadata = Registry.findOne('certificates', { certificateHash: hashToVerify });
+            metadata = await Registry.findOne('certificates', { certificateHash: hashToVerify });
         } else if (certificateId) {
             const isUUID = /^[0-9a-fA-F-]{36}$/.test(certificateId);
             const cert = isUUID
-                ? Registry.findById('certificates', certificateId)
-                : Registry.findOne('certificates', { certificateId });
+                ? await Registry.findById('certificates', certificateId)
+                : await Registry.findOne('certificates', { certificateId });
 
             if (!cert) {
                 return res.status(404).json({ valid: false, message: 'Certificate ID not found on registry.' });
@@ -478,7 +477,7 @@ export const verifyCertificate = async (req, res) => {
 
         // Log verification attempt
         const reqIp = req.ip || req.connection.remoteAddress;
-        Registry.insert('verificationLogs', {
+        await Registry.insert('verificationLogs', {
             certificateId: metadata ? metadata.certificateId : null,
             verificationMethod,
             result: isOnLedger ? (metadata && metadata.isRevoked ? 'revoked' : 'valid') : 'fake',
@@ -489,7 +488,7 @@ export const verifyCertificate = async (req, res) => {
         if (!isOnLedger) {
             await logAudit(req, 'CERTIFICATE_VERIFICATION', 'FAILURE', 'Tampered or unregistered credential detected.', { hash: hashToVerify });
 
-            Registry.insert('fraudAlerts', {
+            await Registry.insert('fraudAlerts', {
                 alertType: 'HASH_MISMATCH',
                 severity: 'HIGH',
                 description: 'Verification attempt for unregistered or tampered hash.',
@@ -548,7 +547,7 @@ export const verifyByEnrollment = async (req, res) => {
             return res.status(400).json({ error: 'Enrollment number and university name are required.' });
         }
 
-        const certs = Registry.find('certificates', {
+        const certs = await Registry.find('certificates', {
             issuer: universityName,
             'metadata.studentEnrollmentNumber': enrollmentNumber
         });
@@ -564,7 +563,7 @@ export const verifyByEnrollment = async (req, res) => {
  */
 export const getCertificates = async (req, res) => {
     try {
-        const certs = Registry.find('certificates', { issuedBy: req.user.id });
+        const certs = await Registry.find('certificates', { issuedBy: req.user.id });
         res.json({ data: certs });
     } catch (err) {
         res.status(500).json({ error: 'Failed to fetch certificates.' });
@@ -576,10 +575,10 @@ export const getCertificates = async (req, res) => {
  */
 export const getStats = async (req, res) => {
     try {
-        const total = Registry.count('certificates', { issuedBy: req.user.id });
-        const confirmed = Registry.count('certificates', { issuedBy: req.user.id, status: 'CONFIRMED' });
-        const pending = Registry.count('certificates', { issuedBy: req.user.id, status: 'PENDING' });
-        const failed = Registry.count('certificates', { issuedBy: req.user.id, status: 'FAILED' });
+        const total = await Registry.count('certificates', { issuedBy: req.user.id });
+        const confirmed = await Registry.count('certificates', { issuedBy: req.user.id, status: 'CONFIRMED' });
+        const pending = await Registry.count('certificates', { issuedBy: req.user.id, status: 'PENDING' });
+        const failed = await Registry.count('certificates', { issuedBy: req.user.id, status: 'FAILED' });
 
         res.json({ total, confirmed, pending, failed });
     } catch (err) {
@@ -595,8 +594,8 @@ export const getCertificateById = async (req, res) => {
         const { id } = req.params;
         const isUUID = /^[0-9a-fA-F-]{36}$/.test(id);
         const cert = isUUID
-            ? Registry.findById('certificates', id)
-            : Registry.findOne('certificates', { certificateId: id });
+            ? await Registry.findById('certificates', id)
+            : await Registry.findOne('certificates', { certificateId: id });
 
         if (!cert) {
             return res.status(404).json({ error: 'Certificate not found.' });
@@ -610,7 +609,7 @@ export const getCertificateById = async (req, res) => {
 
 export const downloadCertificateFile = async (req, res) => {
     try {
-        const cert = Registry.findById('certificates', req.params.id);
+        const cert = await Registry.findById('certificates', req.params.id);
         if (!cert) {
             return res.status(404).json({ error: 'Certificate not found.' });
         }

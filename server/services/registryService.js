@@ -45,6 +45,10 @@ class RegistryService {
             this.isSimulation = false;
             return true;
         } catch (error) {
+            if (process.env.NODE_ENV === 'production') {
+                console.error(`[REGISTRY_CRITICAL] 🚨 Database connection failed in production: ${error.message}`);
+                throw new Error('Database connection failed. Registry cannot initialize.');
+            }
             console.warn(`[REGISTRY] ⚠️ Database connection failed: ${error.message}`);
             console.info('[REGISTRY] 🚀 Falling back to SIMULATION MODE (In-Memory).');
             this.isSimulation = true;
@@ -106,7 +110,7 @@ class RegistryService {
         if (!Model) return document;
         const { _id, ...cleanDoc } = document;
         const result = await Model.create(cleanDoc);
-        return result.toJSON();
+        return result.get({ plain: true }); // Use get({ plain: true }) for clean POJO
     }
 
     /**

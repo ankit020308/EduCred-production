@@ -89,36 +89,36 @@ export default function StudentDashboard() {
       <div className="fixed inset-0 z-0 opacity-20 mix-blend-screen pointer-events-none">
         <BlockchainBackground />
       </div>
-      <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[1000px] h-[500px] bg-blue-600/10 blur-[150px] rounded-full mix-blend-screen pointer-events-none" />
+      <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[1000px] h-[500px] bg-cyan-400/5 blur-[150px] rounded-full mix-blend-screen pointer-events-none" />
 
       {/* ── Header ── */}
       <header className="fixed top-0 inset-x-0 z-50 border-b border-white/[0.04] bg-black/60 backdrop-blur-xl">
         <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
           <div className="flex items-center gap-3 cursor-pointer" onClick={() => navigate('/')}>
-            <div className="w-8 h-8 bg-[#111] border border-white/10 rounded-lg flex items-center justify-center">
-              <Hexagon className="text-blue-500" size={16} />
+            <div className="w-8 h-8 bg-[#050505] border border-cyan-400/20 rounded-lg flex items-center justify-center">
+              <Hexagon className="text-cyan-400 shadow-[0_0_10px_rgba(34,211,238,0.5)]" size={16} />
             </div>
-            <span className="text-lg font-extrabold text-white tracking-tight">
-              Edu<span className="text-blue-500">Cred</span>
+            <span className="text-lg font-black text-white tracking-widest uppercase">
+              Edu<span className="text-cyan-400">Cred</span>
             </span>
           </div>
 
           <div className="flex items-center gap-4">
-            <div className="hidden sm:flex items-center gap-3 px-4 py-2 bg-[#0A0A0A] border border-white/[0.06] rounded-xl">
-              <div className="w-7 h-7 bg-blue-500/10 border border-blue-500/20 rounded-lg flex items-center justify-center text-blue-400 font-bold text-xs">
+            <div className="hidden sm:flex items-center gap-3 px-4 py-2 bg-[#050505] border border-white/5 rounded-xl shadow-inner">
+              <div className="w-8 h-8 bg-cyan-400/10 border border-cyan-400/20 rounded-lg flex items-center justify-center text-cyan-400 font-black text-xs">
                 {user?.name?.charAt(0)?.toUpperCase() || 'S'}
               </div>
               <div>
-                <p className="text-white text-xs font-bold">{user?.name || 'Student'}</p>
-                <p className="text-slate-600 text-[9px] uppercase tracking-widest">Student Node</p>
+                <p className="text-white text-[10px] font-black uppercase tracking-widest">{user?.name || 'Student'}</p>
+                <p className="text-slate-700 text-[8px] font-black uppercase tracking-[0.3em]">Network Identity</p>
               </div>
             </div>
             <button
               onClick={handleLogout}
-              className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest text-slate-500 hover:text-rose-400 transition-colors"
+              className="flex items-center gap-2 text-[9px] font-black uppercase tracking-[0.3em] text-slate-800 hover:text-rose-500 transition-colors"
             >
               <LogOut size={14} />
-              <span className="hidden sm:inline">Sign Out</span>
+              <span className="hidden sm:inline">Terminate Session</span>
             </button>
           </div>
         </div>
@@ -129,53 +129,55 @@ export default function StudentDashboard() {
 
         {/* Welcome Banner */}
         <motion.div {...viewTransition}>
-          <div className="flex items-center gap-3 px-4 py-2 bg-blue-500/10 border border-blue-500/20 rounded-full w-fit mb-4">
-            <div className="w-2 h-2 rounded-full bg-blue-500 animate-pulse" />
-            <span className="text-[9px] font-bold text-blue-400 uppercase tracking-widest">Student Portal Active</span>
+          <div className="flex items-center gap-3 px-5 py-2 bg-cyan-500/10 border border-cyan-400/20 rounded-full w-fit mb-6 shadow-[0_0_20px_rgba(34,211,238,0.1)]">
+            <div className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-pulse" />
+            <span className="text-[9px] font-black text-white uppercase tracking-[0.4em]">Sovereign Node Active</span>
           </div>
-          <h1 className="text-4xl md:text-5xl font-extrabold text-white tracking-tighter leading-none mb-2">
-            Welcome back, <span className="text-blue-500">{user?.name?.split(' ')[0] || 'Student'}.</span>
+          <h1 className="text-5xl md:text-6xl font-black text-white tracking-tighter leading-none mb-4 uppercase">
+            Identified: <span className="text-cyan-400">{user?.name?.split(' ')[0] || 'Citizen'}.</span>
           </h1>
-          <p className="text-slate-500 text-sm">Your blockchain-anchored credentials are listed below.</p>
+          <p className="text-slate-800 text-[10px] font-black uppercase tracking-[0.4em]">Proprietary credentials synchronized with the distributed ledger.</p>
         </motion.div>
 
         {/* Stats Row */}
-        <motion.div {...viewTransition} transition={{ delay: 0.1 }} className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+        <motion.div {...viewTransition} transition={{ delay: 0.1 }} className="grid grid-cols-2 sm:grid-cols-3 gap-6">
           {[
-            { label: 'Total Credentials', val: certificates.length, icon: GraduationCap, color: 'text-blue-400' },
-            { label: 'Verified', val: certificates.filter(c => c.status === 'CONFIRMED').length, icon: ShieldCheck, color: 'text-blue-400' },
-            { label: 'Pending Anchor', val: certificates.filter(c => c.status === 'PENDING').length, icon: Loader2, color: 'text-amber-400' },
+            { label: 'Total Proofs', val: certificates.length, icon: GraduationCap, color: 'text-cyan-400', bg: 'bg-cyan-500/10', border: 'border-cyan-500/20' },
+            { label: 'Verified State', val: certificates.filter(c => c.status === 'CONFIRMED').length, icon: ShieldCheck, color: 'text-cyan-400', bg: 'bg-cyan-500/10', border: 'border-cyan-500/20' },
+            { label: 'In-Transit', val: certificates.filter(c => c.status === 'PENDING').length, icon: Loader2, color: 'text-amber-400', bg: 'bg-amber-500/10', border: 'border-amber-500/20' },
           ].map((s, i) => (
-            <div key={i} className="bg-[#0A0A0A]/80 backdrop-blur-xl p-6 rounded-2xl border border-white/[0.04] flex flex-col items-start">
-              <s.icon className={`${s.color} mb-3`} size={20} />
-              <span className="text-2xl font-extrabold text-white">{s.val}</span>
-              <span className="text-[9px] font-bold text-slate-500 uppercase tracking-widest mt-1">{s.label}</span>
+            <div key={i} className="glass-pane p-8 rounded-[2.5rem] flex flex-col items-start hover:border-cyan-400/20 transition-all shadow-2xl">
+              <div className={`w-10 h-10 rounded-xl ${s.bg} ${s.border} border mb-6 flex items-center justify-center shadow-inner`}>
+                <s.icon className={`${s.color}`} size={20} />
+              </div>
+              <span className="text-4xl font-black text-white tracking-tighter">{s.val}</span>
+              <span className="text-[9px] font-black text-slate-800 uppercase tracking-[0.4em] mt-2">{s.label}</span>
             </div>
           ))}
         </motion.div>
 
         {/* Certificates */}
         <motion.div {...viewTransition} transition={{ delay: 0.2 }}>
-          <div className="flex items-center justify-between mb-6">
-            <h2 className="text-lg font-bold text-white tracking-tight">Your Credentials</h2>
-            <button onClick={() => navigate('/verify')} className="text-[10px] font-bold uppercase tracking-widest text-blue-400 hover:text-blue-300 transition-colors flex items-center gap-1">
-              Verify a Document <ExternalLink size={12} />
+          <div className="flex items-center justify-between mb-8 px-2">
+            <h2 className="text-lg font-black text-white tracking-[0.3em] uppercase">Verified Enclave</h2>
+            <button onClick={() => navigate('/verify')} className="text-[9px] font-black uppercase tracking-[0.3em] text-cyan-400 hover:text-white transition-all underline decoration-cyan-400/30 underline-offset-8">
+              Verify Node Protocol <ExternalLink size={12} />
             </button>
           </div>
 
           {loading ? (
-            <div className="flex flex-col items-center justify-center py-24 gap-4">
-              <Loader2 className="animate-spin text-blue-500" size={32} />
-              <p className="text-[10px] font-bold uppercase tracking-widest text-slate-600">Syncing Credential Ledger...</p>
+            <div className="flex flex-col items-center justify-center py-24 gap-6">
+              <Loader2 className="animate-spin text-cyan-400" size={32} />
+              <p className="text-[10px] font-black uppercase tracking-[0.4em] text-slate-700">Synchronizing Vault...</p>
             </div>
           ) : certificates.length === 0 ? (
-            <div className="bg-[#0A0A0A]/80 border border-white/[0.04] rounded-2xl p-16 text-center space-y-4">
-              <div className="w-16 h-16 bg-slate-800/50 rounded-2xl mx-auto flex items-center justify-center">
-                <GraduationCap className="text-slate-600" size={28} />
+            <div className="glass-pane rounded-[2.5rem] p-20 text-center space-y-6 scanline-overlay">
+              <div className="w-20 h-20 bg-white/[0.02] rounded-3xl mx-auto flex items-center justify-center border border-white/5">
+                <GraduationCap className="text-slate-800" size={32} />
               </div>
-              <p className="text-[10px] font-bold uppercase tracking-widest text-slate-600">No credentials issued yet</p>
-              <p className="text-slate-700 text-xs max-w-xs mx-auto">
-                Your institution will issue certificates here once they are processed and anchored on-chain.
+              <p className="text-[10px] font-black uppercase tracking-[0.4em] text-slate-700">Digital Vault is Empty</p>
+              <p className="text-slate-800 text-[10px] font-black uppercase tracking-widest max-w-xs mx-auto leading-relaxed">
+                Credentials will manifest here once anchored to the global sovereignty ledger.
               </p>
             </div>
           ) : (
@@ -186,87 +188,83 @@ export default function StudentDashboard() {
                   layout
                   initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
-                  className="bg-[#0A0A0A]/80 backdrop-blur-xl border border-white/[0.06] rounded-2xl overflow-hidden hover:border-blue-500/20 transition-all group cursor-pointer"
+                  className="glass-pane rounded-[2rem] overflow-hidden hover:border-cyan-400/20 transition-all group cursor-pointer scanline-overlay sm:border border-white/5"
                   onClick={() => setSelectedCert(selectedCert?._id === cert._id ? null : cert)}
                 >
-                  <div className="p-6 flex items-center justify-between gap-4">
-                    <div className="flex items-center gap-4">
-                      <div className="w-12 h-12 bg-blue-500/10 border border-blue-500/20 rounded-xl flex items-center justify-center text-blue-400 font-bold text-lg shrink-0">
+                  <div className="p-8 flex items-center justify-between gap-6">
+                    <div className="flex items-center gap-6">
+                      <div className="w-14 h-14 bg-[#050505] border border-cyan-400/20 rounded-2xl flex items-center justify-center text-cyan-400 font-black text-xl shrink-0 shadow-inner group-hover:border-cyan-400/40 transition-colors">
                         {cert.studentName?.charAt(0) || '?'}
                       </div>
                       <div>
-                        <p className="text-white font-bold text-sm tracking-tight">{cert.course || cert.certificateType || 'Academic Certificate'}</p>
-                        <p className="text-slate-500 text-[10px] mt-0.5">{cert.issuer} · {new Date(cert.issuedAt || cert.createdAt).toLocaleDateString()}</p>
+                        <p className="text-white font-black text-[11px] tracking-[0.2em] uppercase">{cert.course || cert.certificateType || 'Academic Certificate'}</p>
+                        <p className="text-slate-700 text-[9px] font-black uppercase tracking-[0.3em] mt-2 italic">{cert.issuer} · {new Date(cert.issuedAt || cert.createdAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}</p>
                       </div>
                     </div>
-                    <div className="flex items-center gap-3 shrink-0">
-                      {/* IPFS Badge */}
+                    <div className="flex items-center gap-4 shrink-0">
                       {cert.ipfsCid && (
-                        <div className="flex items-center gap-1 px-2 py-0.5 bg-sky-500/10 border border-sky-500/20 rounded-md">
-                          <span className="text-[8px] font-black text-sky-400 uppercase tracking-tighter">IPFS</span>
+                        <div className="flex items-center gap-1.5 px-3 py-1 bg-cyan-400/10 border border-cyan-400/20 rounded-lg">
+                          <span className="text-[8px] font-black text-cyan-400 uppercase tracking-tighter">Decentralized</span>
                         </div>
                       )}
-                      {/* Status badge */}
-                      <span className={`hidden sm:inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[9px] font-bold uppercase tracking-widest border
-                        ${cert.status === 'CONFIRMED' ? 'bg-blue-500/10 text-blue-400 border-blue-500/20' :
+                      
+                      <span className={`hidden sm:inline-flex items-center gap-2 px-4 py-1.5 rounded-full text-[9px] font-black uppercase tracking-[0.2em] border shadow-inner
+                        ${cert.status === 'CONFIRMED' ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' :
                           cert.status === 'FAILED' ? 'bg-rose-500/10 text-rose-400 border-rose-500/20' :
                           'bg-amber-500/10 text-amber-400 border-amber-500/20'}`}>
-                        <div className={`w-1.5 h-1.5 rounded-full ${cert.status === 'CONFIRMED' ? 'bg-blue-400' : cert.status === 'FAILED' ? 'bg-rose-400' : 'bg-amber-400'} animate-pulse`} />
-                        {cert.status === 'CONFIRMED' ? 'Anchored' : cert.status === 'FAILED' ? 'Failed' : 'Pending'}
+                        <div className={`w-1.5 h-1.5 rounded-full ${cert.status === 'CONFIRMED' ? 'bg-emerald-400' : cert.status === 'FAILED' ? 'bg-rose-400' : 'bg-amber-400'} animate-pulse`} />
+                        {cert.status === 'CONFIRMED' ? 'Verified' : cert.status === 'FAILED' ? 'Revoked' : 'Syncing'}
                       </span>
                     </div>
                   </div>
 
                   {/* Expanded details */}
                   <AnimatePresence>
-                    {selectedCert?._id === cert._id && (
                       <motion.div
                         initial={{ height: 0, opacity: 0 }}
                         animate={{ height: 'auto', opacity: 1 }}
                         exit={{ height: 0, opacity: 0 }}
-                        className="border-t border-white/[0.04] overflow-hidden"
+                        className="border-t border-white/5 overflow-hidden bg-[#050505]/40"
                       >
-                        <div className="p-6 grid grid-cols-1 sm:grid-cols-2 gap-4">
-                          <div className="space-y-3">
-                            <p className="text-[9px] font-bold uppercase tracking-widest text-slate-600">Certificate ID</p>
-                            <div className="flex items-center gap-2">
-                              <p className="text-blue-400 font-mono text-xs truncate">{cert.certificateId || cert._id}</p>
+                        <div className="p-8 grid grid-cols-1 sm:grid-cols-2 gap-8">
+                          <div className="space-y-4">
+                            <p className="text-[9px] font-black uppercase tracking-[0.4em] text-slate-800">Protocol ID</p>
+                            <div className="flex items-center gap-3 bg-[#080808] px-4 py-3 rounded-xl border border-white/5">
+                              <p className="text-cyan-400 font-mono text-[10px] truncate tracking-tight">{cert.certificateId || cert._id}</p>
                               <button 
                                 onClick={(e) => { e.stopPropagation(); copyToClipboard(cert.certificateId || cert._id, cert._id + 'id'); }}
-                                className="shrink-0 text-slate-600 hover:text-white transition-colors"
+                                className="shrink-0 text-slate-700 hover:text-white transition-colors"
                               >
-                                {copiedId === cert._id + 'id' ? <Check size={12} className="text-blue-400" /> : <Copy size={12} />}
+                                {copiedId === cert._id + 'id' ? <Check size={12} className="text-cyan-400" /> : <Copy size={12} />}
                               </button>
                             </div>
                           </div>
-                          <div className="space-y-3">
-                            <p className="text-[9px] font-bold uppercase tracking-widest text-slate-600">SHA-256 Hash</p>
-                            <div className="flex items-center gap-2">
-                              <p className="text-slate-400 font-mono text-xs truncate">{cert.certificateHash?.slice(0, 20)}...</p>
+                          <div className="space-y-4">
+                            <p className="text-[9px] font-black uppercase tracking-[0.4em] text-slate-800">Hash Fingerprint</p>
+                            <div className="flex items-center gap-3 bg-[#080808] px-4 py-3 rounded-xl border border-white/5">
+                              <p className="text-slate-500 font-mono text-[10px] truncate tracking-tight">{cert.certificateHash?.slice(0, 24)}...</p>
                               <button
                                 onClick={(e) => { e.stopPropagation(); copyToClipboard(cert.certificateHash, cert._id + 'hash'); }}
-                                className="shrink-0 text-slate-600 hover:text-white transition-colors"
+                                className="shrink-0 text-slate-700 hover:text-white transition-colors"
                               >
-                                {copiedId === cert._id + 'hash' ? <Check size={12} className="text-blue-400" /> : <Copy size={12} />}
+                                {copiedId === cert._id + 'hash' ? <Check size={12} className="text-cyan-400" /> : <Copy size={12} />}
                               </button>
                             </div>
                           </div>
-                          <div className="col-span-full flex gap-3 pt-2">
+                          <div className="col-span-full flex gap-4 pt-4 border-t border-white/5">
                             {cert.fileUrl && (
-                              <a
-                                href={`/api/certificates/${cert._id}/file`}
-                                target="_blank" rel="noopener noreferrer"
-                                onClick={e => e.stopPropagation()}
-                                className="flex items-center gap-2 px-4 py-2 bg-blue-600/20 border border-blue-500/20 rounded-xl text-blue-400 text-[10px] font-bold uppercase tracking-widest hover:bg-blue-600/30 transition-all"
+                              <button
+                                onClick={(e) => { e.stopPropagation(); window.open(`/api/certificates/${cert._id}/file`, '_blank'); }}
+                                className="btn-command btn-blue px-10 shadow-[0_0_30px_rgba(59,130,246,0.3)]"
                               >
-                                <Download size={12} /> Download
-                              </a>
+                                <Download size={14} /> Download Document
+                              </button>
                             )}
                             <button
                               onClick={(e) => { e.stopPropagation(); navigate('/verify'); }}
-                              className="flex items-center gap-2 px-4 py-2 bg-[#111] border border-white/[0.06] rounded-xl text-slate-400 text-[10px] font-bold uppercase tracking-widest hover:text-white transition-all"
+                              className="btn-command btn-outline px-10"
                             >
-                              <Shield size={12} /> Verify
+                              <Shield size={14} /> Cross-Verify Node
                             </button>
                           </div>
                         </div>
@@ -281,8 +279,8 @@ export default function StudentDashboard() {
 
         {/* Footer Note */}
         <motion.div {...viewTransition} transition={{ delay: 0.3 }} className="text-center">
-          <p className="text-slate-700 text-[9px] font-bold uppercase tracking-[0.4em]">
-            All credentials are mathematically provable · Powered by EduCred Blockchain Network
+          <p className="text-slate-800 text-[10px] font-black uppercase tracking-[0.4em] leading-relaxed">
+            All credentials are mathematically provable · Secured by EduCred Distributed Ledger Technology
           </p>
         </motion.div>
       </div>

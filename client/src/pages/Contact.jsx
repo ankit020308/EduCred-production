@@ -136,9 +136,9 @@ export default function Contact() {
                     <button
                       type="submit"
                       disabled={loading}
-                      className="w-full h-16 bg-white text-black rounded-xl text-[11px] font-bold uppercase tracking-[0.3em] flex items-center justify-center gap-4 transition-all hover:bg-slate-200 hover:shadow-[0_0_40px_rgba(59,130,246,0.3)] active:scale-95 disabled:opacity-50 disabled:hover:shadow-none"
+                      className="btn-command btn-blue w-full h-16"
                     >
-                      {loading ? <Loader2 size={24} className="animate-spin text-black" /> : <><Send size={18} /> Transmit Signal</>}
+                      {loading ? <Loader2 size={18} className="animate-spin" /> : <><Send size={18} /> Transmit Signal</>}
                     </button>
                   </motion.form>
                 )}

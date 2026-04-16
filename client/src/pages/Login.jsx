@@ -138,12 +138,12 @@ export default function Login() {
 
           {/* Header */}
           <div className="relative z-10 flex items-center gap-4 cursor-pointer" onClick={() => navigate('/')}>
-            <div className="w-12 h-12 bg-[#111111] border border-white/[0.06] rounded-xl flex items-center justify-center shadow-[0_0_30px_rgba(59,130,246,0.15)]">
-              <Hexagon className="text-blue-500" size={24} />
+            <div className="w-12 h-12 bg-[#0A0A0A] border border-cyan-400/20 rounded-xl flex items-center justify-center shadow-[0_0_30px_rgba(34,211,238,0.15)] group hover:border-cyan-400 transition-all duration-700">
+              <Hexagon className="text-cyan-400 group-hover:rotate-90 transition-transform duration-700" size={24} />
             </div>
             <div>
-              <span className="text-2xl font-extrabold text-white tracking-tight block">Edu<span className="text-blue-500">Cred</span></span>
-              <span className="text-[9px] font-bold uppercase tracking-[0.3em] text-slate-500">Global Authentication Node</span>
+              <span className="text-2xl font-black text-white tracking-tighter block uppercase leading-none">Edu<span className="text-cyan-400">Cred</span></span>
+              <span className="text-[9px] font-black uppercase tracking-[0.4em] text-slate-800 mt-2">Identity Deployment Oracle</span>
             </div>
           </div>
 
@@ -171,8 +171,8 @@ export default function Login() {
           </div>
 
           {/* Footer Metrics */}
-          <div className="relative z-10 flex justify-between items-center text-[10px] font-bold uppercase tracking-widest text-slate-600 border-t border-white/[0.04] pt-6">
-            <span className="flex items-center gap-2"><Activity size={12} className="text-blue-500" /> Network: Optimal</span>
+          <div className="relative z-10 flex justify-between items-center text-[10px] font-black uppercase tracking-[0.3em] text-slate-600 border-t border-white/5 pt-6">
+            <span className="flex items-center gap-2"><Activity size={12} className="text-cyan-500" /> Network: Optimal</span>
             <span>Protocol v2.4.0</span>
             <span className="flex items-center gap-2"><Lock size={12} /> E2E Encryption</span>
           </div>
@@ -186,8 +186,8 @@ export default function Login() {
           <div className="w-full max-w-[440px]">
             {/* Mobile Header (Hidden on Desktop) */}
             <div className="lg:hidden flex items-center justify-center gap-3 mb-12" onClick={() => navigate('/')}>
-              <Hexagon className="text-blue-500" size={28} />
-              <span className="text-3xl font-extrabold text-white tracking-tight">Edu<span className="text-blue-500">Cred</span></span>
+              <Hexagon className="text-cyan-400" size={28} />
+              <span className="text-3xl font-black text-white tracking-tighter uppercase">Edu<span className="text-cyan-400">Cred</span></span>
             </div>
 
             {/* ERROR ALERT */}
@@ -219,12 +219,8 @@ export default function Login() {
                     </button>
                   )}
                 </div>
-                <h1 className="text-3xl font-extrabold text-white tracking-tighter uppercase">
-                  {authStep === 0 ? 'Log In' : authStep === 1 ? 'Verify Password' : 'Authenticating'}
-                </h1>
-                <p className="text-slate-500 text-[10px] font-bold uppercase tracking-[0.2em]">
-                  {authStep === 0 ? 'Enter Registered Email' : authStep === 1 ? 'Provide Security Credentials' : 'Establishing Consensus...'}
-                </p>
+                <h1 className="text-4xl font-black text-white tracking-tighter uppercase leading-none">{stepTitles[authStep]}</h1>
+                <p className="text-slate-800 text-[9px] font-black uppercase tracking-[0.4em] mt-2">{stepSubs[authStep]}</p>
               </div>
 
               {/* MULTI-STEP FORM LOGIC */}
@@ -235,15 +231,15 @@ export default function Login() {
                   {authStep === 0 && (
                     <motion.form key="step0" variants={formVariants} initial="hidden" animate="visible" exit="exit" onSubmit={handleNextStep} className="space-y-6">
                       <div className="relative group/input">
-                        <Mail className="absolute left-5 top-1/2 -translate-y-1/2 text-slate-600 group-focus-within/input:text-blue-500 transition-colors" size={18} />
+                        <Mail className="absolute left-5 top-1/2 -translate-y-1/2 text-slate-600 group-focus-within/input:text-cyan-400 transition-colors" size={18} />
                         <input
                           type="email" required autoFocus autoComplete="email"
                           value={form.email} onChange={e => setForm({ ...form, email: e.target.value })}
                           placeholder="NAME@EMAIL.COM"
-                          className="w-full bg-[#111111] border border-white/[0.06] rounded-2xl py-4.5 pl-14 pr-6 text-white text-[11px] font-bold tracking-widest outline-none transition-all focus:border-blue-500/50 focus:bg-[#161616] placeholder:text-slate-700 uppercase"
+                          className="w-full bg-[#050505] border border-white/10 rounded-2xl py-5 pl-14 pr-6 text-white text-[11px] font-black tracking-[0.2em] outline-none transition-all focus:border-cyan-400/50 focus:bg-[#080808] placeholder:text-slate-800 uppercase"
                         />
                       </div>
-                      <button type="submit" className="w-full bg-white text-black py-4.5 rounded-2xl font-bold text-[11px] uppercase tracking-[0.2em] transition-all hover:scale-[1.02] active:scale-95 flex items-center justify-center gap-3 shadow-[0_0_30px_rgba(255,255,255,0.1)]">
+                      <button type="submit" className="btn-command btn-blue w-full">
                         Continue <ArrowRight size={16} />
                       </button>
                     </motion.form>
@@ -253,36 +249,33 @@ export default function Login() {
                   {authStep === 1 && (
                     <motion.form key="step1" variants={formVariants} initial="hidden" animate="visible" exit="exit" onSubmit={handleFinalSubmit} className="space-y-6">
                       <div className="relative group/input">
-                        <Lock className="absolute left-5 top-1/2 -translate-y-1/2 text-slate-600 group-focus-within/input:text-blue-500 transition-colors" size={18} />
+                        <Lock className="absolute left-5 top-1/2 -translate-y-1/2 text-slate-600 group-focus-within/input:text-blue-400 transition-colors" size={18} />
                         <input
                           type="password" required autoFocus autoComplete="current-password"
                           value={form.password} onChange={e => setForm({ ...form, password: e.target.value })}
                           placeholder="••••••••••••"
-                          className="w-full bg-[#111111] border border-white/[0.06] rounded-2xl py-4.5 pl-14 pr-6 text-white text-xs outline-none transition-all focus:border-blue-500/50 focus:bg-[#161616] placeholder:text-slate-700 tracking-wider"
+                          className="w-full bg-[#050505] border border-white/10 rounded-2xl py-5 pl-14 pr-6 text-white text-sm outline-none transition-all focus:border-blue-400/50 focus:bg-[#080808] placeholder:text-slate-800 tracking-wider"
                         />
                       </div>
                       <div className="flex justify-end px-1">
-                        <button type="button" className="text-[9px] font-bold text-slate-500 hover:text-blue-400 uppercase tracking-widest transition-colors">Recover Key</button>
+                        <button type="button" className="text-[9px] font-black text-slate-600 hover:text-blue-400 uppercase tracking-widest transition-colors">Recover Key</button>
                       </div>
-                      <button type="submit" className="w-full bg-blue-600 text-white py-4.5 rounded-2xl font-bold text-[11px] uppercase tracking-[0.2em] transition-all hover:bg-blue-500 active:scale-95 flex items-center justify-center gap-3 shadow-[0_0_30px_rgba(59,130,246,0.3)]">
+                      <button type="submit" className="btn-command btn-blue w-full">
                         Initialize Handshake <Zap size={16} />
                       </button>
                     </motion.form>
                   )}
 
-                  {/* STEP 2: PROCESSING (Security Theater) */}
-                  {authStep === 2 && (
                     <motion.div key="step2" variants={formVariants} initial="hidden" animate="visible" exit="exit" className="flex flex-col items-center justify-center py-8 space-y-6">
                       <div className="relative">
-                        <div className="absolute inset-0 border-[3px] border-blue-500/20 rounded-full animate-ping" />
-                        <div className="w-16 h-16 border-[3px] border-t-blue-500 border-r-blue-500 border-b-transparent border-l-transparent rounded-full animate-spin" />
-                        <ShieldCheck className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-blue-500" size={20} />
+                        <div className="absolute inset-0 border-[3px] border-cyan-400/20 rounded-full animate-ping" />
+                        <div className="w-16 h-16 border-[3px] border-t-cyan-400 border-r-cyan-400 border-b-transparent border-l-transparent rounded-full animate-spin" />
+                        <ShieldCheck className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-cyan-400" size={20} />
                       </div>
-                      <p className="text-[10px] font-mono text-blue-400 uppercase tracking-widest animate-pulse">
+                      <p className="text-[10px] font-mono text-cyan-400 uppercase tracking-widest animate-pulse">
                         {telemetryLogs[telemetryLogs.length - 1]}
                       </p>
                     </motion.div>
-                  )}
 
                 </AnimatePresence>
               </div>
@@ -328,14 +321,16 @@ export default function Login() {
               </AnimatePresence>
             </div>
 
-            {/* SIGN UP LINK */}
-            <div className="text-center mt-10">
-              <span className="text-slate-500 text-[10px] font-bold uppercase tracking-[0.2em]">
+            </div>
+
+            {/* PROTOCOL LINK */}
+            <div className="text-center mt-12">
+              <span className="text-slate-800 text-[9px] font-black uppercase tracking-[0.4em]">
                 No Protocol Connection?
               </span>
-              <Link to="/signup" className="text-blue-500 font-bold ml-3 text-[10px] uppercase tracking-[0.2em] hover:text-blue-400 transition-colors">
-                Sign Up
-              </Link>
+              <button onClick={() => navigate('/signup')} className="text-blue-500 font-extrabold ml-4 text-[9px] uppercase tracking-[0.4em] hover:text-white transition-all underline decoration-blue-500/30 underline-offset-8">
+                Initialize New Node
+              </button>
             </div>
 
           </div>

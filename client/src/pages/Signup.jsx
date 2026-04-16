@@ -21,8 +21,8 @@ function getPasswordStrength(pwd) {
     { label: '', color: '' },
     { label: 'Weak', color: 'bg-rose-500' },
     { label: 'Fair', color: 'bg-amber-500' },
-    { label: 'Good', color: 'bg-blue-500' },
-    { label: 'Strong', color: 'bg-blue-500' },
+    { label: 'Good', color: 'bg-cyan-500' },
+    { label: 'Strong', color: 'bg-cyan-600 shadow-[0_0_10px_rgba(34,211,238,0.5)]' },
   ];
   return { score, ...levels[score] };
 }
@@ -49,14 +49,14 @@ const NodeVisualizer = () => {
           <motion.div
             animate={{
               scale: isActive ? 1.15 : 1,
-              backgroundColor: isActive ? 'rgba(59,130,246,0.15)' : 'rgba(255,255,255,0.02)',
-              borderColor: isActive ? 'rgba(59,130,246,0.4)' : 'rgba(255,255,255,0.05)'
+              backgroundColor: isActive ? 'rgba(34,211,238,0.15)' : 'rgba(255,255,255,0.02)',
+              borderColor: isActive ? 'rgba(34,211,238,0.4)' : 'rgba(255,255,255,0.05)'
             }}
             transition={{ duration: 0.4 }}
             className="w-12 h-12 rounded-xl border flex items-center justify-center"
           >
             {isActive
-              ? <Cpu size={16} className="text-blue-500 animate-pulse" />
+              ? <Cpu size={16} className="text-cyan-400 animate-pulse" />
               : <div className="w-1.5 h-1.5 rounded-full bg-slate-700" />}
           </motion.div>
           <div className="h-4 w-[1px] bg-gradient-to-b from-white/[0.05] to-transparent" />
@@ -156,14 +156,12 @@ export default function Signup() {
 
           {/* Logo */}
           <button onClick={() => navigate('/')} className="relative z-10 flex items-center gap-4 w-fit">
-            <div className="w-12 h-12 bg-[#111111] border border-white/[0.06] rounded-xl flex items-center justify-center">
-              <Hexagon className="text-blue-500" size={24} />
+            <div className="w-12 h-12 bg-[#0A0A0A] border border-cyan-400/20 rounded-xl flex items-center justify-center shadow-[0_0_30px_rgba(34,211,238,0.15)] group hover:border-cyan-400 transition-all duration-700">
+              <Hexagon className="text-cyan-400 group-hover:rotate-90 transition-transform duration-700" size={24} />
             </div>
             <div>
-              <span className="text-2xl font-extrabold text-white tracking-tight block">
-                Edu<span className="text-blue-500">Cred</span>
-              </span>
-              <span className="text-[9px] font-bold uppercase tracking-[0.3em] text-slate-500">User Registration</span>
+              <span className="text-2xl font-black text-white tracking-tighter block uppercase leading-none">Edu<span className="text-cyan-400">Cred</span></span>
+              <span className="text-[9px] font-black uppercase tracking-[0.4em] text-slate-800 mt-2">Identity Deployment Oracle</span>
             </div>
           </button>
 
@@ -193,8 +191,8 @@ export default function Signup() {
           </div>
 
           {/* Footer */}
-          <div className="relative z-10 flex justify-between text-[10px] font-bold uppercase tracking-widest text-slate-600 border-t border-white/[0.04] pt-6">
-            <span className="flex items-center gap-2"><Network size={12} className="text-blue-500" /> Topology: Active</span>
+          <div className="relative z-10 flex justify-between text-[10px] font-black uppercase tracking-[0.3em] text-slate-600 border-t border-white/5 pt-6">
+            <span className="flex items-center gap-2"><Network size={12} className="text-cyan-500" /> Topology: Active</span>
             <span>Protocol v2.4</span>
             <span className="flex items-center gap-2"><ShieldCheck size={12} /> Secure</span>
           </div>
@@ -206,8 +204,8 @@ export default function Signup() {
 
             {/* Mobile logo */}
             <button onClick={() => navigate('/')} className="lg:hidden flex items-center justify-center gap-3 mb-10 w-full">
-              <Hexagon className="text-blue-500" size={28} />
-              <span className="text-3xl font-extrabold text-white">Edu<span className="text-blue-500">Cred</span></span>
+              <Hexagon className="text-cyan-400" size={28} />
+              <span className="text-3xl font-black text-white tracking-tighter uppercase">Edu<span className="text-cyan-400">Cred</span></span>
             </button>
 
             {/* Error */}
@@ -242,28 +240,28 @@ export default function Signup() {
                     </button>
                   )}
                 </div>
-                <h1 className="text-3xl font-extrabold text-white tracking-tighter">{stepTitles[authStep]}</h1>
-                <p className="text-slate-500 text-[11px] font-medium mt-1">{stepSubs[authStep]}</p>
+                <h1 className="text-4xl font-black text-white tracking-tighter uppercase leading-none">{stepTitles[authStep]}</h1>
+                <p className="text-slate-800 text-[9px] font-black uppercase tracking-[0.4em] mt-2">{stepSubs[authStep]}</p>
               </div>
 
               {/* Step 0: Role Selection */}
               {authStep === 0 && (
                 <form onSubmit={handleNext} className="space-y-8">
-                  <div className="flex gap-2 p-1.5 bg-[#111111] rounded-[1.5rem] border border-white/[0.04]">
+                  <div className="flex gap-2 p-1.5 bg-[#050505] rounded-[1.5rem] border border-white/5">
                     {['student', 'university'].map((role) => (
                       <button
                         key={role} type="button"
                         onClick={() => setForm({ ...form, role, universityName: '', description: '' })}
-                        className={`relative flex-1 py-4 text-[11px] font-bold uppercase tracking-[0.2em] transition-colors z-10 rounded-xl ${form.role === role ? 'text-white' : 'text-slate-500 hover:text-slate-300'}`}
+                        className={`relative flex-1 py-4 text-[11px] font-black uppercase tracking-[0.2em] transition-colors z-10 rounded-xl ${form.role === role ? 'text-black' : 'text-slate-500 hover:text-slate-400'}`}
                       >
                         {form.role === role && (
-                          <motion.div layoutId="role-pill" className="absolute inset-0 bg-blue-600 rounded-xl shadow-lg shadow-blue-500/30 z-[-1]" />
+                          <motion.div layoutId="role-pill" className="absolute inset-0 bg-cyan-400 rounded-xl shadow-lg shadow-cyan-400/30 z-[-1]" />
                         )}
                         {role === 'student' ? '🎓 Student' : '🏛️ University'}
                       </button>
                     ))}
                   </div>
-                  <button type="submit" className="w-full bg-white text-black py-4 rounded-2xl font-bold text-[11px] uppercase tracking-[0.2em] hover:scale-[1.02] active:scale-95 transition-all flex items-center justify-center gap-3">
+                  <button type="submit" className="btn-command btn-blue w-full">
                     Continue <ArrowRight size={16} />
                   </button>
                 </form>
@@ -273,53 +271,53 @@ export default function Signup() {
               {authStep === 1 && (
                 <form onSubmit={handleNext} className="space-y-5">
                   <div className="relative group/input">
-                    <User className="absolute left-5 top-1/2 -translate-y-1/2 text-slate-600 group-focus-within/input:text-blue-500 transition-colors" size={18} />
+                    <User className="absolute left-5 top-1/2 -translate-y-1/2 text-slate-600 group-focus-within/input:text-cyan-400 transition-colors" size={18} />
                     <input
                       placeholder="Full Name" required autoFocus autoComplete="name" value={form.name}
                       onChange={(e) => setForm({ ...form, name: e.target.value })}
-                      className="w-full bg-[#111111] border border-white/[0.06] rounded-2xl py-4 pl-14 pr-5 text-white text-sm outline-none focus:border-blue-500/50 transition-all placeholder:text-slate-600"
+                      className="w-full bg-[#050505] border border-white/10 rounded-2xl py-5 pl-14 pr-5 text-white text-[11px] font-black tracking-[0.2em] outline-none focus:border-cyan-400/50 transition-all placeholder:text-slate-800 uppercase"
                     />
                   </div>
                   <div className="relative group/input">
-                    <Mail className="absolute left-5 top-1/2 -translate-y-1/2 text-slate-600 group-focus-within/input:text-blue-500 transition-colors" size={18} />
+                    <Mail className="absolute left-5 top-1/2 -translate-y-1/2 text-slate-600 group-focus-within/input:text-cyan-400 transition-colors" size={18} />
                     <input
                       type="email" placeholder="Identity Email (name@email.com)" required autoComplete="email" value={form.email}
                       onChange={(e) => setForm({ ...form, email: e.target.value })}
-                      className="w-full bg-[#111111] border border-white/[0.06] rounded-2xl py-4 pl-14 pr-5 text-white text-sm outline-none focus:border-blue-500/50 transition-all placeholder:text-slate-600"
+                      className="w-full bg-[#050505] border border-white/10 rounded-2xl py-5 pl-14 pr-5 text-white text-[11px] font-black tracking-[0.2em] outline-none focus:border-cyan-400/50 transition-all placeholder:text-slate-800 uppercase"
                     />
                   </div>
-                  <div className="space-y-2">
+                  <div className="space-y-2 text-center sm:text-left">
                     <div className="relative group/input">
-                      <Lock className="absolute left-5 top-1/2 -translate-y-1/2 text-slate-600 group-focus-within/input:text-blue-500 transition-colors" size={18} />
+                      <Lock className="absolute left-5 top-1/2 -translate-y-1/2 text-slate-600 group-focus-within/input:text-blue-400 transition-colors" size={18} />
                       <input
                         type={showPassword ? 'text' : 'password'}
-                        placeholder="Password (min 8 chars)" required autoComplete="new-password" value={form.password}
+                        placeholder="Security Key (min 8 chars)" required autoComplete="new-password" value={form.password}
                         onChange={(e) => setForm({ ...form, password: e.target.value })}
-                        className="w-full bg-[#111111] border border-white/[0.06] rounded-2xl py-4 pl-14 pr-14 text-white text-sm outline-none focus:border-blue-500/50 transition-all placeholder:text-slate-600"
+                        className="w-full bg-[#050505] border border-white/10 rounded-2xl py-5 pl-14 pr-14 text-white text-sm outline-none focus:border-blue-400/50 transition-all placeholder:text-slate-800 tracking-wider"
                       />
                       <button
                         type="button"
                         onClick={() => setShowPassword(p => !p)}
-                        className="absolute right-5 top-1/2 -translate-y-1/2 text-slate-600 hover:text-white transition-colors"
+                        className="absolute right-5 top-1/2 -translate-y-1/2 text-slate-700 hover:text-white transition-colors"
                       >
                         {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
                       </button>
                     </div>
                     {/* Password Strength Bar */}
                     {form.password && (
-                      <div className="space-y-1.5 px-1">
-                        <div className="flex gap-1.5">
+                      <div className="space-y-2 px-1">
+                        <div className="flex gap-2">
                           {[1, 2, 3, 4].map(i => (
-                            <div key={i} className={`h-1 flex-1 rounded-full transition-all duration-300 ${i <= passwordStrength.score ? passwordStrength.color : 'bg-white/10'}`} />
+                            <div key={i} className={`h-1 flex-1 rounded-full transition-all duration-500 ${i <= passwordStrength.score ? passwordStrength.color : 'bg-white/5'}`} />
                           ))}
                         </div>
-                        <p className={`text-[10px] font-bold ${passwordStrength.score >= 3 ? 'text-blue-400' : passwordStrength.score >= 2 ? 'text-amber-400' : 'text-rose-400'}`}>
+                        <p className={`text-[10px] font-black uppercase tracking-widest ${passwordStrength.score >= 3 ? 'text-cyan-400' : passwordStrength.score >= 2 ? 'text-amber-400' : 'text-rose-400'}`}>
                           {passwordStrength.label}
                         </p>
                       </div>
                     )}
                   </div>
-                  <button type="submit" className="w-full bg-white text-black py-4 rounded-2xl font-bold text-[11px] uppercase tracking-[0.2em] hover:scale-[1.02] active:scale-95 transition-all flex items-center justify-center gap-3 mt-2">
+                  <button type="submit" className="btn-command btn-blue w-full mt-2">
                     {form.role === 'university' ? <>Continue <ArrowRight size={16} /></> : <>Create Account <Zap size={16} /></>}
                   </button>
                 </form>
@@ -329,26 +327,26 @@ export default function Signup() {
               {authStep === 2 && (
                 <form onSubmit={handleNext} className="space-y-5">
                   <div className="relative group/input">
-                    <Building2 className="absolute left-5 top-[22px] text-slate-600 group-focus-within/input:text-blue-500 transition-colors" size={18} />
+                    <Building2 className="absolute left-5 top-[26px] text-slate-600 group-focus-within/input:text-blue-400 transition-colors" size={18} />
                     <input
                       placeholder="University / Institution Name" required autoFocus value={form.universityName}
                       onChange={(e) => setForm({ ...form, universityName: e.target.value })}
-                      className="w-full bg-[#111111] border border-white/[0.06] rounded-2xl py-4 pl-14 pr-5 text-white text-sm outline-none focus:border-blue-500/50 transition-all placeholder:text-slate-600"
+                      className="w-full bg-[#050505] border border-white/10 rounded-2xl py-5 pl-14 pr-5 text-white text-[11px] font-black tracking-[0.2em] outline-none focus:border-blue-400/50 transition-all placeholder:text-slate-800 uppercase"
                     />
                   </div>
                   <div className="relative group/input">
-                    <FileText className="absolute left-5 top-5 text-slate-600 group-focus-within/input:text-blue-500 transition-colors" size={18} />
+                    <FileText className="absolute left-5 top-6 text-slate-600 group-focus-within/input:text-blue-400 transition-colors" size={18} />
                     <textarea
                       placeholder="Brief description of your institution (accreditation, region, etc.)"
                       rows="3" required value={form.description}
                       onChange={(e) => setForm({ ...form, description: e.target.value })}
-                      className="w-full bg-[#111111] border border-white/[0.06] rounded-2xl py-4 pl-14 pr-5 text-white text-sm leading-relaxed outline-none focus:border-blue-500/50 transition-all placeholder:text-slate-600 resize-none"
+                      className="w-full bg-[#050505] border border-white/10 rounded-2xl py-5 pl-14 pr-5 text-white text-[11px] font-black tracking-[0.2em] leading-relaxed outline-none focus:border-blue-400/50 transition-all placeholder:text-slate-800 uppercase resize-none h-32"
                     />
                   </div>
-                  <div className="bg-amber-500/[0.06] border border-amber-500/20 rounded-xl p-4 text-amber-400 text-[11px] font-medium leading-relaxed">
-                    ⚠️ University accounts require admin approval before you can issue certificates.
+                  <div className="bg-amber-500/[0.06] border border-amber-500/20 rounded-xl p-4 text-amber-500 text-[9px] font-black uppercase tracking-[0.2em] leading-relaxed">
+                    ⚠️ Institution accounts require admin approval before protocol issuance access.
                   </div>
-                  <button type="submit" className="w-full bg-blue-600 text-white py-4 rounded-2xl font-bold text-[11px] uppercase tracking-[0.2em] hover:bg-blue-500 active:scale-95 transition-all flex items-center justify-center gap-3">
+                  <button type="submit" className="btn-command btn-blue w-full">
                     Submit Application <Zap size={16} />
                   </button>
                 </form>
@@ -358,11 +356,11 @@ export default function Signup() {
               {authStep === 3 && (
                 <div className="flex flex-col items-center justify-center py-10 space-y-6">
                   <div className="relative">
-                    <div className="absolute inset-0 border-[3px] border-blue-500/20 rounded-[1.5rem] animate-ping" />
-                    <div className="w-20 h-20 border-[3px] border-t-blue-500 border-r-blue-500 border-b-transparent border-l-transparent rounded-[1.5rem] animate-spin" />
-                    <Hexagon className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-blue-500" size={24} />
+                    <div className="absolute inset-0 border-[3px] border-cyan-400/20 rounded-[1.5rem] animate-ping" />
+                    <div className="w-20 h-20 border-[3px] border-t-cyan-400 border-r-cyan-400 border-b-transparent border-l-transparent rounded-[1.5rem] animate-spin" />
+                    <Hexagon className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-cyan-400" size={24} />
                   </div>
-                  <p className="text-[11px] font-mono text-blue-400 uppercase tracking-widest animate-pulse text-center">
+                  <p className="text-[10px] font-mono text-cyan-400 uppercase tracking-widest animate-pulse text-center">
                     {logs[logs.length - 1]}
                   </p>
                 </div>
@@ -406,9 +404,9 @@ export default function Signup() {
               )}
             </div>
 
-            <p className="text-center mt-8 text-slate-500 text-sm">
+            <p className="text-center mt-12 text-slate-800 text-[9px] font-black uppercase tracking-[0.4em]">
               Already have an account?{' '}
-              <Link to="/login" className="text-blue-500 font-semibold hover:text-blue-400 transition-colors">Sign in</Link>
+              <button onClick={() => navigate('/login')} className="text-cyan-400 font-black ml-3 hover:text-white transition-all underline decoration-cyan-400/30 underline-offset-8">Authorize Identity</button>
             </p>
           </div>
         </div>

@@ -63,9 +63,10 @@ const steps = [
 
 function MetricCard({ label, value, accent }) {
   return (
-    <div className="rounded-[1.75rem] border border-white/8 bg-white/[0.03] p-6 backdrop-blur-xl scanline-overlay overflow-hidden">
-      <p className="text-[10px] font-black uppercase tracking-[0.4em] font-mono text-slate-500">{label}</p>
-      <p className={`mt-3 text-3xl font-bold tracking-tighter text-emissive-pulse ${accent}`}>{value}</p>
+    <div className="glass-pane p-8 rounded-[2rem] border border-white/5 relative overflow-hidden group shadow-2xl">
+      <div className="absolute top-0 right-0 w-24 h-24 bg-cyan-400/5 blur-[40px] rounded-full opacity-0 group-hover:opacity-100 transition-opacity" />
+      <p className="text-[9px] font-black uppercase tracking-[0.4em] font-mono text-slate-800">{label}</p>
+      <p className={`mt-4 text-4xl font-black tracking-tighter uppercase ${accent}`}>{value}</p>
     </div>
   );
 }
@@ -184,13 +185,22 @@ export default function Landing() {
   };
 
   return (
-    <div className="relative min-h-screen overflow-x-hidden bg-[#000000] text-slate-100 selection:bg-cyan-400 selection:text-black">
+    <div className="relative min-h-screen overflow-x-hidden bg-[#000000] text-slate-100 selection:bg-cyan-400 selection:text-black font-sans">
       <ProtocolBootSequence onComplete={() => setIsBooting(false)} />
       <HyperCursor />
-      <div className="fixed inset-0 opacity-40 pointer-events-none">
-        <BlockchainBackground />
-      </div>
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,#14345f_0%,#07111f_42%,#030712_100%)]" />
+      
+      <AnimatePresence>
+        {!isBooting && (
+          <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ duration: 1.5, ease: "easeOut" }}
+          >
+            <div className="fixed inset-0 opacity-40 pointer-events-none">
+              <BlockchainBackground />
+            </div>
+            <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,#14345f_0%,#000000_42%,#000000_100%)]" />
+
 
       <header className="fixed top-6 left-1/2 -translate-x-1/2 z-50 w-full max-w-7xl px-6">
         <div className="flex items-center justify-between rounded-full border border-white/12 bg-black/40 px-8 py-5 backdrop-blur-2xl">
@@ -210,35 +220,34 @@ export default function Landing() {
             <Link to="/verify" data-text="Verify" className="text-sm text-slate-300 transition hover:text-white text-glitch">Verify</Link>
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-4">
             {user ? (
               <>
                 <button
                   onClick={() => navigate('/dashboard')}
-                  className="hidden sm:inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.04] px-5 py-2.5 text-sm font-medium text-white transition hover:bg-white/[0.08]"
+                  className="btn-command btn-outline !px-6 !py-3 flex items-center gap-3"
                 >
-                  <LayoutDashboard size={16} />
-                  Dashboard
+                  <LayoutDashboard size={14} />
+                  Terminal
                 </button>
                 <button
                   onClick={() => { logout(); navigate('/'); }}
-                  className="inline-flex items-center gap-2 rounded-full bg-white px-5 py-2.5 text-sm font-medium text-slate-950 transition hover:bg-slate-100"
+                  className="btn-command btn-blue !px-6 !py-3 flex items-center gap-3"
                 >
-                  <LogOut size={16} />
-                  Sign out
+                  <LogOut size={14} />
+                  Terminate
                 </button>
               </>
             ) : (
               <>
-                <Link to="/login" className="hidden text-sm text-slate-300 transition hover:text-white sm:block">
-                  Log in
+                <Link to="/login" className="text-[9px] font-black uppercase tracking-[0.4em] text-slate-800 hover:text-white transition-colors">
+                  Authorize
                 </Link>
                 <Link
                   to="/signup"
-                  className="inline-flex items-center gap-2 rounded-full bg-white px-5 py-2.5 text-sm font-medium text-slate-950 transition hover:bg-slate-100"
+                  className="btn-command btn-blue !px-8 !py-3.5 shadow-[0_0_30px_rgba(59,130,246,0.3)]"
                 >
-                  Start now
-                  <ArrowRight size={16} />
+                  Initialize <ArrowRight size={14} />
                 </Link>
               </>
             )}
@@ -284,22 +293,16 @@ export default function Landing() {
                 EduCred turns certificate validation into a simple flow: upload, hash, anchor on blockchain, verify instantly.
               </motion.p>
 
-              <div className="mt-12 flex flex-wrap gap-5">
+              <div className="mt-12 flex flex-wrap gap-6">
                 <motion.div
                   whileHover={{ scale: 1.05 }}
                   whileTap={{ scale: 0.95 }}
-                  className="relative"
                 >
                   <Link
                     to="/verify"
-                    className="group relative inline-flex items-center gap-2 overflow-hidden rounded-full bg-cyan-400 px-8 py-4 text-sm font-bold text-black transition-all glow-cyan"
+                    className="btn-command btn-blue !px-10 !py-5 text-[10px] shadow-[0_0_50px_rgba(59,130,246,0.4)]"
                   >
-                    <span className="relative z-10">Open verifier</span>
-                    <ArrowRight size={18} className="relative z-10 transition-transform group-hover:translate-x-1" />
-                    <motion.div 
-                      className="absolute inset-0 z-0 bg-white/20 opacity-0 transition-opacity group-hover:opacity-100" 
-                      transition={{ duration: 0.4 }}
-                    />
+                    Authorize Node <ArrowRight size={18} />
                   </Link>
                 </motion.div>
                 <motion.div
@@ -308,9 +311,9 @@ export default function Landing() {
                 >
                   <Link
                     to="/signup"
-                    className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.03] px-8 py-4 text-sm font-bold text-white backdrop-blur-md transition-all hover:bg-white/[0.08] hover:border-white/20"
+                    className="btn-command btn-outline !px-10 !py-5 text-[10px]"
                   >
-                    Issue certificates
+                    Deploy Protocol
                   </Link>
                 </motion.div>
               </div>
@@ -345,10 +348,10 @@ export default function Landing() {
                 </div>
 
                 <div className="mt-10 grid gap-6 sm:grid-cols-2">
-                  <MetricCard label="Active nodes" value={stats.activeNodes} accent="text-white" />
-                  <MetricCard label="Credentials secured" value={stats.credentialsSecured} accent="text-cyan-400" />
-                  <MetricCard label="Consensus speed" value={stats.avgBlockTime} accent="text-indigo-400" />
-                  <MetricCard label="Service uptime" value={stats.networkUptime} accent="text-white" />
+                  <MetricCard label="Active Nodes" value={stats.activeNodes} accent="text-white" />
+                  <MetricCard label="Proofs Secured" value={stats.credentialsSecured} accent="text-cyan-400" />
+                  <MetricCard label="Consensus Speed" value={stats.avgBlockTime} accent="text-blue-500" />
+                  <MetricCard label="Protocol Uptime" value={stats.networkUptime} accent="text-white" />
                 </div>
 
                 <div className="mt-6 rounded-[1.5rem] border border-white/8 bg-slate-950/60 p-5">
@@ -423,8 +426,22 @@ export default function Landing() {
               whileInView={{ opacity: 1, scale: 1 }}
               viewport={{ once: true }}
               transition={{ ...transition, delay: 0.2 }}
+              className="relative"
             >
               <ProtocolSchematic />
+              
+              <div className="mt-8 grid gap-4 grid-cols-2">
+                <div className="rounded-[1.5rem] border border-white/8 bg-white/[0.03] p-6 backdrop-blur-xl">
+                  <Workflow className="text-cyan-400" size={20} />
+                  <h4 className="mt-4 text-sm font-bold text-white uppercase tracking-widest">Audit Trail</h4>
+                  <p className="mt-2 text-[10px] leading-relaxed text-slate-500">Verification events are tracked via immutable ledger sequences.</p>
+                </div>
+                <div className="rounded-[1.5rem] border border-white/8 bg-white/[0.03] p-6 backdrop-blur-xl">
+                  <Building2 className="text-indigo-400" size={20} />
+                  <h4 className="mt-4 text-sm font-bold text-white uppercase tracking-widest">Issuer Nodes</h4>
+                  <p className="mt-2 text-[10px] leading-relaxed text-slate-500">Authorised institutions manage credentials via private keys.</p>
+                </div>
+              </div>
             </motion.div>
           </div>
         </section>
@@ -461,83 +478,36 @@ export default function Landing() {
             </div>
           </div>
         </section>
-              <div className="grid gap-5 md:grid-cols-2">
-                <div className="rounded-[1.5rem] border border-white/8 bg-white/[0.03] p-5">
-                  <Workflow className="text-sky-300" size={20} />
-                  <h4 className="mt-4 text-lg font-semibold text-white">Instant audit trail</h4>
-                  <p className="mt-2 text-sm leading-7 text-slate-400">
-                    Verification events, issuance results, and tamper alerts can all be tracked through the API and ledger view.
-                  </p>
-                </div>
-
-                <div className="rounded-[1.5rem] border border-white/8 bg-white/[0.03] p-5">
-                  <Building2 className="text-cyan-300" size={20} />
-                  <h4 className="mt-4 text-lg font-semibold text-white">Institution-ready flow</h4>
-                  <p className="mt-2 text-sm leading-7 text-slate-400">
-                    University dashboards can issue, monitor, and revoke credentials without leaving the product surface.
-                  </p>
-                </div>
-
-                <div className="rounded-[1.5rem] border border-white/8 bg-white/[0.03] p-5">
-                  <Network className="text-sky-300" size={20} />
-                  <h4 className="mt-4 text-lg font-semibold text-white">Live node visibility</h4>
-                  <p className="mt-2 text-sm leading-7 text-slate-400">
-                    Approved institutions and network state are surfaced live instead of being hidden behind manual steps.
-                  </p>
-                </div>
-
-                <div className="rounded-[1.5rem] border border-white/8 bg-white/[0.03] p-5">
-                  <FileCheck2 className="text-amber-300" size={20} />
-                  <h4 className="mt-4 text-lg font-semibold text-white">Clear trust signals</h4>
-                  <p className="mt-2 text-sm leading-7 text-slate-400">
-                    Results distinguish between blockchain-backed verification and registry-only checks in local development.
-                  </p>
-                </div>
-              </div>
-
-              <div className="mt-8 rounded-[2rem] border border-white/10 bg-black/40 p-8 scanline-overlay overflow-hidden">
-                <p className="text-[10px] font-black uppercase tracking-[0.4em] font-mono text-cyan-500/60">Live protocol nodes</p>
-                <div className="mt-8 marquee-infinite">
-                  <div className="marquee-content">
-                    {(nodes.length ? [...nodes, ...nodes] : [{ name: 'Awaiting local data', status: 'Pending' }, { name: 'Awaiting local data', status: 'Pending' }]).map((node, i) => (
-                      <span
-                        key={i}
-                        className="flex items-center gap-3 whitespace-nowrap rounded-full border border-white/8 bg-white/[0.03] px-6 py-3 text-[11px] font-black uppercase tracking-[0.25em] text-cyan-200"
-                      >
-                        <span className="h-2 w-2 rounded-full bg-cyan-400 animate-pulse" />
-                        {node.name}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </section>
 
         <section className="px-6 pb-32 pt-12">
-          <div className="mx-auto max-w-7xl rounded-[3rem] border border-white/10 bg-gradient-to-br from-cyan-400 to-indigo-500 px-12 py-16 text-black shadow-[0_0_100px_rgba(34,211,238,0.3)]">
-            <div className="flex flex-col gap-10 lg:flex-row lg:items-center lg:justify-between">
-              <div className="max-w-2xl">
-                <p className="text-[10px] font-black uppercase tracking-[0.4em] text-black/60">Ready for deployment</p>
-                <h2 className="mt-4 text-5xl font-bold tracking-tighter sm:text-6xl">
-                  Launch the full certificate verification flow from one place.
+          <div className="mx-auto max-w-7xl relative overflow-hidden rounded-[3rem] border border-white/5 bg-[#050505] p-16 md:p-24 shadow-[0_0_100px_rgba(34,211,238,0.1)] scanline-overlay">
+            <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-cyan-400/5 blur-[150px] rounded-full" />
+            
+            <div className="relative z-10 flex flex-col gap-14 lg:flex-row lg:items-center lg:justify-between">
+              <div className="max-w-2xl space-y-6">
+                <p className="inline-block rounded-full border border-cyan-400/20 bg-cyan-400/10 px-5 py-2 text-[10px] font-black uppercase tracking-[0.5em] text-cyan-400">
+                  Ready for deployment
+                </p>
+                <h2 className="text-5xl md:text-7xl font-black tracking-tighter text-white uppercase leading-none">
+                  Establish Your <span className="text-cyan-400">Node.</span>
                 </h2>
+                <p className="text-xl text-slate-800 font-bold uppercase tracking-widest max-w-lg leading-relaxed">
+                  Launch the full certificate verification flow within the high-fidelity sovereign enclave.
+                </p>
               </div>
 
-              <div className="flex flex-wrap gap-4">
+              <div className="flex flex-col sm:flex-row gap-6">
                 <Link
                   to="/verify"
-                  className="inline-flex items-center gap-2 rounded-full bg-black px-8 py-4 text-sm font-bold text-white transition-all hover:scale-105 active:scale-95"
+                  className="btn-command btn-blue px-12 !py-6 text-[11px] shadow-[0_0_40px_rgba(59,130,246,0.2)]"
                 >
-                  Verify now
-                  <ArrowRight size={18} />
+                  Authorize Node <ArrowRight size={18} />
                 </Link>
                 <Link
                   to="/signup"
-                  className="inline-flex items-center gap-2 rounded-full border border-black/20 bg-black/5 px-8 py-4 text-sm font-bold text-black transition-all hover:bg-black/10"
+                  className="btn-command btn-outline px-12 !py-6 text-[11px]"
                 >
-                  Create institution account
+                  Initialize Protocol
                 </Link>
               </div>
             </div>
@@ -563,6 +533,9 @@ export default function Landing() {
           </div>
         </div>
       </footer>
-    </div>
+    </motion.div>
+    )}
+    </AnimatePresence>
+  </div>
   );
 }

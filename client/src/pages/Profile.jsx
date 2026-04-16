@@ -21,7 +21,7 @@ import api from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import BlockchainBackground from '../components/BlockchainBackground';
 
-// 💠 ANIMATION CONSTANTS (ZERO-G SPEC)
+// 💠 ANIMATION CONSTANTS (OBSIDIAN PROTOCOL)
 const viewTransition = {
   initial: { opacity: 0, y: 30, scale: 0.98 },
   animate: { opacity: 1, y: 0, scale: 1 },
@@ -65,62 +65,63 @@ export default function Profile() {
   };
 
   if (loading) return (
-    <div className="h-screen flex items-center justify-center bg-[#010409]">
-      <Loader2 className="animate-spin text-indigo-500" size={48} />
+    <div className="h-screen flex items-center justify-center bg-[#000000]">
+      <Loader2 className="animate-spin text-cyan-400" size={48} />
     </div>
   );
 
   return (
-    <div className="relative min-h-screen bg-[#010409] text-slate-300 overflow-x-hidden selection:bg-indigo-500/30">
+    <div className="relative min-h-screen bg-[#000000] text-slate-300 overflow-x-hidden selection:bg-cyan-500/30">
       
       {/* 🌌 INTERACTIVE BACKGROUND */}
-      <BlockchainBackground />
+      <div className="fixed inset-0 opacity-20 pointer-events-none z-0">
+        <BlockchainBackground />
+      </div>
 
       {/* AMBIENT GLOW */}
-      <div className="absolute inset-0 z-0 pointer-events-none">
-        <div className="absolute top-1/4 left-1/2 -translate-x-1/2 w-[800px] h-[800px] bg-indigo-600/5 blur-[160px] rounded-full animate-pulse" />
-      </div>
+      <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[1000px] h-[500px] bg-cyan-400/5 blur-[150px] rounded-full mix-blend-screen pointer-events-none" />
 
       <div className="container max-w-6xl mx-auto px-6 pt-32 pb-24 relative z-10 space-y-12">
         
         {/* ── PROFILE HEADER ────────────────────────────────── */}
-        <motion.div {...viewTransition} className="glass-card p-10 md:p-14 border border-white/10 group overflow-hidden">
+        <motion.div {...viewTransition} className="glass-pane p-12 md:p-16 rounded-[2.5rem] border border-white/5 group relative overflow-hidden scanline-overlay sm:border">
           {/* Subtle Orb */}
-          <div className="absolute top-0 right-0 w-80 h-80 bg-indigo-600/5 blur-[100px] pointer-events-none group-hover:bg-indigo-600/10 transition-all duration-1000" />
+          <div className="absolute top-0 right-0 w-80 h-80 bg-cyan-400/5 blur-[100px] pointer-events-none group-hover:bg-cyan-400/10 transition-all duration-1000" />
           
-          <div className="flex flex-col md:flex-row items-center gap-12 relative z-10">
+          <div className="flex flex-col md:flex-row items-center gap-14 relative z-10">
             <div className="relative group/avatar">
-              <div className="w-40 h-40 rounded-[2.5rem] bg-gradient-to-br from-indigo-500 to-purple-500 flex items-center justify-center shadow-2xl transition-all duration-700 group-hover/avatar:scale-[1.02] border border-white/10">
-                <span className="text-6xl font-bold text-white select-none">{profileData?.name?.charAt(0)}</span>
-                <div className="absolute inset-0 bg-black/40 opacity-0 group-hover/avatar:opacity-100 transition-opacity flex items-center justify-center cursor-pointer rounded-[2.5rem] backdrop-blur-sm">
-                  <Edit3 className="text-white" size={32} />
+              <div className="w-48 h-48 rounded-3xl bg-[#050505] border border-white/10 flex items-center justify-center shadow-2xl transition-all duration-700 group-hover/avatar:scale-[1.05] group-hover/avatar:border-cyan-400/30 relative overflow-hidden">
+                <div className="absolute inset-0 bg-gradient-to-br from-cyan-400/10 to-transparent opacity-50" />
+                <span className="text-7xl font-black text-white select-none relative z-10">{profileData?.name?.charAt(0)}</span>
+                <div className="absolute inset-0 bg-cyan-400/20 opacity-0 group-hover/avatar:opacity-100 transition-opacity flex items-center justify-center cursor-pointer backdrop-blur-sm z-20">
+                  <Edit3 className="text-white" size={36} />
                 </div>
               </div>
             </div>
 
-            <div className="flex-1 text-center md:text-left space-y-4">
-              <h2 className="text-4xl md:text-5xl font-bold text-white tracking-tighter italic uppercase leading-none">
+            <div className="flex-1 text-center md:text-left space-y-6">
+              <h2 className="text-5xl md:text-7xl font-black text-white tracking-tighter uppercase leading-none">
                 {profileData?.name}
               </h2>
               <div className="flex flex-wrap justify-center md:justify-start gap-4">
-                <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-indigo-500/10 border border-indigo-500/20">
-                  <ShieldCheck size={14} className="text-indigo-400" />
-                  <span className="text-[9px] font-black uppercase tracking-widest text-slate-400">
-                    {user?.role === 'university' ? 'Institutional Authority' : 'Verified Identity'}
+                <div className="inline-flex items-center gap-3 px-5 py-2 rounded-full bg-cyan-400/10 border border-cyan-400/20 shadow-inner">
+                  <ShieldCheck size={14} className="text-cyan-400 animate-pulse" />
+                  <span className="text-[9px] font-black uppercase tracking-[0.4em] text-white">
+                    {user?.role === 'university' ? 'Authority Sovereign' : 'Verified Identity'}
                   </span>
                 </div>
-                <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-white/[0.03] border border-white/5">
-                   <Fingerprint size={12} className="text-slate-600" />
-                   <span className="text-[9px] font-bold uppercase tracking-widest text-slate-500">Node ID: {profileData?.profileId?.slice(-8) || 'GLOBAL'}</span>
+                <div className="inline-flex items-center gap-3 px-5 py-2 rounded-full bg-[#050505] border border-white/5 shadow-inner">
+                   <Fingerprint size={12} className="text-slate-700" />
+                   <span className="text-[9px] font-black uppercase tracking-[0.4em] text-slate-800">Node ID: {profileData?.profileId?.slice(-12) || 'GLOBAL-0X'}</span>
                 </div>
               </div>
             </div>
 
             <button 
               onClick={() => isEditing ? handleSave() : setIsEditing(true)}
-              className="bg-white text-black px-10 py-4 rounded-2xl text-[10px] font-black uppercase tracking-widest flex items-center gap-3 transition-all active:scale-95 shadow-xl hover:bg-slate-200"
+              className="btn-command btn-blue px-12 py-5 shadow-[0_0_30px_rgba(59,130,246,0.2)]"
             >
-              {isEditing ? <><Save size={16} /> Sync Changes</> : <><Edit3 size={16} /> Modify Profile</>}
+              {isEditing ? <><Save size={18} /> Sync Matrix</> : <><Edit3 size={18} /> Modify Manifest</>}
             </button>
           </div>
         </motion.div>
@@ -128,32 +129,32 @@ export default function Profile() {
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 items-start">
           
           {/* ── IDENTITY MATRIX ───────────────────────────────── */}
-          <motion.div {...viewTransition} transition={{ ...viewTransition.transition, delay: 0.1 }} className="lg:col-span-7 glass-card p-10 md:p-12 border border-white/5 space-y-12">
-            <h3 className="text-xl font-bold text-white uppercase tracking-tight flex items-center gap-4">
-              <User size={20} className="text-indigo-400" /> Identity Matrix
+          <motion.div {...viewTransition} transition={{ ...viewTransition.transition, delay: 0.1 }} className="lg:col-span-12 glass-pane p-12 md:p-16 rounded-[2.5rem] border border-white/5 space-y-14 scanline-overlay">
+            <h3 className="text-2xl font-black text-white uppercase tracking-tighter flex items-center gap-5 leading-none">
+              <User size={24} className="text-cyan-400" /> Identity Matrix Manifest
             </h3>
             
-            <div className="grid grid-cols-1 gap-10">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
                {[
-                 { label: 'FULL LEGAL NAME', value: profileData?.name, key: 'name', icon: User },
-                 { label: 'NETWORK EMAIL', value: profileData?.email, key: 'email', icon: Mail },
-                 { label: 'PRIMARY AUTHORITY', value: profileData?.universityName || user?.universityName || 'EDUCRED GLOBAL NETWORK', icon: Building2 },
-                 { label: 'AUTHENTICATION DATE', value: profileData?.createdAt ? new Date(profileData.createdAt).toLocaleDateString() : '\u2014', icon: Calendar }
+                 { label: 'SOVEREIGN LEGAL NAME', value: profileData?.name, key: 'name', icon: User },
+                 { label: 'PROTOCOL TRANSMISSION EMAIL', value: profileData?.email, key: 'email', icon: Mail },
+                 { label: 'AUTHORITY SOURCE', value: profileData?.universityName || user?.universityName || 'EDUCRED GLOBAL NETWORK', icon: Building2 },
+                 { label: 'ARCHIVE AUTHENTICATION DATE', value: profileData?.createdAt ? new Date(profileData.createdAt).toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' }) : '\u2014', icon: Calendar }
                ].map((item, idx) => (
-                 <div key={idx} className="space-y-4">
-                   <div className="flex items-center gap-3 ml-1">
-                      <item.icon size={12} className="text-indigo-500/40" /> 
-                      <label className="text-[9px] font-black text-slate-600 uppercase tracking-[0.3em]">{item.label}</label>
+                 <div key={idx} className="space-y-4 group/field">
+                   <div className="flex items-center gap-4 ml-1">
+                      <item.icon size={14} className="text-cyan-400/40 group-hover/field:text-cyan-400 transition-colors" /> 
+                      <label className="text-[9px] font-black text-slate-800 uppercase tracking-[0.4em]">{item.label}</label>
                    </div>
                    {isEditing && item.key ? (
                      <input 
                       type="text" 
                       value={item.value} 
                       onChange={(e) => setProfileData({...profileData, [item.key]: e.target.value.toUpperCase()})}
-                      className="w-full bg-white/[0.02] border border-white/10 rounded-2xl py-4 px-6 text-white text-[11px] font-bold tracking-widest outline-none focus:border-indigo-500/50 transition-all"
+                      className="w-full bg-[#050505] border border-white/10 rounded-[1.5rem] py-5 px-8 text-white text-[11px] font-black tracking-[0.2em] uppercase outline-none focus:border-cyan-400/40 transition-all shadow-inner"
                      />
                    ) : (
-                     <div className="bg-white/[0.01] border border-white/5 px-6 py-4 rounded-2xl text-white font-bold text-[11px] tracking-widest uppercase italic bg-gradient-to-r from-white/[0.02] to-transparent">
+                     <div className="bg-[#050505] border border-white/5 px-8 py-5 rounded-[1.5rem] text-white font-black text-[11px] tracking-[0.3em] uppercase italic shadow-inner">
                        {item.value || 'UNRESOLVED'}
                      </div>
                    )}
@@ -232,12 +233,12 @@ export default function Profile() {
             initial={{ opacity: 0, y: 50, scale: 0.9 }} 
             animate={{ opacity: 1, y: 0, scale: 1 }} 
             exit={{ opacity: 0, scale: 0.9 }}
-            className={`fixed bottom-12 right-12 px-8 py-5 rounded-[2rem] shadow-3xl border flex items-center gap-4 z-[100] backdrop-blur-xl ${
-              msg.type === 'success' ? 'bg-blue-500/10 border-blue-500/20 text-blue-500' : 'bg-rose-500/10 border-rose-500/20 text-rose-400'
+            className={`fixed bottom-12 right-12 px-10 py-6 rounded-[2.5rem] shadow-[0_0_50px_rgba(0,0,0,0.5)] border flex items-center gap-5 z-[100] backdrop-blur-2xl ${
+              msg.type === 'success' ? 'bg-cyan-400/10 border-cyan-400/20 text-cyan-400' : 'bg-rose-500/10 border-rose-500/20 text-rose-500'
             }`}
           >
-            {msg.type === 'success' ? <CheckCircle2 size={24} /> : <X size={24} />}
-            <span className="text-[10px] font-black uppercase tracking-[0.3em]">{msg.text}</span>
+            {msg.type === 'success' ? <CheckCircle2 size={24} className="animate-pulse" /> : <X size={24} />}
+            <span className="text-[10px] font-black uppercase tracking-[0.4em]">{msg.text}</span>
           </motion.div>
         )}
       </AnimatePresence>
