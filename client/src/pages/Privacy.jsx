@@ -12,7 +12,7 @@ const viewTransition = {
 export default function Privacy() {
   return (
     <div className="relative min-h-screen bg-[#000000] text-slate-300 overflow-x-hidden selection:bg-blue-500/30">
-      
+
       {/* 🌌 INTERACTIVE BACKGROUND */}
       <BlockchainBackground />
 
@@ -22,7 +22,7 @@ export default function Privacy() {
       </div>
 
       <div className="container max-w-4xl mx-auto px-6 pt-40 pb-24 relative z-10 space-y-16">
-        
+
         {/* HEADER */}
         <motion.div {...viewTransition} className="space-y-6">
           <div className="inline-flex items-center gap-3 px-6 py-2.5 rounded-full bg-white/[0.03] border border-white/10 backdrop-blur-md animate-levitate shadow-xl shadow-blue-500/5">
@@ -39,28 +39,28 @@ export default function Privacy() {
 
         {/* CONTENT GLASS PANEL */}
         <motion.div {...viewTransition} transition={{ ...viewTransition.transition, delay: 0.1 }} className="glass-card p-10 md:p-14 border border-white/10 space-y-16">
-          
+
           <div className="grid grid-cols-1 md:grid-cols-2 gap-12">
             {[
-              { 
-                icon: Eye, 
-                title: "Data Extraction", 
-                text: "We collect only the essential metadata (Name, Email, Institutional Reference) required to establish a valid cryptographic link." 
+              {
+                icon: Eye,
+                title: "Data Extraction",
+                text: "We collect only the essential metadata (Name, Email, Institutional Reference) required to establish a valid cryptographic link."
               },
-              { 
-                icon: Server, 
-                title: "Network Usage", 
-                text: "Your data is used strictly for credential verification, node-level communication, and ledger integrity checks." 
+              {
+                icon: Server,
+                title: "Network Usage",
+                text: "Your data is used strictly for credential verification, node-level communication, and ledger integrity checks."
               },
-              { 
-                icon: Globe, 
-                title: "On-Chain Hashing", 
-                text: "Credentials are recomputed into secure SHA-256 hashes and anchored to the ledger. No original binary assets are publicly exposed." 
+              {
+                icon: Globe,
+                title: "On-Chain Hashing",
+                text: "Credentials are recomputed into secure SHA-256 hashes and anchored to the ledger. No original binary assets are publicly exposed."
               },
-              { 
-                icon: ShieldCheck, 
-                title: "Identity Sovereignty", 
-                text: "We provide you with absolute sovereign control over your manifest. Your data is never traded or distributed outside the network." 
+              {
+                icon: ShieldCheck,
+                title: "Identity Sovereignty",
+                text: "We provide you with absolute sovereign control over your manifest. Your data is never traded or distributed outside the network."
               }
             ].map((section, idx) => (
               <div key={idx} className="space-y-4">
@@ -79,7 +79,7 @@ export default function Privacy() {
               Under the EduCred Governance Protocol, every node (User) maintains the right to access, synchronize, or request the detachment of their identity manifest from the identity controller at any time.
             </p>
             <div className="flex items-center gap-4 text-[10px] font-black uppercase tracking-[0.3em] text-blue-500 cursor-pointer hover:gap-6 transition-all group">
-               Sync Identity Control <RefreshCcw size={14} className="group-hover:rotate-180 transition-transform" />
+              Sync Identity Control <RefreshCcw size={14} className="group-hover:rotate-180 transition-transform" />
             </div>
           </div>
 
@@ -87,15 +87,13 @@ export default function Privacy() {
 
         {/* FOOTER */}
         <footer className="text-center space-y-10 pt-12">
-             <div className="h-px w-24 bg-white/5 mx-auto" />
-             <p className="text-slate-800 text-[10px] font-black uppercase tracking-[0.5em] max-w-sm mx-auto leading-loose italic opacity-30">
-                Authorized Governance Protocol. Last Synchronized: {new Date().getFullYear()} Cycle.
-             </p>
+          <div className="h-px w-24 bg-white/5 mx-auto" />
+          <p className="text-slate-800 text-[10px] font-black uppercase tracking-[0.5em] max-w-sm mx-auto leading-loose italic opacity-30">
+            Authorized Governance Protocol. Last Synchronized: {new Date().getFullYear()} Cycle.
+          </p>
         </footer>
 
       </div>
     </div>
-  );
-}
   );
 }

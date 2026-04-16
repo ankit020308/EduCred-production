@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { motion, useScroll, useTransform, useSpring, useMotionValue } from 'framer-motion';
+import { motion, useScroll, useTransform, useSpring, useMotionValue, AnimatePresence } from 'framer-motion';
 import {
   ArrowRight,
   BadgeCheck,
@@ -65,7 +65,7 @@ function MetricCard({ label, value, accent }) {
   return (
     <div className="glass-pane p-8 rounded-[2rem] border border-white/5 relative overflow-hidden group shadow-2xl">
       <div className="absolute top-0 right-0 w-24 h-24 bg-cyan-400/5 blur-[40px] rounded-full opacity-0 group-hover:opacity-100 transition-opacity" />
-      <p className="text-[9px] font-black uppercase tracking-[0.4em] font-mono text-slate-800">{label}</p>
+      <p className="text-[9px] font-black uppercase tracking-[0.4em] font-mono text-cyan-400/60">{label}</p>
       <p className={`mt-4 text-4xl font-black tracking-tighter uppercase ${accent}`}>{value}</p>
     </div>
   );
@@ -240,7 +240,7 @@ export default function Landing() {
               </>
             ) : (
               <>
-                <Link to="/login" className="text-[9px] font-black uppercase tracking-[0.4em] text-slate-800 hover:text-white transition-colors">
+                <Link to="/login" className="text-[9px] font-black uppercase tracking-[0.4em] text-cyan-400/60 hover:text-white transition-colors">
                   Authorize
                 </Link>
                 <Link
@@ -265,8 +265,9 @@ export default function Landing() {
               initial={{ opacity: 0, y: 24 }}
               animate={{ opacity: 1, y: 0 }}
               transition={transition}
+              className="relative z-10"
             >
-              <div className="inline-flex items-center gap-2 rounded-full border border-sky-400/20 bg-sky-400/10 px-4 py-2 text-[11px] font-black uppercase tracking-[0.26em] text-sky-200">
+              <div className="inline-flex items-center gap-2 rounded-full border border-cyan-400/20 bg-cyan-400/10 px-4 py-2 text-[11px] font-black uppercase tracking-[0.26em] text-cyan-200">
                 <Sparkles size={14} />
                 Verify in seconds
               </div>
@@ -306,8 +307,8 @@ export default function Landing() {
                   </Link>
                 </motion.div>
                 <motion.div
-                   whileHover={{ scale: 1.05 }}
-                   whileTap={{ scale: 0.95 }}
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
                 >
                   <Link
                     to="/signup"
@@ -356,7 +357,7 @@ export default function Landing() {
 
                 <div className="mt-6 rounded-[1.5rem] border border-white/8 bg-slate-950/60 p-5">
                   <div className="flex items-center gap-3">
-                    <div className="flex h-10 w-10 items-center justify-center rounded-2xl border border-sky-400/20 bg-sky-400/10 text-sky-200">
+                    <div className="flex h-10 w-10 items-center justify-center rounded-2xl border border-cyan-400/20 bg-cyan-400/10 text-cyan-200">
                       <BadgeCheck size={18} />
                     </div>
                     <div>
@@ -367,7 +368,7 @@ export default function Landing() {
                 </div>
               </div>
             </motion.div>
-          </div>
+          </motion.div>
         </section>
 
         <section id="features" className="px-6 py-32">
@@ -491,7 +492,7 @@ export default function Landing() {
                 <h2 className="text-5xl md:text-7xl font-black tracking-tighter text-white uppercase leading-none">
                   Establish Your <span className="text-cyan-400">Node.</span>
                 </h2>
-                <p className="text-xl text-slate-800 font-bold uppercase tracking-widest max-w-lg leading-relaxed">
+                <p className="text-xl text-cyan-400/60 font-bold uppercase tracking-widest max-w-lg leading-relaxed">
                   Launch the full certificate verification flow within the high-fidelity sovereign enclave.
                 </p>
               </div>

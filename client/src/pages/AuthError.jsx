@@ -35,20 +35,20 @@ export default function AuthError() {
         <h1 className="text-3xl font-extrabold text-white tracking-tighter uppercase mb-3">
           Auth Failed
         </h1>
-        <p className="text-[9px] font-black uppercase tracking-[0.4em] text-slate-500 mb-8">
+        <p className="text-[10px] font-black uppercase tracking-[0.4em] text-cyan-400/40 mb-8">
           Google identity verification was rejected or cancelled
         </p>
 
         {/* Error detail */}
-        <div className="bg-blue-500/[0.08] border border-blue-500/20 rounded-2xl p-5 mb-10 text-left">
-          <p className="text-slate-500 text-[9px] font-black uppercase tracking-[0.4em] leading-relaxed mb-10 max-w-xs mx-auto">
-            The path you're looking for doesn't exist on this protocol.
+        <div className="bg-rose-500/[0.03] border border-white/5 rounded-2xl p-6 mb-10 text-left">
+          <p className="text-rose-400/60 text-[10px] font-black uppercase tracking-[0.2em] leading-relaxed mb-6">
+            Protocol failure detected:
           </p>
-          <ul className="mt-3 space-y-1.5 text-blue-400/70 text-[10px] font-mono list-disc list-inside">
-            <li>Login was cancelled by user</li>
-            <li>Google account not permitted</li>
-            <li>OAuth callback URL mismatch</li>
-            <li>Session or network timeout</li>
+          <ul className="space-y-3 text-white/40 text-[9px] font-black uppercase tracking-widest list-none">
+            <li className="flex items-center gap-3"><div className="w-1 h-1 bg-rose-500 rounded-full" /> Login was cancelled by user</li>
+            <li className="flex items-center gap-3"><div className="w-1 h-1 bg-rose-500 rounded-full" /> Google account not permitted</li>
+            <li className="flex items-center gap-3"><div className="w-1 h-1 bg-rose-500 rounded-full" /> OAuth callback URL mismatch</li>
+            <li className="flex items-center gap-3"><div className="w-1 h-1 bg-rose-500 rounded-full" /> Session or network timeout</li>
           </ul>
         </div>
 

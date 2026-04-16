@@ -188,10 +188,16 @@ app.use((err, req, res, next) => {
 // ─── Seed Data (System Authorization) ────────────────
 async function seedSystem() {
   try {
-
     const shouldSeedAdmin = process.env.SEED_DEFAULT_ADMIN === 'true';
-
     if (!shouldSeedAdmin) return;
+
+    const adminEmail = process.env.ADMIN_EMAIL;
+    const adminPassword = process.env.ADMIN_PASSWORD;
+
+    if (!adminEmail || !adminPassword) {
+      console.warn('⚠️ [SEED]: Skipping administrative seeding - ADMIN_EMAIL or ADMIN_PASSWORD missing in .env');
+      return;
+    }
 
     const adminExists = await Registry.findOne('users', { email: adminEmail });
     if (adminExists) {

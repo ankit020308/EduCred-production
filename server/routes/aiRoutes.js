@@ -23,7 +23,7 @@ const router = express.Router();
  * - Secure by default
  *
  * Base: /api/ai
- /
+ */
 
 // ─────────────────────────────────────────────
 // 🔒 GLOBAL SECURITY

@@ -1,10 +1,9 @@
-// EduCred Integration Verification Script
-import Registry from '../server/services/registryService.js';
-import { isPinataConfigured, testPinataConnection } from '../server/utils/ipfsService.js';
-import { blockchainMode, getBlockchainRuntimeInfo } from '../server/utils/blockchain.js';
+import Registry from '../services/registryService.js';
+import { isPinataConfigured, testPinataConnection } from '../utils/ipfsService.js';
+import { blockchainMode, getBlockchainRuntimeInfo } from '../utils/blockchain.js';
 import dotenv from 'dotenv';
 
-dotenv.config({ path: './server/.env' });
+dotenv.config({ path: './.env' });
 
 async function verifyIntegration() {
     console.log('--- 🧪 EduCred Backend Integration Audit ---');
@@ -16,8 +15,9 @@ async function verifyIntegration() {
         const mode = Registry.isSimulation ? 'SIMULATION (In-Memory)' : 'SQL (PostgreSQL/Sequelize)';
         console.log(`Result: Storage active in ${mode} mode.`);
         
-        const testUser = await Registry.findOne('users', { email: 'ankit@educred.com' });
-        console.log(`Data Check: ${testUser ? '✅ Found master user' : '⚠️ Master user not found (Seeding might be needed)'}`);
+        const adminEmail = process.env.ADMIN_EMAIL || 'ankitaman0003@gmail.com';
+        const testUser = await Registry.findOne('users', { email: adminEmail });
+        console.log(`Data Check: ${testUser ? `✅ Found master user (${adminEmail})` : '⚠️ Master user not found (Seeding might be needed)'}`);
     } catch (err) {
         console.error('Result: ❌ Registry init failed:', err.message);
     }

@@ -20,15 +20,32 @@ const dbUrl = process.env.DATABASE_URL || 'postgres://postgres:password@localhos
 const sequelize = new Sequelize(dbUrl, {
     dialect: 'postgres',
     logging: process.env.NODE_ENV === 'development' ? (msg) => console.log(`[DB]: ${msg.substring(0, 100)}...`) : false,
+    dialectOptions: {
+        connectTimeout: 60000,
+        ssl: process.env.NODE_ENV === 'production' ? {
+            require: true,
+            rejectUnauthorized: false
+        } : false
+    },
     pool: {
         max: 5,
         min: 0,
-        acquire: 30000,
+        acquire: 60000,
         idle: 10000
     },
     define: {
-        timestamps: true, // Auto-manage createdAt/updatedAt
-        freezeTableName: true // Ensure table names match model names
+        timestamps: true,
+        freezeTableName: true
+    },
+    retry: {
+        match: [
+            /ConnectionError/,
+            /ConnectionRefusedError/,
+            /ConnectionTimedOutError/,
+            /SequelizeConnectionError/,
+            /SequelizeConnectionRefusedError/
+        ],
+        max: 3
     }
 });
 

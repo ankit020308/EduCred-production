@@ -152,7 +152,7 @@ export default function Signup() {
 
         {/* ─── LEFT PANEL ────────────────────────────────────────────── */}
         <div className="hidden lg:flex w-1/2 flex-col justify-between p-12 border-r border-white/[0.04] bg-[#020202]/80 backdrop-blur-md relative overflow-hidden">
-          <div className="absolute top-1/2 left-0 -translate-y-1/2 w-[800px] h-[800px] bg-blue-600/8 blur-[150px] rounded-full pointer-events-none" />
+          <div className="absolute top-1/2 left-0 -translate-y-1/2 w-[800px] h-[800px] bg-cyan-600/5 blur-[150px] rounded-full pointer-events-none" />
 
           {/* Logo */}
           <button onClick={() => navigate('/')} className="relative z-10 flex items-center gap-4 w-fit">
@@ -161,7 +161,7 @@ export default function Signup() {
             </div>
             <div>
               <span className="text-2xl font-black text-white tracking-tighter block uppercase leading-none">Edu<span className="text-cyan-400">Cred</span></span>
-              <span className="text-[9px] font-black uppercase tracking-[0.4em] text-slate-800 mt-2">Identity Deployment Oracle</span>
+              <span className="text-[9px] font-black uppercase tracking-[0.4em] text-cyan-400/40 mt-2">Identity Deployment Oracle</span>
             </div>
           </button>
 
@@ -173,10 +173,7 @@ export default function Signup() {
 
             {/* Telemetry */}
             <div className="bg-[#050505] border border-white/[0.06] rounded-2xl p-6 font-mono text-xs text-blue-400 space-y-2 shadow-[inset_0_0_30px_rgba(0,0,0,0.5)]">
-              <div className="flex items-center gap-2 mb-4 border-b border-white/[0.04] pb-3 text-slate-500">
-                <Terminal size={14} />
-                <span className="tracking-widest uppercase text-[10px] font-bold">Registration Telemetry</span>
-              </div>
+                <span className="tracking-widest uppercase text-[10px] font-bold text-cyan-400/60">Registration Telemetry</span>
               {logs.map((log, i) => (
                 <motion.div key={i} initial={{ opacity: 0, x: -8 }} animate={{ opacity: 1, x: 0 }} className="opacity-80 text-[11px]">
                   {log}
@@ -241,7 +238,7 @@ export default function Signup() {
                   )}
                 </div>
                 <h1 className="text-4xl font-black text-white tracking-tighter uppercase leading-none">{stepTitles[authStep]}</h1>
-                <p className="text-slate-800 text-[9px] font-black uppercase tracking-[0.4em] mt-2">{stepSubs[authStep]}</p>
+                <p className="text-cyan-400/40 text-[9px] font-black uppercase tracking-[0.4em] mt-2">{stepSubs[authStep]}</p>
               </div>
 
               {/* Step 0: Role Selection */}

@@ -49,52 +49,48 @@ function normalizeHash(certificateHash) {
 }
 
 async function initializeContract() {
-  if (!CONTRACT_ADDRESS || !CONTRACT_ABI || !PRIVATE_KEY || !RPC_URL) {
+  if (!CONTRACT_ADDRESS || !CONTRACT_ABI || !RPC_URL) {
     const missing = [];
     if (!CONTRACT_ADDRESS) missing.push('CONTRACT_ADDRESS');
-    if (!PRIVATE_KEY) missing.push('PRIVATE_KEY');
+    if (!CONTRACT_ABI) missing.push('CONTRACT_ABI');
     if (!RPC_URL) missing.push('RPC_URL');
 
     console.error(`❌ [BLOCKCHAIN]: Missing critical configuration: ${missing.join(', ')}`);
-
-    // Updated: Graceful fallback for missing config in production
-    if (isProduction) {
-      console.log("⚠️ Missing blockchain config — running in OFFLINE mode");
-      return;
-    }
     return;
   }
 
   const tempProvider = new ethers.JsonRpcProvider(RPC_URL);
 
   try {
-    // Connection check with 5s timeout
+    // Basic connectivity check
     await Promise.race([
       tempProvider.getBlockNumber(),
       new Promise((_, reject) =>
-        setTimeout(() => reject(new Error('Connection timeout — blockchain node unreachable')), 5000)
+        setTimeout(() => reject(new Error('Connection timeout')), 5000)
       ),
     ]);
 
-    wallet = new ethers.Wallet(PRIVATE_KEY, tempProvider);
-    eduCredContract = new ethers.Contract(CONTRACT_ADDRESS, CONTRACT_ABI, wallet);
     provider = tempProvider;
+    
+    // Initialize contract (Read-Only by default)
+    eduCredContract = new ethers.Contract(CONTRACT_ADDRESS, CONTRACT_ABI, provider);
+
+    if (PRIVATE_KEY) {
+      wallet = new ethers.Wallet(PRIVATE_KEY, provider);
+      eduCredContract = eduCredContract.connect(wallet);
+      console.log('✅ [BLOCKCHAIN]: Authoritative ledger connected (RW Mode)');
+    } else {
+      console.log('✅ [BLOCKCHAIN]: Authoritative ledger connected (Read-Only Mode)');
+    }
+
     runtimeMode = 'LIVE';
-    console.log('✅ [BLOCKCHAIN]: Authoritative ledger connected at', CONTRACT_ADDRESS);
   } catch (error) {
     try { tempProvider.destroy(); } catch { }
     provider = null;
     wallet = null;
     eduCredContract = null;
     runtimeMode = 'OFFLINE';
-
     console.error('❌ [BLOCKCHAIN_CRITICAL]: Failed to connect to ledger -', error.message);
-
-    // Updated: Graceful fallback for connection failure in production
-    if (isProduction) {
-      console.log("⚠️ Blockchain not connected in production — running in OFFLINE mode");
-      return;
-    }
   }
 }
 

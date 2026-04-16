@@ -37,20 +37,31 @@ class RegistryService {
      */
     async init() {
         try {
-            console.log('[REGISTRY] Initializing SQL storage protocol...');
-            await sequelize.authenticate();
-            await sequelize.sync({ alter: true });
+            console.log('[Registry] Initializing SQL storage protocol...');
             
-            console.log('[REGISTRY] SQL storage layer active.');
+            // Explicitly verify connection
+            await sequelize.authenticate();
+            
+            // Sync models (Safe by default, alter handles schema diffs)
+            const syncMode = process.env.DB_FORCE_SYNC === 'true' ? { force: true } : { alter: true };
+            await sequelize.sync(syncMode);
+            
+            console.log('✅ [Registry] SQL storage layer active & synced.');
             this.isSimulation = false;
             return true;
         } catch (error) {
+            // Production MUST have a functional database
             if (process.env.NODE_ENV === 'production') {
-                console.error(`[REGISTRY_CRITICAL] 🚨 Database connection failed in production: ${error.message}`);
-                throw new Error('Database connection failed. Registry cannot initialize.');
+                console.error(`[Registry_CRITICAL] 🚨 Database connection failed: ${error.message}`);
+                throw new Error('Database connection failed. Registry cannot initialize in production.');
             }
-            console.warn(`[REGISTRY] ⚠️ Database connection failed: ${error.message}`);
-            console.info('[REGISTRY] 🚀 Falling back to SIMULATION MODE (In-Memory).');
+
+            // Development fallback to Simulation Mode
+            console.warn(`⚠️ [Registry] Database connection failed: ${error.message}`);
+            if (error.original) {
+                console.warn(`🔍 [Detail]: ${error.original.code} - ${error.original.address}:${error.original.port}`);
+            }
+            console.info('🚀 [Registry] Falling back to SIMULATION MODE (In-Memory).');
             this.isSimulation = true;
             return true; 
         }
