@@ -283,7 +283,7 @@ export default function Signup() {
                   <div className="relative group/input">
                     <Mail className="absolute left-5 top-1/2 -translate-y-1/2 text-slate-600 group-focus-within/input:text-blue-500 transition-colors" size={18} />
                     <input
-                      type="email" placeholder="Email Address" required autoComplete="email" value={form.email}
+                      type="email" placeholder="Identity Email (name@email.com)" required autoComplete="email" value={form.email}
                       onChange={(e) => setForm({ ...form, email: e.target.value })}
                       className="w-full bg-[#111111] border border-white/[0.06] rounded-2xl py-4 pl-14 pr-5 text-white text-sm outline-none focus:border-blue-500/50 transition-all placeholder:text-slate-600"
                     />

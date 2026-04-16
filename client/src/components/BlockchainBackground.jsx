@@ -13,20 +13,22 @@ export default function BlockchainBackground({ isSurging = false }) {
   // Configuration Matrices
   const CONFIG = {
     node: {
-      count: 60, // Reduced from 90 for performance
-      baseSize: 1.0,
-      baseSpeed: 0.35,
-      color: "rgba(59, 130, 246, ", // Sapphire Blue
-      surgeColor: "rgba(255, 255, 255, ", // Pure White
+      count: 75, // Moderate density for "Hyper-Neural" feel
+      baseSize: 0.8,
+      baseSpeed: 0.25,
+      color: "rgba(34, 211, 238, ", // Hyper-Cyan
+      surgeColor: "rgba(99, 102, 241, ", // Electric Indigo
     },
     links: {
-      radius: 190,
-      baseWidth: 0.4,
-      surgeWidth: 1.2,
+      radius: 180,
+      baseWidth: 0.5,
+      surgeWidth: 1.5,
+      color: "rgba(34, 211, 238, ",
     },
     interaction: {
-      radius: 280,
-      gravity: 0.09,
+      radius: 350,
+      gravity: 0.12,
+      friction: 0.95
     }
   };
 
@@ -57,7 +59,7 @@ export default function BlockchainBackground({ isSurging = false }) {
 
     const drawGrid = (surge) => {
       ctx.beginPath();
-      ctx.strokeStyle = `rgba(59, 130, 246, ${0.03 + surge * 0.05})`;
+      ctx.strokeStyle = `rgba(34, 211, 238, ${0.02 + surge * 0.04})`;
       ctx.lineWidth = 0.5;
       const step = 60;
 
@@ -153,7 +155,7 @@ export default function BlockchainBackground({ isSurging = false }) {
             ctx.lineWidth = lineWidth;
 
             ctx.beginPath();
-            ctx.strokeStyle = `rgba(59, 130, 246, ${baseOpacity})`;
+            ctx.strokeStyle = `${CONFIG.links.color}${baseOpacity})`;
             ctx.moveTo(p1.x, p1.y);
             ctx.lineTo(p2.x, p2.y);
             ctx.stroke();
@@ -205,6 +207,13 @@ export default function BlockchainBackground({ isSurging = false }) {
 
       drawConnections(surge);
       drawShimmer(surge);
+
+      // 🎭 Vignette Overlay
+      const grad = ctx.createRadialGradient(width / 2, height / 2, 0, width / 2, height / 2, Math.max(width, height) * 0.8);
+      grad.addColorStop(0, "rgba(0, 0, 0, 0)");
+      grad.addColorStop(1, "rgba(0, 0, 0, 0.6)");
+      ctx.fillStyle = grad;
+      ctx.fillRect(0, 0, width, height);
 
       animationFrameId = requestAnimationFrame(animate);
     };

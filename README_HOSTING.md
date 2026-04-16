@@ -8,7 +8,7 @@ This guide outlines the professional deployment workflow for the EduCred platfor
 *   **Frontend**: React + Vite (Optimized for Vercel/Netlify)
 *   **Backend**: Node.js/Express (Optimized for Render/Railway/Heroku)
 *   **Blockchain**: Hardhat Node (Development) or Alchemy/Infura RPC (Production)
-*   **Database**: MongoDB Atlas (Cloud Managed)
+*   **Database**: PostgreSQL (Managed Service seperti Neon/Supabase/Render)
 
 ---
 
@@ -19,7 +19,7 @@ You MUST set these variables in your hosting provider's dashboard before launchi
 | Variable | Description | Example |
 | :--- | :--- | :--- |
 | `PORT` | Node server port | `5001` |
-| `MONGO_URI` | MongoDB Atlas Connection String | `mongodb+srv://user:pass@cluster.mongodb.net/educred` |
+| `DATABASE_URL` | PostgreSQL Connection String | `postgres://user:pass@host:5432/db` |
 | `RPC_URL` | Public Blockchain RPC (Polygon/Ethereum/Goerli) | `https://eth-mainnet.g.alchemy.com/v2/YOUR_KEY` |
 | `PRIVATE_KEY` | Institutional Admin Wallet Private Key | `0x... (Keep Secure!)` |
 | `JWT_SECRET` | Secret for Authentication Tokens | `a_long_random_string_here` |

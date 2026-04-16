@@ -223,7 +223,7 @@ export default function Login() {
                   {authStep === 0 ? 'Log In' : authStep === 1 ? 'Verify Password' : 'Authenticating'}
                 </h1>
                 <p className="text-slate-500 text-[10px] font-bold uppercase tracking-[0.2em]">
-                  {authStep === 0 ? 'Enter Institutional Email' : authStep === 1 ? 'Provide Security Credentials' : 'Establishing Consensus...'}
+                  {authStep === 0 ? 'Enter Registered Email' : authStep === 1 ? 'Provide Security Credentials' : 'Establishing Consensus...'}
                 </p>
               </div>
 
@@ -239,7 +239,7 @@ export default function Login() {
                         <input
                           type="email" required autoFocus autoComplete="email"
                           value={form.email} onChange={e => setForm({ ...form, email: e.target.value })}
-                          placeholder="EMAIL@UNIVERSITY.EDU"
+                          placeholder="NAME@EMAIL.COM"
                           className="w-full bg-[#111111] border border-white/[0.06] rounded-2xl py-4.5 pl-14 pr-6 text-white text-[11px] font-bold tracking-widest outline-none transition-all focus:border-blue-500/50 focus:bg-[#161616] placeholder:text-slate-700 uppercase"
                         />
                       </div>

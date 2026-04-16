@@ -188,8 +188,7 @@ app.use((err, req, res, next) => {
 // ─── Seed Data (System Authorization) ────────────────
 async function seedSystem() {
   try {
-    const adminEmail = requireEnv('ADMIN_EMAIL');
-    const adminPassword = requireEnv('ADMIN_PASSWORD');
+
     const shouldSeedAdmin = process.env.SEED_DEFAULT_ADMIN === 'true';
 
     if (!shouldSeedAdmin) return;

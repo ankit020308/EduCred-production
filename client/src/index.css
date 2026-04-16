@@ -5,22 +5,20 @@
    ────────────────────────────────────────────────────────────────────────── */
 @layer base {
   :root {
-    /* 🕋 FAANG-GRADE MATTE PALETTE (Deep Indigo/Sapphire Focus) */
+    /* 🕋 OBSIDIAN-SERIES PALETTE (Web3 Midnight Focus) */
     --color-bg-deep: #000000;
-    --color-bg-matte: #050505;
+    --color-bg-matte: #030303;
     --color-bg-surface: #0a0a0a;
-    --color-bg-elevated: #111111;
+    --color-bg-elevated: #121212;
 
-    /* 💎 SEAMLESS ACCENT ARCHITECTURE */
-    --color-blue-500: #3b82f6;
-    --color-amber-500: #f59e0b;
+    /* 💎 NEON ACCENT ARCHITECTURE */
+    --color-cyan-vivid: #22d3ee;
+    --color-indigo-vivid: #6366f1;
+    --color-border-subtle: rgba(255, 255, 255, 0.04);
 
-    /* 📄 NEOTERIC TYPOGRAPHY */
-    --color-text-vibrant: #ffffff;
-    --color-text-dim: #94a3b8;
-    --color-text-muted: #475569;
-
-    --font-sans: 'Inter', 'Satoshi', 'Geist', system-ui, sans-serif;
+    /* 📄 PREMIUM TYPOGRAPHY */
+    --font-sans: 'Inter', system-ui, sans-serif;
+    --font-mono: 'Geist Mono', 'SF Mono', monospace;
   }
 
   html {
@@ -31,117 +29,86 @@
   body {
     margin: 0;
     background-color: var(--color-bg-deep);
-    color: var(--color-text-vibrant);
+    color: #ffffff;
     font-family: var(--font-sans);
     -webkit-font-smoothing: antialiased;
-    overflow-x: hidden;
-  }
-
-  ::selection {
-    background-color: rgba(59, 130, 246, 0.2);
-    color: #ffffff;
+    letter-spacing: -0.01em;
   }
 }
 
 /* ──────────────────────────────────────────────────────────────────────────
-   🪄 UTILITIES: GLASS & GLOW SYSTEMS
+   🪄 UTILITIES: HIGH-END SURFACE SYSTEMS
    ────────────────────────────────────────────────────────────────────────── */
 
-  /* FAANG-Grade Glassmorphism */
 @utility glass-pane {
-  background: rgba(10, 10, 10, 0.8);
-  backdrop-filter: blur(40px) saturate(180%);
-  border: 1px solid rgba(255, 255, 255, 0.04);
-  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
-}
+  background: rgba(10, 10, 10, 0.6);
+  backdrop-filter: blur(48px) saturate(180%);
+  border: 1px solid var(--color-border-subtle);
+  position: relative;
+  overflow: hidden;
 
-/* Interactive Glow States */
-@utility glow-blue {
-  box-shadow: 0 0 80px -20px rgba(59, 130, 246, 0.15);
+  /* Subtle noise texture overlay */
+  &::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E");
+    opacity: 0.02;
+    pointer-events: none;
+  }
 }
 
 @utility glow-cyan {
-  box-shadow: 0 0 80px -20px rgba(6, 182, 212, 0.15);
+  box-shadow: 0 0 100px -20px rgba(34, 211, 238, 0.12);
 }
 
-@utility glow-rose {
-  box-shadow: 0 0 80px -20px rgba(244, 63, 94, 0.15);
+@utility glow-border-animated {
+  &::after {
+    content: "";
+    position: absolute;
+    inset: -1px;
+    background: conic-gradient(from 0deg, transparent 70%, var(--color-cyan-vivid) 100%);
+    mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+    mask-composite: exclude;
+    padding: 1px;
+    border-radius: inherit;
+    animation: rotate-glow 4s linear infinite;
+    opacity: 0;
+    transition: opacity 0.4s ease;
+  }
+  
+  &:hover::after {
+    opacity: 1;
+  }
 }
 
-@utility glow-amber {
-  box-shadow: 0 0 80px -20px rgba(245, 158, 11, 0.15);
-}
-
-@utility glow-indigo {
-  box-shadow: 0 0 80px -20px rgba(79, 70, 229, 0.15);
-}
-
-@utility glow-purple {
-  box-shadow: 0 0 80px -20px rgba(147, 51, 234, 0.15);
-}
-
-@utility text-glow-blue {
-  text-shadow: 0 0 15px rgba(59, 130, 246, 0.5);
-}
-
-@utility text-glow-indigo {
-  text-shadow: 0 0 15px rgba(79, 70, 229, 0.5);
-}
-
-/* Precision Typography */
-@utility tracking-widest {
-  letter-spacing: 0.25em;
-}
-
-@utility tracking-command {
-  letter-spacing: 0.4em;
+@keyframes rotate-glow {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
 }
 
 /* Linear-style Grid & Mesh */
 @utility mesh-grid {
   background-image:
-    radial-gradient(circle at 1px 1px, rgba(255, 255, 255, 0.03) 1px, transparent 0);
-  background-size: 32px 32px;
+    linear-gradient(rgba(255, 255, 255, 0.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
+  background-size: 40px 40px;
 }
 
-@utility mask-radial-fade {
-  mask-image: radial-gradient(circle at center, black 30%, transparent 100%);
+@utility text-premium-tight {
+  letter-spacing: -0.04em;
+  line-height: 0.95;
 }
 
-/* Custom Smooth Scrollbar */
-@utility custom-scrollbar {
-  &::-webkit-scrollbar {
-    width: 4px;
-  }
-
-  &::-webkit-scrollbar-track {
-    background: transparent;
-  }
-
-  &::-webkit-scrollbar-thumb {
-    background: rgba(255, 255, 255, 0.1);
-    border-radius: 10px;
-  }
-}
-
-/* Emissive text glow — referenced across Landing, Verifier, SystemAdmin */
-@utility text-glow-emissive {
-  text-shadow:
-    0 0 20px rgba(99, 102, 241, 0.6),
-    0 0 60px rgba(99, 102, 241, 0.3),
-    0 0 100px rgba(99, 102, 241, 0.1);
-}
-
-/* Shimmer skeleton loading animation */
 @utility shimmer {
   background: linear-gradient(
     90deg,
-    rgba(255,255,255,0.03) 0%,
-    rgba(255,255,255,0.08) 50%,
-    rgba(255,255,255,0.03) 100%
+    rgba(255,255,255,0) 0%,
+    rgba(255,255,255,0.05) 50%,
+    rgba(255,255,255,0) 100%
   );
   background-size: 200% 100%;
-  animation: shimmer 1.6s ease-in-out infinite;
+  animation: shimmer 2s ease-in-out infinite;
 }
 
 /* ──────────────────────────────────────────────────────────────────────────
@@ -173,77 +140,67 @@
 /* ──────────────────────────────────────────────────────────────────────────
    🌀 QUANTUM MOTION: HIGH-FIDELITY ANIMATIONS
    ────────────────────────────────────────────────────────────────────────── */
-@keyframes scan {
-  0% {
-    transform: translateY(-100%);
-    opacity: 0;
-  }
+/* ──────────────────────────────────────────────────────────────────────────
+   🧬 NARRATIVE FX: GLITCH & HOLOGRAMS
+   ────────────────────────────────────────────────────────────────────────── */
 
-  50% {
-    opacity: 1;
-  }
-
-  100% {
-    transform: translateY(1000%);
-    opacity: 0;
-  }
-}
-
-@keyframes pulse-mesh {
-
-  0%,
-  100% {
-    opacity: 0.2;
-  }
-
-  50% {
-    opacity: 0.4;
-  }
-}
-
-@keyframes levitate {
-
-  0%,
-  100% {
-    transform: translateY(0);
-  }
-
-  50% {
-    transform: translateY(-10px);
+@utility text-glitch {
+  position: relative;
+  &:hover {
+    &::before, &::after {
+      content: attr(data-text);
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      z-index: -1;
+    }
+    &::before {
+      color: #0ff;
+      animation: glitch-anim 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94) both infinite;
+    }
+    &::after {
+      color: #f0f;
+      animation: glitch-anim 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94) reverse both infinite;
+    }
   }
 }
 
-@keyframes marquee {
-  0% {
-    transform: translateX(0);
-  }
-
-  100% {
-    transform: translateX(-50%);
-  }
+@keyframes glitch-anim {
+  0% { transform: translate(0); }
+  20% { transform: translate(-2px, 2px); }
+  40% { transform: translate(-2px, -2px); }
+  60% { transform: translate(2px, 2px); }
+  80% { transform: translate(2px, -2px); }
+  100% { transform: translate(0); }
 }
 
-@keyframes shimmer {
-  0% { background-position: 200% 0; }
-  100% { background-position: -200% 0; }
+@utility holographic-edge {
+  background: linear-gradient(
+    45deg,
+    rgba(34, 211, 238, 0.2) 0%,
+    rgba(99, 102, 241, 0.2) 50%,
+    rgba(34, 211, 238, 0.2) 100%
+  );
+  background-size: 200% 200%;
+  animation: holographic-slide 4s linear infinite;
 }
 
-@keyframes toast-in {
-  from { opacity: 0; transform: translateY(16px) scale(0.96); }
-  to   { opacity: 1; transform: translateY(0)    scale(1); }
+@keyframes holographic-slide {
+  0% { background-position: 0% 50%; }
+  100% { background-position: 200% 50%; }
 }
 
-@keyframes toast-out {
-  from { opacity: 1; transform: translateY(0)    scale(1); }
-  to   { opacity: 0; transform: translateY(-8px) scale(0.96); }
+/* SVG Path Flow animation for Schematics */
+.path-flow {
+  stroke-dasharray: 10, 10;
+  animation: flow 1s linear infinite;
 }
 
-.animate-scan {
-  animation: scan 4s linear infinite;
-}
-
-.animate-levitate {
-  animation: levitate 5s ease-in-out infinite;
+@keyframes flow {
+  from { stroke-dashoffset: 20; }
+  to { stroke-dashoffset: 0; }
 }
 
 /* 🎨 SCROLLBAR THEME (CHROME/SAFARI) */

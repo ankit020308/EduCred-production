@@ -71,7 +71,8 @@ export const register = async (req, res) => {
 
     if (error) return res.status(400).json({ error: error.details[0].message });
 
-    const { name, email, password, role, universityName } = req.body;
+    const { name, email: rawEmail, password, role, universityName } = req.body;
+    const email = rawEmail.toLowerCase();
 
     const existing = await Registry.findOne('users', { email });
     if (existing) {
@@ -148,7 +149,8 @@ export const login = async (req, res) => {
     const { error } = loginSchema.validate(req.body);
     if (error) return res.status(400).json({ error: error.details[0].message });
 
-    const { email, password } = req.body;
+    const { email: rawEmail, password } = req.body;
+    const email = rawEmail.toLowerCase();
     const user = await Registry.findOne('users', { email });
 
     if (!user || !(await bcrypt.compare(password, user.passwordHash))) {
@@ -194,7 +196,8 @@ export const login = async (req, res) => {
 export const verifyOTP = async (req, res) => {
   try {
     // Basic validation for OTP
-    const { email, otp } = req.body;
+    const { email: rawEmail, otp } = req.body;
+    const email = rawEmail.toLowerCase();
     if (!email || !otp) return res.status(400).json({ error: 'Email and security key are required.' });
 
     const user = await Registry.findOne('users', { email });
@@ -263,7 +266,8 @@ export const verifyOTP = async (req, res) => {
  */
 export const resendOTP = async (req, res) => {
   try {
-    const { email } = req.body;
+    const { email: rawEmail } = req.body;
+    const email = rawEmail.toLowerCase();
     if (!email) return res.status(400).json({ error: 'Email is required.' });
 
     const user = await Registry.findOne('users', { email });
@@ -349,13 +353,14 @@ export const googleLogin = async (req, res) => {
       return res.status(400).json({ error: 'Google account email is unavailable.' });
     }
 
-    const { name, email, picture, sub: googleId } = payload;
+    const email = payload.email.toLowerCase();
+    const { name, picture, sub: googleId } = payload;
 
     let user = await Registry.findOne('users', { email });
 
     if (!user) {
       // Auto-provision new node if it doesn't exist
-
+      user = await Registry.insert('users', {
         name,
         email,
         passwordHash: crypto.randomBytes(16).toString('hex'), // Randomized password for social-only nodes
@@ -481,7 +486,8 @@ export const getMe = async (req, res) => {
  */
 export const createAdmin = async (req, res) => {
   try {
-    const { name, email, password, role } = req.body;
+    const { name, email: rawEmail, password, role } = req.body;
+    const email = rawEmail.toLowerCase();
 
     if (!name || !email || !password || !role) {
       return res.status(400).json({ error: 'All fields (name, email, password, role) are required.' });

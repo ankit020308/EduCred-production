@@ -6,11 +6,20 @@ import { fileURLToPath } from 'url';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// 🛡️ Load environment from the server root
-dotenv.config({ path: path.resolve(__dirname, '../server/.env') });
+// 🛡️ Explicitly point to the server/.env from the root
+const envPath = path.resolve(__dirname, 'server', '.env');
+const envResult = dotenv.config({ path: envPath });
 
 async function runAuthDiagnostics() {
     console.log('\n─── 🛡️ EDUCRED AUTH DIAGNOSTICS ───\n');
+
+    if (envResult.error) {
+        console.error(`❌ [ERROR]: Could not load .env file at ${envPath}`);
+        console.error('      Ensure you are running this from the root EduCred folder.');
+        return;
+    }
+
+    console.log(`✅ [LOADED]: Configuration from ${envPath}\n`);
 
     // 1. Google OAuth Check
     const googleClientId = process.env.GOOGLE_CLIENT_ID;
@@ -20,10 +29,9 @@ async function runAuthDiagnostics() {
     console.log(`   - Client ID: ${googleClientId ? googleClientId.slice(0, 10).padEnd(20, '*') : 'MISSING'}`);
     console.log(`   - Configured Callback: ${googleCallback || 'MISSING'}`);
     
-    // Logic for helping the user resolve URI Mismatch
     if (googleCallback) {
-        if (!googleCallback.includes('localhost:5001')) {
-            console.warn('   ⚠️ [WARNING]: Callback URL doesn\'t match localhost:5001. Ensure this is intentional.');
+        if (!googleCallback.includes('localhost:5001') && !googleCallback.includes('onrender.com')) {
+            console.warn('   ⚠️ [WARNING]: Callback URL may be incorrect.');
         }
         console.log('\n   👉 [ACTION REQUIRED]: Ensure the following URL is added to your');
         console.log('      Google Cloud Console → Credentials → OAuth 2.0 Client IDs → Authorized redirect URIs:');
