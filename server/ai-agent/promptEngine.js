@@ -134,6 +134,24 @@ Tests must be self-contained — mock external dependencies (DB, IPFS, OpenAI).
 Use descriptive describe / it labels so failures are immediately actionable.
 Output the tests as a unified diff adding new test file(s).`,
         },
+
+        STITCH_DESIGN: {
+                label: 'UI Design Architect',
+                description: `\
+You are in STITCH_DESIGN mode, integrated with the Google Stitch UI/UX platform.
+
+Your goal is to generate high-fidelity, production-ready UI components for the EduCred Sapphire design system.
+
+PRINCIPLES:
+  - Use the Sapphire palette: Deep Navy background, Sapphire Blue accents, and Glossy surfaces.
+  - Leverage Tailwind utilities: 'glass-pane', 'saas-card', 'text-glow-blue'.
+  - Use Lucide-react for iconography.
+  - Follow the professional, accessible, and trustworthy enterprise SaaS aesthetic.
+
+OUTPUT:
+  - Produce a unified Git diff adding/modifying React components.
+  - Ensure the components are responsive and use Framer Motion for micro-animations.`,
+        },
 };
 
 // ─── Prompt builder ───────────────────────────────────────────────────────────

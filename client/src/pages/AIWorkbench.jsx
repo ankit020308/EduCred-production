@@ -10,14 +10,14 @@ import {
 } from 'lucide-react';
 import api from '../services/api';
 import { useAuth } from '../context/AuthContext';
-import BlockchainBackground from '../components/BlockchainBackground';
+import { useToast } from '../components/Toast';
 import { useToast } from '../components/Toast';
 
-// 💠 OBSIDIAN ANIMATION PROTOCOL
+// 💠 UI ANIMATIONS
 const containerTransition = {
-  initial: { opacity: 0, y: 20 },
-  animate: { opacity: 1, y: 0 },
-  transition: { duration: 0.6, ease: [0.22, 1, 0.36, 1] }
+  initial: { opacity: 0, scale: 0.98 },
+  animate: { opacity: 1, scale: 1 },
+  transition: { duration: 0.8, ease: [0.22, 1, 0.36, 1] }
 };
 
 const diffTransition = {
@@ -28,8 +28,8 @@ const diffTransition = {
 };
 
 /**
- * 🕵️ AI Workbench: Forensic Code Engineering Node
- * Allows Super Admins to request, review, and anchor AI-generated features.
+ * 🛠️ AI Workbench: Feature Generation Node
+ * Allows administrators to request, review, and apply AI-generated code features.
  */
 export default function AIWorkbench() {
   const { user } = useAuth();
@@ -62,7 +62,7 @@ export default function AIWorkbench() {
       setModes(res.data.modes || []);
     } catch (err) {
       console.error('Failed to fetch AI modes:', err);
-      toast.error('AI Agent offline. Check node connection.');
+      toast.error('Intelligence system offline.');
     }
   };
 
@@ -81,7 +81,7 @@ export default function AIWorkbench() {
       setGeneratedOutput(res.data);
       toast.success('Feature logic generated successfully.');
     } catch (err) {
-      const errMsg = err.response?.data?.error || 'Intelligence engine timeout.';
+      const errMsg = err.response?.data?.error || 'Integration timeout.';
       setError(errMsg);
       toast.error(errMsg);
     } finally {
@@ -94,16 +94,16 @@ export default function AIWorkbench() {
 
     setIsApplying(true);
     try {
-      const res = await api.post('/api/ai/apply-patch', {
+      await api.post('/api/ai/apply-patch', {
         filePath: filePath,
         patch: generatedOutput.patch
       });
 
-      toast.success('Patch anchored to filesystem.');
+      toast.success('Changes applied to filesystem.');
       setGeneratedOutput(null);
       setPrompt('');
     } catch (err) {
-      toast.error(err.response?.data?.error || 'Patch application failed.');
+      toast.error(err.response?.data?.error || 'Failed to apply changes.');
     } finally {
       setIsApplying(false);
     }
@@ -116,7 +116,7 @@ export default function AIWorkbench() {
       let bg = '';
       if (line.startsWith('+')) { color = 'text-emerald-400'; bg = 'bg-emerald-500/5'; }
       if (line.startsWith('-')) { color = 'text-rose-400'; bg = 'bg-rose-500/5'; }
-      if (line.startsWith('@@')) { color = 'text-cyan-400'; bg = 'bg-cyan-500/5'; }
+      if (line.startsWith('@@')) { color = 'text-blue-400'; bg = 'bg-blue-500/5'; }
 
       return (
         <div key={i} className={`font-mono text-[10px] py-0.5 px-3 flex gap-4 ${bg}`}>
@@ -128,75 +128,76 @@ export default function AIWorkbench() {
   };
 
   return (
-    <div className="relative min-h-screen bg-[#F8FAFC] text-slate-800 font-sans selection:bg-blue-500/30 overflow-hidden">
+  return (
+    <div className="relative min-h-screen bg-[#F9FAFB]">
+      
+      {/* 🏔️ CLEAN BACKGROUND ELEMENTS */}
+      <div className="absolute inset-0 overflow-hidden pointer-events-none">
+        <div className="absolute top-[5%] right-[-5%] w-[40%] h-[40%] bg-blue-500/5 blur-[120px] rounded-full" />
+      </div>
 
-      {/* 🌌 BACKGROUND GRADIENT */}
-      <div className="fixed inset-0 bg-[#0B132B] pointer-events-none z-0" />
-      <div className="fixed inset-0 hero-gradient pointer-events-none" />
-
-      <div className="container max-w-[1400px] mx-auto px-6 pt-32 pb-24 relative z-10 space-y-12">
+      <div className="relative z-10 space-y-16 p-8 md:p-12 max-w-[1600px] mx-auto">
 
         {/* HEADER SECTION */}
-        <motion.div {...containerTransition} className="flex flex-col md:flex-row md:items-end justify-between gap-12">
-          <div className="space-y-6">
-            <div className="flex items-center gap-4 px-4 py-1.5 bg-blue-500/10 border border-blue-500/20 rounded-full w-fit">
-              <div className="w-2 h-2 rounded-full bg-blue-500 animate-pulse" />
-              <span className="text-[9px] font-black text-blue-600 uppercase tracking-widest">Enterprise AI Builder</span>
+        <motion.div {...containerTransition} className="flex flex-col md:flex-row md:items-end justify-between gap-12 border-b border-[#E5E7EB] pb-12">
+          <div className="space-y-8">
+            <div className="flex items-center gap-4 px-6 py-2 bg-blue-500/5 border border-blue-500/10 rounded-full w-fit">
+              <span className="text-[10px] font-black text-[#60A5FA] uppercase tracking-[0.2em]">Platform Design Node</span>
             </div>
-            <h1 className="text-6xl md:text-[5.5rem] font-black text-white tracking-tighter leading-[0.9] uppercase">
-              Feature <span className="text-blue-500">Workbench.</span>
+            <h1 className="text-6xl md:text-8xl font-black text-[#2C2F33] tracking-tighter leading-none uppercase">
+              AI <span className="opacity-30 italic">Workbench.</span>
             </h1>
-            <p className="text-slate-400 text-[10px] font-black uppercase tracking-[0.4em] flex items-center gap-4">
-              <Cpu size={14} className="text-blue-500/60" /> Advanced Feature Generation & Code Review
+            <p className="text-[#4B5563] text-[11px] font-black uppercase tracking-[0.3em] flex items-center gap-6 italic">
+              <Cpu size={18} className="text-[#60A5FA]" /> Professional Feature Architecture
             </p>
           </div>
 
-          <div className="flex gap-4">
+          <div className="flex gap-6">
             <button
               onClick={() => { setGeneratedOutput(null); setPrompt(''); }}
-              className="h-14 w-14 rounded-2xl bg-white/5 border border-white/10 backdrop-blur-md flex items-center justify-center text-white/40 hover:text-blue-500 transition-all shadow-xl group"
+              className="h-16 w-16 rounded-2xl bg-white border border-[#E5E7EB] flex items-center justify-center text-[#4B5563] hover:text-[#60A5FA] hover:border-[#60A5FA]/30 transition-all shadow-sm"
             >
-              <RefreshCcw size={20} className="group-hover:rotate-180 transition-transform duration-500" />
+              <RefreshCcw size={22} />
             </button>
-            <div className="h-14 px-8 rounded-2xl bg-white/5 border border-white/10 flex items-center gap-4 text-white/40 shadow-xl group hover:text-blue-500 transition-colors cursor-pointer">
-              <History size={20} className="opacity-20 group-hover:opacity-100" />
-              <span className="text-[10px] font-black uppercase tracking-widest">History</span>
+            <div className="h-16 px-10 rounded-2xl bg-white border border-[#E5E7EB] flex items-center gap-6 text-[#2C2F33] hover:bg-slate-50 transition-all cursor-pointer shadow-sm">
+              <History size={22} className="text-[#4B5563]" />
+              <span className="text-[11px] font-black uppercase tracking-[0.2em]">Archives</span>
             </div>
           </div>
         </motion.div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 items-start">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-16 items-start">
 
           {/* 🧩 CONFIGURATION (Left Panel) */}
           <motion.div
             {...containerTransition}
             transition={{ delay: 0.1 }}
-            className="lg:col-span-5 space-y-8"
+            className="lg:col-span-5 space-y-12"
           >
-            <div className="bg-white p-10 rounded-[2.5rem] border border-slate-100 shadow-2xl shadow-slate-900/10 space-y-10 relative overflow-hidden">
-              <div className="absolute top-0 right-0 w-32 h-32 bg-blue-500/5 blur-[60px] rounded-full" />
+            <div className="bg-white p-12 rounded-[3rem] border border-[#E5E7EB] shadow-2xl space-y-12 relative overflow-hidden">
+              <div className="absolute top-0 right-0 w-48 h-48 bg-blue-500/5 blur-[80px] rounded-full" />
 
-              <div className="space-y-8">
-                <div className="flex items-center gap-5">
-                  <div className="p-3 bg-blue-50 rounded-2xl border border-blue-100 shadow-sm">
-                    <Zap className="text-blue-600" size={24} />
+              <div className="space-y-12">
+                <div className="flex items-center gap-6">
+                  <div className="w-16 h-16 bg-blue-500/5 border border-blue-500/10 rounded-3xl flex items-center justify-center">
+                    <Zap className="text-[#60A5FA]" size={28} />
                   </div>
                   <div>
-                    <h3 className="text-[11px] font-black uppercase tracking-widest text-slate-900 leading-none">AI Operation</h3>
-                    <p className="text-[9px] text-slate-400 mt-2 font-black uppercase tracking-widest">Select logic generation mode</p>
+                    <h3 className="text-[14px] font-black uppercase tracking-[0.2em] text-[#2C2F33]">Architectural Protocol</h3>
+                    <p className="text-[10px] text-[#4B5563] mt-2 font-black uppercase tracking-widest leading-none">Intelligence mode selection</p>
                   </div>
                 </div>
 
                 {/* Mode Grid */}
-                <div className="grid grid-cols-2 gap-4">
-                  {modes.map(mode => (
+                <div className="grid grid-cols-2 gap-5">
+                  {[...modes, 'STITCH_DESIGN'].map(mode => (
                     <button
                       key={mode}
                       onClick={() => setSelectedMode(mode)}
-                      className={`py-4 px-6 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all border
+                      className={`h-16 px-6 rounded-2xl text-[10px] font-black uppercase tracking-[0.15em] transition-all border
                         ${selectedMode === mode
-                          ? 'bg-blue-600 border-blue-700 text-white shadow-lg shadow-blue-500/20'
-                          : 'bg-slate-50 border-slate-100 text-slate-400 hover:text-slate-900 hover:bg-slate-100'}`}
+                          ? 'bg-[#2C2F33] border-[#2C2F33] text-white shadow-xl shadow-slate-900/10'
+                          : 'bg-[#F9FAFB] border-[#E5E7EB] text-[#4B5563] hover:text-[#2C2F33] hover:bg-white'}`}
                     >
                       {mode.replace(/_/g, ' ')}
                     </button>
@@ -204,131 +205,136 @@ export default function AIWorkbench() {
                 </div>
 
                 {/* File Path */}
-                <div className="space-y-4">
-                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Target File Path</label>
+                <div className="space-y-5">
+                  <label className="text-[11px] font-black text-[#4B5563] uppercase tracking-[0.2em] ml-2">Target Filecontext</label>
                   <div className="relative group">
-                    <FileCode className="absolute left-5 top-1/2 -translate-y-1/2 text-slate-300 group-focus-within:text-blue-500 transition-colors" size={18} />
+                    <FileCode className="absolute left-6 top-1/2 -translate-y-1/2 text-[#D1D5DB] group-focus-within:text-[#60A5FA] transition-colors" size={22} />
                     <input
                       value={filePath}
                       onChange={(e) => setFilePath(e.target.value)}
                       placeholder="e.g. server/controllers/certificateController.js"
-                      className="w-full bg-slate-50 border border-slate-200 rounded-xl py-5 pl-14 pr-6 text-sm font-medium text-slate-900 outline-none focus:border-blue-500 transition-all shadow-sm"
+                      className="w-full h-16 bg-[#F9FAFB] border border-[#E5E7EB] rounded-2xl pl-16 pr-6 text-[12px] font-bold text-[#111827] outline-none focus:bg-white focus:border-[#60A5FA] transition-all shadow-inner uppercase tracking-[0.1em] placeholder:text-[#9CA3AF]"
                     />
                   </div>
                 </div>
 
                 {/* Prompt Area */}
-                <div className="space-y-4">
-                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Feature Description</label>
+                <div className="space-y-5">
+                  <label className="text-[11px] font-black text-[#4B5563] uppercase tracking-[0.2em] ml-2">Generation Directive</label>
                   <textarea
                     value={prompt}
                     onChange={(e) => setPrompt(e.target.value)}
-                    rows={6}
-                    placeholder="Describe the functionality you'd like the AI to generate..."
-                    className="w-full bg-slate-50 border border-slate-200 rounded-[2rem] p-8 text-sm font-medium text-slate-900 outline-none focus:border-blue-500 transition-all shadow-sm resize-none leading-relaxed"
+                    rows={7}
+                    placeholder="Describe the high-fidelity component or logic enhancement..."
+                    className="w-full bg-[#F9FAFB] border border-[#E5E7EB] rounded-[2rem] p-10 text-[14px] font-medium text-[#111827] outline-none focus:bg-white focus:border-[#60A5FA] transition-all shadow-inner resize-none leading-relaxed tracking-wide placeholder:text-[#9CA3AF]"
                   />
                 </div>
 
                 <button
                   onClick={handleGenerate}
                   disabled={isGenerating || !prompt.trim()}
-                  className="btn-primary w-full h-16 shadow-blue-500/20"
+                  className="w-full h-18 bg-[#2C2F33] text-white rounded-2xl text-[12px] font-black uppercase tracking-[0.3em] hover:bg-[#1F2937] hover:scale-[1.02] transition-all shadow-xl disabled:bg-slate-100 disabled:text-slate-300 flex items-center justify-center gap-6"
                 >
                   {isGenerating ? (
                     <>
-                      <Loader2 size={24} className="animate-spin" />
-                      Generating Logic...
+                      <Loader2 size={28} className="animate-spin opacity-40" />
+                      Initializing...
                     </>
                   ) : (
                     <>
-                      <Play size={20} fill="currentColor" />
-                      Generate Enhancement
+                      <Play size={24} fill="currentColor" />
+                      Assemble Architecture
                     </>
                   )}
                 </button>
               </div>
             </div>
 
-            <div className="bg-amber-50 border border-amber-100 p-6 rounded-[2rem] flex gap-5 shadow-sm">
-              <ShieldAlert className="text-amber-500 flex-shrink-0" size={24} />
-              <p className="text-[10px] text-amber-700/80 leading-relaxed font-black uppercase tracking-widest">
-                AI enhancements are reviewed by our security filters. Destructive operations are restricted.
+            <div className="bg-amber-50 border border-amber-100 p-10 rounded-[2.5rem] flex gap-8 shadow-xl">
+              <ShieldAlert className="text-amber-600 flex-shrink-0" size={28} />
+              <p className="text-[11px] text-[#4B5563] leading-relaxed font-black uppercase tracking-[0.15em] italic opacity-80">
+                Architectural changes are sandboxed. Review all diffs before finalizing the commitment.
               </p>
             </div>
           </motion.div>
 
           {/* 📝 CODE REVIEWER (Right Panel) */}
-          <div className="lg:col-span-7 h-full min-h-[600px]">
+          <div className="lg:col-span-7 h-full min-h-[850px]">
             <AnimatePresence mode="wait">
               {!generatedOutput && !isGenerating ? (
                 <motion.div
                   key="empty"
                   initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-                  className="h-full flex flex-col items-center justify-center border-2 border-dashed border-slate-100 rounded-[2.5rem] bg-white/50 text-center space-y-6"
+                  className="h-full flex flex-col items-center justify-center border border-[#E5E7EB] rounded-[3.5rem] bg-white text-center space-y-10 shadow-2xl"
                 >
-                  <div className="w-20 h-20 bg-slate-50 rounded-3xl flex items-center justify-center text-slate-200 border border-slate-100">
-                    <Terminal size={40} />
+                  <div className="w-28 h-28 bg-[#F3F4F6] rounded-full flex items-center justify-center text-[#D1D5DB] border border-[#E5E7EB] shadow-inner">
+                    <Terminal size={56} />
                   </div>
-                  <div className="space-y-2">
-                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Awaiting Input</p>
-                    <p className="text-[11px] text-slate-300 font-medium max-w-xs mx-auto">Configure your feature request to start building.</p>
+                  <div className="space-y-4">
+                    <p className="text-[14px] font-black text-[#2C2F33] uppercase tracking-[0.3em]">Workbench Node: Waiting</p>
+                    <p className="text-[11px] text-[#4B5563] font-black uppercase tracking-[0.2em] max-w-xs mx-auto italic opacity-60">Assemble your build directive to begin.</p>
                   </div>
                 </motion.div>
               ) : isGenerating ? (
                 <motion.div
                   key="loading"
                   initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-                  className="h-full flex flex-col items-center justify-center space-y-10"
+                  className="h-full flex flex-col items-center justify-center space-y-16"
                 >
                   <div className="relative">
-                    <div className="absolute inset-0 border-4 border-blue-500/10 rounded-full animate-ping" />
-                    <div className="h-24 w-24 border-b-2 border-blue-600 rounded-full animate-spin shadow-xl shadow-blue-500/20" />
+                    <Loader2 size={120} className="text-[#60A5FA] animate-spin opacity-20" />
+                    <div className="absolute inset-0 flex items-center justify-center">
+                      <Cpu size={56} className="text-[#2C2F33] animate-pulse" />
+                    </div>
                   </div>
-                  <div className="text-center space-y-3">
-                    <p className="text-[12px] font-black text-slate-900 uppercase tracking-widest">AI Agent Analysis</p>
-                    <p className="text-[10px] text-slate-400 uppercase tracking-widest font-black animate-pulse">Scanning application context...</p>
+                  <div className="text-center space-y-6">
+                    <p className="text-[18px] font-black text-[#2C2F33] uppercase tracking-[0.4em] leading-none">Architecting Feature</p>
+                    <p className="text-[11px] text-[#4B5563] uppercase tracking-[0.2em] font-black opacity-60 italic">Resolving context dependencies...</p>
                   </div>
                 </motion.div>
               ) : (
                 <motion.div
                   key="output"
                   {...diffTransition}
-                  className="flex flex-col h-full space-y-8"
+                  className="flex flex-col h-full space-y-10"
                 >
-                  <div className="flex-1 flex flex-col bg-white border border-slate-100 rounded-[2.5rem] overflow-hidden shadow-2xl shadow-slate-900/10 h-full">
-                    <div className="p-8 border-b border-slate-50 flex items-center justify-between bg-slate-50/50">
-                      <div className="flex items-center gap-4">
-                        <div className="w-2.5 h-2.5 rounded-full bg-blue-500 shadow-lg shadow-blue-500/40 animate-pulse" />
-                        <span className="text-[10px] font-black uppercase tracking-widest text-slate-900">Review Changes</span>
-                        <div className="h-4 w-px bg-slate-200 mx-2" />
-                        <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest truncate max-w-[200px]">{filePath}</span>
+                  <div className="flex-1 flex flex-col bg-white border border-[#E5E7EB] rounded-[3rem] overflow-hidden shadow-2xl h-full">
+                    <div className="px-12 py-10 border-b border-[#E5E7EB] flex items-center justify-between bg-[#F9FAFB]">
+                      <div className="flex items-center gap-6">
+                        <div className="w-3 h-3 rounded-full bg-[#60A5FA]" />
+                        <span className="text-[12px] font-black uppercase tracking-[0.2em] text-[#2C2F33]">Registry Patch Review</span>
+                        <div className="h-5 w-px bg-[#E5E7EB] mx-3" />
+                        <span className="text-[11px] font-black text-[#4B5563] uppercase tracking-[0.1em] truncate max-w-[250px] opacity-60 italic">{filePath}</span>
                       </div>
-                      <div className="px-5 py-2 bg-blue-50 text-blue-600 text-[9px] font-black uppercase tracking-widest rounded-xl border border-blue-100 shadow-sm">
-                        Confidence: {(generatedOutput.confidence * 100).toFixed(0)}%
+                      <div className="px-6 py-2.5 bg-blue-50 text-[#60A5FA] text-[11px] font-black uppercase tracking-[0.2em] rounded-xl border border-blue-100">
+                        Reliability Factor: {(generatedOutput.confidence * 100).toFixed(0)}%
                       </div>
                     </div>
 
-                    <div className="flex-1 overflow-y-auto bg-slate-950 p-6 font-mono text-sm leading-relaxed">
-                      {renderDiff(generatedOutput.patch || 'No changes required.')}
+                    <div className="flex-1 overflow-y-auto bg-slate-50 p-12 font-mono text-[11px] leading-loose selection:bg-blue-100">
+                      {renderDiff(generatedOutput.patch || 'No architectural permutations required.')}
                     </div>
 
-                    <div className="p-10 border-t border-slate-100 space-y-8 bg-slate-50/30">
-                      <div className="space-y-4">
-                        <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">AI Implementation Summary</label>
-                        <p className="text-[12px] text-slate-600 leading-relaxed font-medium bg-white p-8 rounded-3xl border border-slate-100 shadow-sm">
+                    <div className="p-14 border-t border-[#E5E7EB] space-y-12 bg-[#F9FAFB]/50">
+                      <div className="space-y-8">
+                        <label className="text-[11px] font-black uppercase tracking-[0.3em] text-[#4B5563] flex items-center gap-4">
+                          <CheckCircle2 size={16} className="text-[#60A5FA]" />
+                          Implementation Strategy
+                        </label>
+                        <p className="text-[13px] text-[#2C2F33] leading-relaxed font-bold bg-white p-12 rounded-[2rem] border border-[#E5E7EB] shadow-sm uppercase tracking-wider opacity-90 italic">
                           {generatedOutput.explanation}
                         </p>
                       </div>
 
                       {generatedOutput.risks?.length > 0 && (
-                        <div className="bg-rose-50 border border-rose-100 p-8 rounded-3xl flex gap-6 shadow-sm">
-                          <AlertTriangle className="text-rose-500 flex-shrink-0" size={24} />
-                          <div className="space-y-3">
-                            <p className="text-[10px] font-black text-rose-500 uppercase tracking-widest">Risk Assessment</p>
-                            <ul className="space-y-2">
+                        <div className="bg-rose-50 border border-rose-100 p-12 rounded-[2rem] flex gap-10 shadow-sm">
+                          <AlertTriangle className="text-rose-600 flex-shrink-0" size={36} />
+                          <div className="space-y-6">
+                            <p className="text-[12px] font-black text-rose-600 uppercase tracking-[0.3em]">Critical Analysis Matrix</p>
+                            <ul className="space-y-4">
                               {generatedOutput.risks.map((risk, i) => (
-                                <li key={i} className="text-[11px] text-slate-600 font-bold uppercase tracking-widest flex items-center gap-3">
-                                  <div className="w-1.5 h-1.5 bg-rose-500 rounded-full" />
+                                <li key={i} className="text-[11px] text-[#4B5563] font-black uppercase tracking-[0.15em] flex items-center gap-5 opacity-80">
+                                  <div className="w-2 h-2 bg-rose-500 rounded-full" />
                                   {risk}
                                 </li>
                               ))}
@@ -337,20 +343,20 @@ export default function AIWorkbench() {
                         </div>
                       )}
 
-                      <div className="flex gap-4 pt-4">
+                      <div className="flex gap-6 pt-6">
                         <button
                           onClick={() => setGeneratedOutput(null)}
-                          className="flex-1 h-16 rounded-xl border border-slate-200 text-[10px] font-black uppercase tracking-widest text-slate-500 hover:bg-slate-50 transition-all font-sans"
+                          className="flex-1 h-18 rounded-2xl border border-[#E5E7EB] text-[12px] font-black uppercase tracking-[0.3em] text-[#4B5563] hover:bg-slate-50 transition-all font-sans"
                         >
                           Discard
                         </button>
                         <button
                           disabled={isApplying || !generatedOutput.patch}
                           onClick={handleApply}
-                          className="flex-[2] btn-primary h-16 !shadow-blue-500/20"
+                          className="flex-[2.5] h-18 bg-[#2C2F33] text-white rounded-2xl text-[12px] font-black uppercase tracking-[0.3em] hover:bg-[#1F2937] transition-all shadow-xl flex items-center justify-center gap-6 font-sans"
                         >
-                          {isApplying ? <Loader2 className="animate-spin" size={20} /> : <HardDrive size={20} />}
-                          Apply Changes
+                          {isApplying ? <Loader2 className="animate-spin opacity-40" size={24} /> : <HardDrive size={26} />}
+                          Finalize Architecture
                         </button>
                       </div>
                     </div>

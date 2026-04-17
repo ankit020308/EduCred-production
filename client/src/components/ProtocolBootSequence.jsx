@@ -35,7 +35,7 @@ export default function ProtocolBootSequence({ onComplete }) {
           initial={{ opacity: 1 }}
           exit={{ opacity: 0, scale: 1.05, filter: "blur(10px)" }}
           transition={{ duration: 0.8, ease: [0.22, 1, 0.36, 1] }}
-          className="fixed inset-0 z-[1000] flex flex-col items-center justify-center bg-[#0B132B] font-sans"
+          className="fixed inset-0 z-[1000] flex flex-col items-center justify-center bg-[#F9FAFB] font-sans"
         >
           <div className="relative flex flex-col items-center">
             {/* Minimal Circular Loader */}
@@ -48,7 +48,7 @@ export default function ProtocolBootSequence({ onComplete }) {
                         stroke="currentColor"
                         strokeWidth="3"
                         fill="transparent"
-                        className="text-white/5"
+                        className="text-slate-100"
                     />
                     <motion.circle
                         cx="48"
@@ -59,7 +59,7 @@ export default function ProtocolBootSequence({ onComplete }) {
                         fill="transparent"
                         strokeDasharray="283"
                         strokeDashoffset={283 - (283 * progress) / 100}
-                        className="text-blue-500"
+                        className="text-[#60A5FA]"
                         strokeLinecap="round"
                     />
                 </svg>
@@ -69,10 +69,10 @@ export default function ProtocolBootSequence({ onComplete }) {
             </div>
 
             <div className="text-center space-y-3">
-              <h2 className="text-white text-xs font-black uppercase tracking-[0.5em] animate-pulse">
+              <h2 className="text-[#2C2F33] text-xs font-black uppercase tracking-[0.5em] animate-pulse">
                 EduCred
               </h2>
-              <p className="text-slate-500 text-[10px] font-bold uppercase tracking-[0.2em]">
+              <p className="text-[#4B5563] text-[10px] font-bold uppercase tracking-[0.2em] opacity-60">
                 {progress < 40 ? "Securing connection..." : progress < 80 ? "Preparing your dashboard..." : "Finalizing environment..."}
               </p>
             </div>

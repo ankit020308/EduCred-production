@@ -11,75 +11,71 @@ const viewTransition = {
 
 export default function Terms() {
   return (
-    <div className="relative min-h-screen bg-[#000000] text-slate-300 overflow-x-hidden selection:bg-blue-500/30">
+    <div className="relative min-h-screen bg-[#F8FAFC] text-slate-800 font-sans selection:bg-blue-500/30 overflow-x-hidden">
       
-      {/* 🌌 INTERACTIVE BACKGROUND */}
-      <BlockchainBackground />
-
-      {/* AMBIENT GLOW */}
-      <div className="absolute inset-0 z-0 pointer-events-none overflow-hidden">
-        <div className="absolute top-0 left-0 w-[800px] h-[800px] bg-blue-600/5 blur-[200px] rounded-full" />
-      </div>
+      {/* 🌌 BACKGROUND GRADIENT */}
+      <div className="fixed inset-0 bg-[#0B132B] pointer-events-none z-0" />
+      <div className="fixed inset-0 hero-gradient pointer-events-none" />
 
       <div className="container max-w-4xl mx-auto px-6 pt-40 pb-24 relative z-10 space-y-16">
         
         {/* HEADER */}
         <motion.div {...viewTransition} className="space-y-6 text-left">
-          <div className="inline-flex items-center gap-3 px-6 py-2.5 rounded-full bg-white/[0.03] border border-white/10 backdrop-blur-md animate-levitate shadow-xl shadow-blue-500/5">
-            <Gavel className="text-blue-400" size={16} />
-            <span className="text-[10px] font-black uppercase tracking-[0.4em] text-blue-400">Governance Protocol Terms</span>
+          <div className="inline-flex items-center gap-3 px-6 py-2.5 rounded-full bg-blue-500/10 border border-blue-500/20 backdrop-blur-md shadow-sm">
+            <Gavel className="text-blue-600" size={16} />
+            <span className="text-[10px] font-black uppercase tracking-widest text-blue-700">Platform Governance</span>
           </div>
-          <h1 className="text-6xl md:text-[5.5rem] font-bold text-white tracking-tighter leading-none uppercase">
-            Protocol <span className="bg-gradient-to-r from-blue-400 to-white bg-clip-text text-transparent text-glow-emissive">Governance.</span>
+          <h1 className="text-6xl md:text-[5.5rem] font-black text-white tracking-tighter leading-none uppercase">
+            Terms of <span className="text-blue-500">Service.</span>
           </h1>
-          <p className="text-slate-500 text-xs font-bold uppercase tracking-[0.2em] max-w-xl leading-relaxed">
-            By synchronizing with the EduCred ecosystem, you agree to abide by the decentralized governance protocols outlined in this manifest.
+          <p className="text-slate-400 text-xs font-bold uppercase tracking-widest max-w-xl leading-relaxed">
+            By using the EduCred platform, you agree to comply with our service terms and record-keeping standards.
           </p>
         </motion.div>
 
-        {/* CONTENT GLASS PANEL */}
-        <motion.div {...viewTransition} transition={{ ...viewTransition.transition, delay: 0.1 }} className="glass-card p-10 md:p-14 border border-white/10 space-y-16">
+        {/* CONTENT PANEL */}
+        <motion.div {...viewTransition} transition={{ ...viewTransition.transition, delay: 0.1 }} className="bg-white p-10 md:p-14 border border-slate-100 rounded-[2.5rem] shadow-2xl shadow-slate-900/10 space-y-16">
           
           <div className="grid grid-cols-1 md:grid-cols-2 gap-12">
             {[
               { 
                 icon: Network, 
-                title: "Node Usage", 
-                text: "EduCred provides high-integrity blockchain-based verification. Nodes must operate within the legal boundaries of their respective jurisdictions." 
+                title: "Account Usage", 
+                text: "EduCred provides secure digital verification services. Users must operate within the legal boundaries of their respective institutions and jurisdictions." 
               },
               { 
                 icon: ShieldAlert, 
-                title: "Input Authenticity", 
-                text: "Issuers are cryptographically responsible for the accuracy of anchored assets. Fraudulent injection will result in immediate node detachment." 
+                title: "Data Accuracy", 
+                text: "Issuers are responsible for the accuracy of all submitted records. Fraudulent or incorrect data may result in account suspension." 
               },
               { 
                 icon: Cpu, 
-                title: "Immutability", 
-                text: "All cryptographic hashes anchored to the ledger are permanent and non-deletable once consensus is achieved on the EduCred network." 
+                title: "Record Integrity", 
+                text: "All verified records anchored to the platform are permanent and intended to provide long-term proof of achievement." 
               },
               { 
                 icon: Activity, 
-                title: "Liability Limit", 
-                text: "EduCred is a decentralized protocol interface. We are not liable for external misinterpretation or incorrect institutional data injection." 
+                title: "Limitation of Liability", 
+                text: "EduCred is a service interface. We are not liable for errors in third-party information or institutional data entry." 
               }
             ].map((section, idx) => (
               <div key={idx} className="space-y-4">
-                <div className="flex items-center gap-4 text-blue-400">
-                  <section.icon size={20} className="opacity-40" />
-                  <h2 className="text-[11px] font-black uppercase tracking-[0.3em]">{section.title}</h2>
+                <div className="flex items-center gap-4 text-blue-600">
+                  <section.icon size={20} className="opacity-60" />
+                  <h2 className="text-[11px] font-black uppercase tracking-widest leading-none">{section.title}</h2>
                 </div>
-                <p className="text-slate-500 text-[10px] font-bold uppercase tracking-[0.2em] leading-relaxed italic">{section.text}</p>
+                <p className="text-slate-500 text-[11px] font-semibold uppercase tracking-widest leading-relaxed">{section.text}</p>
               </div>
             ))}
           </div>
 
-          <div className="pt-16 border-t border-white/5 space-y-8">
-            <h2 className="text-2xl font-bold text-white tracking-tighter uppercase">Modifications</h2>
-            <p className="text-slate-500 text-[10px] font-bold uppercase tracking-[0.2em] leading-relaxed italic max-w-2xl">
-              The Governance Protocol may be updated as the network evolves. Nodes are responsible for periodically synchronizing with this manifest to ensure compliance with the latest consensus rules.
+          <div className="pt-16 border-t border-slate-50 space-y-8">
+            <h2 className="text-2xl font-black text-slate-900 tracking-tighter uppercase">Service Updates</h2>
+            <p className="text-slate-500 text-[11px] font-semibold uppercase tracking-widest leading-relaxed max-w-2xl">
+              These terms may be updated as the platform evolves. Users are encouraged to periodically review these terms to ensure continued compliance with our standards.
             </p>
-            <div className="flex items-center gap-4 text-[10px] font-black uppercase tracking-[0.3em] text-blue-500 cursor-pointer hover:gap-6 transition-all group">
-               Sync Protocol Version <RefreshCcw size={14} className="group-hover:rotate-180 transition-transform" />
+            <div className="flex items-center gap-4 text-[10px] font-black uppercase tracking-widest text-blue-600 cursor-pointer hover:gap-6 transition-all group">
+               View Latest Version <RefreshCcw size={14} className="group-hover:rotate-180 transition-transform" />
             </div>
           </div>
 
@@ -87,9 +83,8 @@ export default function Terms() {
 
         {/* FOOTER */}
         <footer className="text-center space-y-10 pt-12">
-             <div className="h-px w-24 bg-white/5 mx-auto" />
-             <p className="text-slate-800 text-[10px] font-black uppercase tracking-[0.5em] max-w-sm mx-auto leading-loose italic opacity-30">
-                Authorized Governance Protocol. Protocol Version: {new Date().getFullYear()}.01
+             <p className="text-slate-500 text-[10px] font-black uppercase tracking-widest opacity-40">
+                Authorized Platform Terms. Version: {new Date().getFullYear()}.01
              </p>
         </footer>
 

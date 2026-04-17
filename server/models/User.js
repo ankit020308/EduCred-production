@@ -73,6 +73,10 @@ const User = sequelize.define('User', {
     lastOtpResend: {
         type: DataTypes.DATE,
         allowNull: true
+    },
+    isSuperAdmin: {
+        type: DataTypes.BOOLEAN,
+        defaultValue: false
     }
 }, {
     indexes: [

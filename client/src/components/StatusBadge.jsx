@@ -2,51 +2,51 @@ import { CheckCircle2, Clock, XCircle, ShieldCheck, ShieldAlert } from 'lucide-r
 
 const CONFIG = {
   CONFIRMED: {
-    label: 'Confirmed',
+    label: 'Verified',
     icon: ShieldCheck,
-    color: 'text-blue-400',
-    bg: 'bg-blue-500/10',
-    border: 'border-blue-500/20',
-    dot: 'bg-blue-500',
+    color: 'text-blue-600',
+    bg: 'bg-blue-50',
+    border: 'border-blue-100',
+    dot: 'bg-blue-600',
   },
   PENDING: {
-    label: 'Pending',
+    label: 'Processing',
     icon: Clock,
-    color: 'text-amber-400',
-    bg: 'bg-amber-500/10',
-    border: 'border-amber-500/20',
+    color: 'text-amber-600',
+    bg: 'bg-amber-50',
+    border: 'border-amber-100',
     dot: 'bg-amber-500',
   },
   FAILED: {
     label: 'Failed',
     icon: XCircle,
-    color: 'text-rose-400',
-    bg: 'bg-rose-500/10',
-    border: 'border-rose-500/20',
+    color: 'text-rose-600',
+    bg: 'bg-rose-50',
+    border: 'border-rose-100',
     dot: 'bg-rose-500',
   },
   APPROVED: {
-    label: 'Approved',
+    label: 'Authorized',
     icon: CheckCircle2,
-    color: 'text-cyan-400',
-    bg: 'bg-cyan-500/10',
-    border: 'border-cyan-500/20',
-    dot: 'bg-cyan-500',
+    color: 'text-emerald-500',
+    bg: 'bg-emerald-50',
+    border: 'border-emerald-100',
+    dot: 'bg-emerald-500',
   },
   REJECTED: {
-    label: 'Rejected',
+    label: 'Denied',
     icon: XCircle,
-    color: 'text-rose-400',
-    bg: 'bg-rose-500/10',
-    border: 'border-rose-500/20',
+    color: 'text-rose-600',
+    bg: 'bg-rose-50',
+    border: 'border-rose-100',
     dot: 'bg-rose-500',
   },
 };
 
 /**
- * StatusBadge — reusable pill for CONFIRMED/PENDING/FAILED/APPROVED/REJECTED
- * @param {string} status - one of the keys above
- * @param {boolean} pulse - optional pulsing dot for PENDING
+ * StatusBadge — Reusable indicator for institutional and certificate states.
+ * @param {string} status - The status key (case-insensitive)
+ * @param {boolean} pulse - Optional override to control the indicator pulse
  */
 export default function StatusBadge({ status, pulse }) {
   const cfg = CONFIG[status?.toUpperCase()] || CONFIG.PENDING;
@@ -55,10 +55,10 @@ export default function StatusBadge({ status, pulse }) {
 
   return (
     <span
-      className={`inline-flex items-center gap-2 px-3 py-1 rounded-full border text-[9px] font-black uppercase tracking-widest ${cfg.bg} ${cfg.border} ${cfg.color}`}
+      className={`inline-flex items-center gap-2.5 px-4 py-1.5 rounded-full border text-[10px] font-black uppercase tracking-widest shadow-sm transition-all ${cfg.bg} ${cfg.border} ${cfg.color}`}
     >
       <span className={`w-1.5 h-1.5 rounded-full ${cfg.dot} ${shouldPulse ? 'animate-pulse' : ''}`} />
-      <Icon size={11} />
+      <Icon size={12} className="opacity-80" />
       {cfg.label}
     </span>
   );

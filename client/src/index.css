@@ -5,20 +5,20 @@
    ────────────────────────────────────────────────────────────────────────── */
 @layer base {
   :root {
-    /* ✨ TRUSTWORTHY PALETTE (Stripe/Vercel Aesthetic) */
-    --color-bg-deep: #0B132B;      /* Deep Navy */
-    --color-bg-canvas: #F8FAFC;    /* Off-white canvas */
-    --color-bg-matte: #ffffff;     /* Pure white Surface */
-    --color-bg-light: #F1F5F9;     /* Light Gray */
+    /* 🏛️ ABSOLUTE PALETTE: STEEL & ICY BLUE */
+    --color-bg-deep: #F9FAFB;      /* Strict Background */
+    --color-bg-canvas: #F3F4F6;    /* Secondary Background */
+    --color-bg-matte: #FFFFFF;     /* Pure Surface */
+    --color-bg-light: #E5E7EB;     /* Component Gray */
     
-    --color-primary: #2563EB;      /* Enterprise Blue */
-    --color-primary-hover: #1D4ED8;
-    --color-accent: #38BDF8;       /* Sky Blue */
+    --color-primary: #2C2F33;      /* Steel Gray */
+    --color-primary-hover: #1F2937;
+    --color-accent: #60A5FA;       /* Icy Blue */
     
-    --color-border: rgba(15, 23, 42, 0.08);
-    --color-border-dark: rgba(255, 255, 255, 0.1);
-    --color-text-main: #1E293B;    /* Slate 800 */
-    --color-text-muted: #64748B;   /* Slate 500 */
+    --color-border: #E5E7EB;
+    --color-border-dark: #D1D5DB;
+    --color-text-main: #111827;    /* Pure Text */
+    --color-text-muted: #4B5563;   /* Secondary Text */
 
     /* 📄 PREMIUM TYPOGRAPHY */
     --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
@@ -32,7 +32,7 @@
   body {
     margin: 0;
     background-color: var(--color-bg-deep);
-    color: #F8FAFC;
+    color: var(--color-text-main);
     font-family: var(--font-sans);
     -webkit-font-smoothing: antialiased;
     letter-spacing: -0.01em;
@@ -62,25 +62,23 @@
 }
 
 @utility btn-primary {
-  @apply bg-blue-600 text-white font-bold px-8 py-3.5 rounded-xl 
-         hover:bg-blue-500 hover:scale-[1.02] active:scale-95 
-         transition-all duration-300 shadow-xl shadow-blue-900/20 
+  @apply bg-[#2C2F33] text-white font-bold px-8 py-3.5 rounded-xl 
+         hover:bg-[#1F2937] hover:scale-[1.02] active:scale-95 
+         transition-all duration-300 shadow-xl shadow-slate-900/10 
          flex items-center justify-center gap-2;
 }
 
 @utility btn-secondary {
-  @apply border border-white/10 bg-white/5 text-white font-semibold 
-         px-8 py-3.5 rounded-xl hover:bg-white/10 hover:border-white/20 
+  @apply border border-slate-200 bg-white text-slate-700 font-semibold 
+         px-8 py-3.5 rounded-xl hover:bg-slate-50 hover:border-slate-300 
          active:scale-95 transition-all duration-300 flex items-center justify-center gap-2;
 }
 
 @utility hero-gradient {
-  background: radial-gradient(circle at 50% 10%, rgba(37, 99, 235, 0.12) 0%, transparent 60%);
+  background: radial-gradient(circle at 50% 10%, rgba(96, 165, 250, 0.08) 0%, transparent 60%);
 }
 
-@utility text-glow-blue {
-  text-shadow: 0 0 30px rgba(37, 99, 235, 0.4);
-}
+/* Removal of text-glow-blue as per absolute palette adherence */
 
 /* 🎨 SCROLLBAR THEME */
 ::-webkit-scrollbar {

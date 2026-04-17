@@ -52,11 +52,21 @@ const University = sequelize.define('University', {
     city: {
         type: DataTypes.STRING,
         allowNull: true
+    },
+    publicWalletAddress: {
+        type: DataTypes.STRING,
+        allowNull: true,
+        unique: true
+    },
+    encryptedPrivateKey: {
+        type: DataTypes.STRING,
+        allowNull: true
     }
 }, {
     indexes: [
         { fields: ['userId'] },
-        { fields: ['status'] }
+        { fields: ['status'] },
+        { fields: ['publicWalletAddress'] }
     ]
 });
 
