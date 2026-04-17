@@ -16,6 +16,7 @@ export default function VerifyOTP() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [cooldown, setCooldown] = useState(60);
+  const [showSuccess, setShowSuccess] = useState(false);
   const inputRefs = useRef([]);
 
   // Redirect if accessed without an email payload
@@ -99,7 +100,14 @@ export default function VerifyOTP() {
     setError('');
 
     try {
-      await verifyOTP(email, code);
+      const u = await verifyOTP(email, code);
+      
+      // 🎓 Detect if University pending approval
+      if (u && u.role === 'university') {
+         setShowSuccess(true);
+         return;
+      }
+      
       navigate('/dashboard');
     } catch (err) {
       const errorMsg = typeof err === 'string' ? err : err?.response?.data?.error || 'Verification failed. Please try again.';
@@ -125,13 +133,53 @@ export default function VerifyOTP() {
       <div className="fixed inset-0 bg-[#0B132B] pointer-events-none z-0" />
       <div className="fixed inset-0 hero-gradient pointer-events-none" />
 
-      <motion.div
-        initial={{ opacity: 0, y: 20, scale: 0.95 }}
-        animate={{ opacity: 1, y: 0, scale: 1 }}
-        transition={{ duration: 0.8, ease: [0.22, 1, 0.36, 1] }}
-        className="relative w-full max-w-[500px] z-10"
-      >
-        <div className="bg-white p-10 md:p-14 rounded-[2.5rem] shadow-2xl shadow-slate-900/10 border border-slate-100 relative overflow-hidden">
+      <AnimatePresence mode="wait">
+        {showSuccess ? (
+          <motion.div
+            key="success"
+            initial={{ opacity: 0, scale: 0.95, y: 20 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            className="relative w-full max-w-[500px] z-10"
+          >
+            <div className="bg-white p-12 md:p-16 rounded-[2.5rem] shadow-2xl shadow-slate-900/10 border border-slate-100 text-center space-y-10">
+               <div className="w-24 h-24 bg-emerald-50 rounded-[2.5rem] flex items-center justify-center mx-auto border border-emerald-100 shadow-sm">
+                  <motion.div
+                    initial={{ rotate: -15, scale: 0.5, opacity: 0 }}
+                    animate={{ rotate: 0, scale: 1, opacity: 1 }}
+                    transition={{ type: "spring", damping: 12 }}
+                  >
+                    <ShieldCheck size={48} className="text-emerald-600" />
+                  </motion.div>
+               </div>
+
+               <div className="space-y-4">
+                  <h2 className="text-3xl font-black text-slate-900 tracking-tighter uppercase">
+                    Protocol <span className="text-emerald-600">Verified.</span>
+                  </h2>
+                  <p className="text-[#4B5563] text-[11px] font-black uppercase tracking-[0.2em] leading-relaxed italic opacity-80">
+                    Your institutional request has been initiated successfully. You'll receive your credentials via email once the EduCred admin approves your node.
+                  </p>
+               </div>
+
+               <div className="h-px w-20 bg-slate-100 mx-auto" />
+
+               <button
+                  onClick={() => navigate('/login')}
+                  className="h-16 px-12 bg-[#0B132B] text-white rounded-2xl text-[11px] font-black uppercase tracking-[0.2em] hover:bg-black transition-all shadow-xl shadow-slate-900/20 flex items-center justify-center gap-4 mx-auto w-full group"
+               >
+                  Return to Gateway <ArrowRight size={18} className="group-hover:translate-x-1 transition-transform" />
+               </button>
+            </div>
+          </motion.div>
+        ) : (
+          <motion.div
+            key="form"
+            initial={{ opacity: 0, y: 20, scale: 0.95 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            transition={{ duration: 0.8, ease: [0.22, 1, 0.36, 1] }}
+            className="relative w-full max-w-[500px] z-10"
+          >
+            <div className="bg-white p-10 md:p-14 rounded-[2.5rem] shadow-2xl shadow-slate-900/10 border border-slate-100 relative overflow-hidden">
           
           {/* HEADER */}
           <div className="text-center mb-10 space-y-6 relative z-10">
@@ -215,6 +263,8 @@ export default function VerifyOTP() {
           </div>
         </div>
       </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

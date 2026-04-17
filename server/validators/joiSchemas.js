@@ -74,8 +74,11 @@ export const registrationSchema = Joi.object({
     is: 'university',
     then: Joi.required(),
     otherwise: Joi.optional().allow('', null)
-  })
+  }),
+  description: Joi.string().optional().allow('', null),
+  documents: Joi.array().items(Joi.string()).optional()
 });
+
 
 export const loginSchema = Joi.object({
   email: Joi.string().email().required(),
