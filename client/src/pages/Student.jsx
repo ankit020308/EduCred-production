@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import { ArrowLeft, Calendar, Fingerprint, GraduationCap, ShieldCheck } from 'lucide-react';
-import { Link, useParams } from 'react-router-dom';
+import { Link, useParams, useNavigate } from 'react-router-dom';
 import api from '../services/api';
 import BlockchainBackground from '../components/BlockchainBackground';
 import StatusBadge from '../components/StatusBadge';

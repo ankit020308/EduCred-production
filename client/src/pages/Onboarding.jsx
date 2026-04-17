@@ -184,10 +184,5 @@ export default function Onboarding() {
         </div>
       </motion.div>
     </div>
-
-          </div>
-        </div>
-      </motion.div>
-    </div>
   );
 }

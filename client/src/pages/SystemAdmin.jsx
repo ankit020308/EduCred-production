@@ -107,7 +107,6 @@ function SystemAdminDashboard() {
   );
 
   return (
-  return (
     <div className="relative min-h-screen bg-[#F9FAFB]">
       
       <div className="relative z-10 space-y-16 p-8 md:p-16 max-w-[1600px] mx-auto">
