@@ -16,7 +16,8 @@ import os from 'os';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-const ROOT = __dirname;
+// Since this is now in /scripts, the project ROOT is one level up
+const ROOT = path.join(__dirname, '..');
 const BC_DIR = path.join(ROOT, 'blockchain');
 const SRV_DIR = path.join(ROOT, 'server');
 const CLT_DIR = path.join(ROOT, 'client');

@@ -63,15 +63,19 @@ export const generateCertificatePDF = async (certData) => {
       doc.font('Times-Roman').fontSize(10).text('Verified on EduCred Blockchain Network', { align: 'center' }, doc.page.height - 60);
       
       // Generate QR
-      const qrUrl = `https://educred.app/verify?id=${certData.certificateId}`;
-      const qrImage = await QRCode.toDataURL(qrUrl, { margin: 1 });
+      const qrPayload = certData.qrPayload || JSON.stringify({ id: certData.certificateId });
+      const qrImage = await QRCode.toDataURL(qrPayload, { margin: 1 });
       doc.image(qrImage, doc.page.width - 100, doc.page.height - 75, { width: 50 });
 
-      // Note: We don't have the hash yet, so we cannot embed it at the exact generation time!
-      // But prompt asks for SHA-256 at the very bottom.
-      // Wait, hash is computed from the PDF buffer, meaning you can't embed it in the PDF before generating it.
-      // So I will just leave the SHA-256 placeholder or note.
-      doc.font('Courier').fontSize(7).fillColor('gray').text(`Generative Anchor ID`, 50, doc.page.height - 40);
+      // Embed the structural hash dynamically if provided
+      if (certData.qrPayload) {
+          const payloadObj = JSON.parse(certData.qrPayload);
+          if (payloadObj.hash) {
+              doc.font('Courier').fontSize(7).fillColor('gray').text(`Structural Hash: ${payloadObj.hash}`, 50, doc.page.height - 40);
+          }
+      } else {
+          doc.font('Courier').fontSize(7).fillColor('gray').text(`Generative Anchor ID`, 50, doc.page.height - 40);
+      }
 
       doc.end();
     } catch (err) {

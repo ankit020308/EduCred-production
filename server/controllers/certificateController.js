@@ -83,18 +83,14 @@ export const issueCertificate = async (req, res) => {
         } = value;
 
         const programName = value.programName || value.course || 'General Degree';
-        const issuanceMode = value.issuanceMode || (req.file ? 'UPLOAD' : 'GENERATE');
-        const file = req.file;
-
-        if (issuanceMode === 'UPLOAD') {
-            if (!file) return res.status(400).json({ error: 'Certificate file is required for upload mode.' });
-            if (file.size === 0) return res.status(400).json({ error: 'Cannot process zero-byte certificate files.' });
-        }
 
         // 1. Authorization: Verify Institutional Node Status
         const university = await Registry.findOne('universities', { userId: req.user.id });
         if (!university || university.status !== 'APPROVED') {
             return res.status(403).json({ error: 'Institution not yet approved. Contact system administrator.' });
+        }
+        if (!university.encryptedPrivateKey) {
+             return res.status(403).json({ error: 'Institution wallet not configured. Re-approval needed.' });
         }
 
         // Generate Certificate ID
@@ -103,59 +99,24 @@ export const issueCertificate = async (req, res) => {
         const seq = Math.floor(10000 + Math.random() * 90000);
         const certificateId = `EDUCRED-${currentYear}-${progCode}-${seq}`;
 
-        let fileBuffer;
-        if (issuanceMode === 'GENERATE') {
-            fileBuffer = await generateCertificatePDF({
-                universityName: university.name,
-                studentName,
-                programName,
-                branch: branch || 'General',
-                cgpa: cgpa || '',
-                city: university.city || 'India',
-                graduationYear: graduationYear || currentYear,
-                certificateId
-            });
-        } else {
-            fileBuffer = fs.readFileSync(file.path);
-        }
+        // Create Deterministic Structural Hash early to prevent duplicates before queuing
+        const { generateStructuralHash } = await import('../utils/hashing.js');
+        const structuralHash = generateStructuralHash({
+            studentName,
+            course: programName,
+            issuerId: university.id
+        });
 
-        // 2. Cryptographic Fingerprinting (SHA-256)
-        const fileHash = generateBinaryHash(fileBuffer);
-
-        // 🚨 Integrity Check: Prevent duplicate issuance of the same credential
-        const existingCert = await Registry.findOne('certificates', { certificateHash: fileHash });
+        const existingCert = await Registry.findOne('certificates', { certificateHash: structuralHash });
         if (existingCert) {
             return res.status(409).json({
                 error: 'Duplicate Credential Detected',
-                message: 'A certificate with this exact content has already been anchored on the ledger.',
+                message: 'A certificate with this exact logical data already exists.',
                 existingCertificateId: existingCert.certificateId
             });
         }
 
-        // 3. Storage — IPFS via Pinata (falls back to local disk if not configured)
-        let fileUrl;
-        let ipfsCid = null;
-        const filename = `CERT_${certificateId}_${Date.now()}.pdf`;
-
-        if (isPinataConfigured()) {
-            try {
-                const ipfsResult = await uploadFileToPinata(fileBuffer, filename, {
-                    certificateId,
-                    studentName,
-                    issuer: university.name,
-                    certificateType: certificateType || 'Degree Certificate',
-                });
-                ipfsCid = ipfsResult.cid;
-                fileUrl = ipfsResult.url;
-            } catch (ipfsErr) {
-                console.error('❌ [IPFS]: Upload failed, falling back to local disk:', ipfsErr.message);
-                fileUrl = await saveFileLocally(fileBuffer, filename);
-            }
-        } else {
-            fileUrl = await saveFileLocally(fileBuffer, filename);
-        }
-
-        // 4. Resolve student record for linking
+        // Resolve student record for linking
         let studentId = null;
         try {
             const studentUser = await Registry.findOne('users', { email: studentEmail });
@@ -165,7 +126,7 @@ export const issueCertificate = async (req, res) => {
             }
         } catch (_) { }
 
-        // 5. Creation in Registry (Status: PENDING)
+        // Creation in Registry (Status: PROCESSING)
         const certData = {
             certificateId,
             studentName,
@@ -174,10 +135,8 @@ export const issueCertificate = async (req, res) => {
             studentId,
             course: programName,
             issuer: university.name,
-            fileUrl,
-            ipfsCid,
-            certificateHash: fileHash,
-            status: 'PENDING',
+            certificateHash: structuralHash,
+            status: 'PROCESSING',
             workflowStatus: 'STAGE2',
             issuedBy: req.user.id,
             universityId: university.id,
@@ -186,91 +145,40 @@ export const issueCertificate = async (req, res) => {
             workflowLog: [{ stage: 'Academic Record Verified', actorId: req.user.id, actorName: req.user.name, timestamp: new Date() }]
         };
 
-        // NEW: Mandatory Metadata upload to IPFS for persistence
-        if (isPinataConfigured()) {
-            try {
-                const metaResult = await uploadJSONToPinata(certData, `META_${certificateId}`);
-                certData.metadataIpfsCid = metaResult.cid;
-            } catch (err) {
-                console.warn('⚠️ [IPFS]: Metadata upload failed, proceeding with registry only.');
-            }
-        }
-
         const cert = await Registry.insert('certificates', certData);
 
-        // 6. Mandatory Blockchain Anchor (Sync Pattern for Production)
-        try {
-            const io = req.app.get('io');
-
-            const receipt = await issueCertificateOnChain(
-                cert.id.toString(),
-                fileHash,
-                CERTIFICATE_TYPE_CODES[cert.certificateType] ?? 0
-            );
-
-            const update = {
-                blockchainTxHash: receipt.hash,
-                status: 'CONFIRMED',
-                workflowStatus: 'ISSUED'
-            };
-            await Registry.update('certificates', { id: cert.id }, update);
-
-            await Registry.insert('ledger', {
-                type: 'ISSUE',
-                studentName: cert.studentName,
-                universityName: university.name,
-                certificateId: cert.id,
-                txHash: receipt.hash,
-                status: 'SUCCESS',
-                metadata: { certificateType: cert.certificateType }
-            });
-
-            // Signal success via Socket.io
-            io?.to(`university_${university.id}`)?.emit('certificateConfirmed', { certificateId: cert.certificateId, status: 'CONFIRMED', txHash: receipt.hash });
-
-            const studentUser = await Registry.findOne('users', { email: cert.studentEmail });
-            if (studentUser) {
-                io?.to(`user_${studentUser.id}`)?.emit('newCertificate', { certId: cert.id, type: cert.certificateType });
+        // ENQUEUE JOB TO BULL
+        const { enqueueCertificateJob } = await import('../queues/producers.js');
+        await enqueueCertificateJob({
+            certDbId: cert.id,
+            studentData: {
+                 studentName,
+                 course: programName,
+                 branch,
+                 cgpa,
+                 graduationYear,
+                 certificateId,
+                 certificateType: cert.certificateType
+            },
+            universityData: {
+                 id: university.id,
+                 name: university.name,
+                 city: university.city,
+                 encryptedPrivateKey: university.encryptedPrivateKey
             }
+        });
 
-            await logAudit(req, 'ISSUANCE_ANCHORED', 'SUCCESS', `Certificate anchored for ${studentName}.`, { certId: cert.id, hash: fileHash, tx: receipt.hash });
-
-            res.status(201).json({
-                success: true,
-                message: 'Certificate anchored successfully on the authoritative ledger.',
-                certificateId: cert.certificateId,
-                hash: fileHash,
-                txHash: receipt.hash,
-                fileUrl,
-                ipfsCid,
-                certDbId: cert.id
-            });
-
-        } catch (anchorErr) {
-            console.error('❌ [LEDGER] Anchor failed:', anchorErr.message);
-            Registry.update('certificates', { id: cert.id }, { status: 'FAILED' });
-
-            Registry.insert('ledger', {
-                type: 'ISSUE',
-                studentName: cert.studentName,
-                universityName: university.name,
-                certificateId: cert.id,
-                status: 'FAILED',
-                metadata: { error: anchorErr.message, certificateType: cert.certificateType }
-            });
-
-            return res.status(502).json({
-                error: 'Blockchain Anchor Failed',
-                message: 'The registry entry was created but anchoring failed. Identity record set to FAILED.',
-                details: anchorErr.message
-            });
-        }
+        res.status(202).json({
+            success: true,
+            message: 'Certificate issuance queued successfully.',
+            certificateId: cert.certificateId,
+            status: 'PROCESSING'
+        });
 
     } catch (err) {
         console.error('🚀 Issuance Pipeline CRASH:', err);
         res.status(500).json({ error: 'Certificate issuance failed.', details: err.message });
     } finally {
-        // Cleanup temp file
         if (tempPath && fs.existsSync(tempPath)) {
             fs.unlinkSync(tempPath);
         }
@@ -420,8 +328,89 @@ export const revokeCertificate = async (req, res) => {
 };
 
 export const batchIssue = async (req, res) => {
-    // Process CSV, generate PDFs, compute merkletree root and Anchor it
-    res.status(200).json({ message: 'Batch issuance initialized' });
+    try {
+        const file = req.file;
+        if (!file) return res.status(400).json({ error: 'CSV file required for bulk issuance.' });
+
+        const university = await Registry.findOne('universities', { userId: req.user.id });
+        if (!university || university.status !== 'APPROVED') {
+            return res.status(403).json({ error: 'Institution not yet approved.' });
+        }
+        if (!university.encryptedPrivateKey) {
+             return res.status(403).json({ error: 'Institution wallet not configured. Re-approval needed.' });
+        }
+
+        const { enqueueCertificateJob } = await import('../queues/producers.js');
+        const { generateStructuralHash } = await import('../utils/hashing.js');
+        const csv = (await import('csv-parser')).default;
+
+        let totalQueued = 0;
+        
+        fs.createReadStream(file.path)
+            .pipe(csv())
+            .on('data', async (row) => {
+                const programName = row.programName || row.course || 'General Degree';
+                
+                // Structural Validation
+                if (!row.studentName || !row.studentEmail) return; // Skip invalid rows in stream
+
+                // Generate ID
+                const seq = Math.floor(10000 + Math.random() * 90000);
+                const certificateId = `EDUCRED-BULK-${seq}`;
+
+                const structuralHash = generateStructuralHash({
+                    studentName: row.studentName,
+                    course: programName,
+                    issuerId: university.id
+                });
+
+                // Create minimal processing stub
+                const cert = await Registry.insert('certificates', {
+                    certificateId,
+                    studentName: row.studentName,
+                    studentEmail: row.studentEmail,
+                    course: programName,
+                    issuer: university.name,
+                    certificateHash: structuralHash,
+                    status: 'PROCESSING',
+                    issuedBy: req.user.id,
+                    universityId: university.id,
+                    certificateType: row.certificateType || 'Degree Certificate',
+                    metadata: { ...row }
+                });
+
+                // Fire & forget to queue
+                enqueueCertificateJob({
+                    certDbId: cert.id,
+                    studentData: {
+                         studentName: row.studentName,
+                         course: programName,
+                         branch: row.branch,
+                         cgpa: row.cgpa,
+                         graduationYear: row.graduationYear,
+                         certificateId,
+                         certificateType: cert.certificateType
+                    },
+                    universityData: {
+                         id: university.id,
+                         name: university.name,
+                         city: university.city,
+                         encryptedPrivateKey: university.encryptedPrivateKey
+                    }
+                });
+
+                totalQueued++;
+            })
+            .on('end', () => {
+                // Delete temp file after stream completion
+                if (fs.existsSync(file.path)) fs.unlinkSync(file.path);
+                res.status(202).json({ message: `Batch issuance initialized. ${totalQueued} certificates queued.` });
+            });
+
+    } catch (err) {
+        console.error('Batch Issue error:', err);
+        res.status(500).json({ error: 'Batch initialization failed.' });
+    }
 };
 
 /**
@@ -439,10 +428,29 @@ export const verifyCertificate = async (req, res) => {
         let verificationMethod = file ? 'upload' : 'id';
         let hashToVerify = '';
         let metadata = null;
+        let extractedId = certificateId;
 
         if (file) {
             if (file.size === 0) return res.status(400).json({ error: 'Invalid file: size is 0 bytes.' });
-            hashToVerify = generateBinaryHash(buffer);
+            
+            // Extract the embedded hash and ID using pdf-parse instead of unstable binary hashing
+            const pdfParse = (await import('pdf-parse')).default;
+            const fileBuffer = fs.readFileSync(tempPath);
+            const pdfData = await pdfParse(fileBuffer);
+            const pdfText = pdfData.text;
+            
+            // Extract Structural Hash from text
+            const hashMatch = pdfText.match(/Structural Hash:\s*([a-fA-F0-9]{64})/);
+            if (hashMatch) {
+                hashToVerify = hashMatch[1];
+            } else {
+                return res.status(400).json({ valid: false, message: 'Could not extract valid structural hash from the uploaded PDF.' });
+            }
+
+            // Also try to extract ID
+            const idMatch = pdfText.match(/ID:\s*(EDUCRED-[^\s]+)/);
+            if (idMatch) extractedId = idMatch[1];
+            
             metadata = await Registry.findOne('certificates', { certificateHash: hashToVerify });
         } else if (certificateId) {
             const isUUID = /^[0-9a-fA-F-]{36}$/.test(certificateId);

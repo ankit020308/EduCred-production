@@ -1,10 +1,10 @@
-# 🚀 EduCred: Live Hosting & Deployment Guide
+# EduCred: Live Hosting & Deployment Guide
 
 This guide outlines the professional deployment workflow for the EduCred platform, ensuring cryptographic security and high-performance "Liquid Glass" rendering in production.
 
 ---
 
-## 🏗️ 1. Architecture Overview
+## 1. Architecture Overview
 *   **Frontend**: React + Vite (Optimized for Vercel/Netlify)
 *   **Backend**: Node.js/Express (Optimized for Render/Railway/Heroku)
 *   **Blockchain**: Hardhat Node (Development) or Alchemy/Infura RPC (Production)
@@ -12,7 +12,7 @@ This guide outlines the professional deployment workflow for the EduCred platfor
 
 ---
 
-## 🔒 2. Required Environment Variables
+## 2. Required Environment Variables
 You MUST set these variables in your hosting provider's dashboard before launching.
 
 ### Backend (`/server`)
@@ -32,7 +32,7 @@ You MUST set these variables in your hosting provider's dashboard before launchi
 
 ---
 
-## 🚀 3. Deployment Steps
+## 3. Deployment Steps
 
 ### Phase A: Backend (e.g., Render.com)
 1.  **Repository**: Root folder of this project.
@@ -51,7 +51,7 @@ You MUST set these variables in your hosting provider's dashboard before launchi
 
 ---
 
-## ⚠️ 4. Post-Deployment Checklist
+## 4. Post-Deployment Checklist
 1.  **CORS Validation**: Verify that the `CLIENT_URL` in the backend matches your Vercel URL exactly.
 2.  **Gas Check**: Ensure the Institutional Wallet (`PRIVATE_KEY`) has enough native currency (ETH/MATIC) to anchor certificates.
 3.  **Hash Sync**: Confirm the `EduCred.json` ABI is identical in both `client/src` and `server/utils` (the deployment script handles this locally).

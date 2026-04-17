@@ -82,6 +82,32 @@ io.on('connection', (socket) => {
   });
 });
 
+// ─── BullMQ Global Event Forwarding ───
+import { certificateQueue } from './queues/producers.js';
+certificateQueue.on('global:completed', async (jobId, resultString) => {
+    try {
+        const result = JSON.parse(resultString);
+        const job = await certificateQueue.getJob(jobId);
+        if (job && job.data && job.data.universityData) {
+            io.to(`university_${job.data.universityData.id}`).emit('certificateConfirmed', {
+                certificateId: job.data.studentData.certificateId,
+                status: 'CONFIRMED',
+                txHash: result.txHash
+            });
+            // Also notify the student user room directly
+            const studentUser = await Registry.findOne('users', { email: job.data.studentData.studentEmail });
+            if (studentUser) {
+                 io.to(`user_${studentUser.id}`).emit('certificateConfirmed', {
+                     certificateId: job.data.studentData.certificateId,
+                     status: 'CONFIRMED'
+                 });
+            }
+        }
+    } catch (err) {
+        console.error("Failed to construct socket telemetry from worker job:", err);
+    }
+});
+
 const PORT = process.env.PORT || 5001;
 
 // ─── CLOUD PROXY CONFIGURATION ────────────────────────

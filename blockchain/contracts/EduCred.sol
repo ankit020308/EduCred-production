@@ -11,6 +11,8 @@ contract EduCred is Ownable {
     
     // Mapping of SHA-256 certificate hashes to their validity status
     mapping(bytes32 => bool) public validCertificates;
+    // Explicitly binding certificate hash to University Wallet as per audit
+    mapping(bytes32 => address) public certificateIssuer;
     mapping(address => bool) public authorizedIssuers;
 
     struct CertRecord {
@@ -71,7 +73,11 @@ contract EduCred is Ownable {
     function storeHash(bytes32 _hash) public {
         require(authorizedIssuers[msg.sender], "Not authorized issuer");
         require(!validCertificates[_hash], "Certificate already registered");
+        require(certificateIssuer[_hash] == address(0), "Certificate already exists");
+        
         validCertificates[_hash] = true;
+        certificateIssuer[_hash] = msg.sender;
+        
         emit HashStored(_hash, block.timestamp);
     }
 

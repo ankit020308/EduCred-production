@@ -33,6 +33,19 @@ export function generateHash(data) {
 }
 
 /**
+ * Normalized structural hash for certificates to prevent slight space differences from altering the hash.
+ */
+export function generateStructuralHash(data) {
+  const normalizedData = {
+    studentName: (data.studentName || '').trim().toLowerCase(),
+    course: (data.course || '').trim().toLowerCase(),
+    issuerId: (data.issuerId || '').toString(),
+    // We can add more fields if necessary, but this keeps the base structural integrity tight.
+  };
+  return generateHash(normalizedData);
+}
+
+/**
  * Generates a SHA-256 hash from strictly verified binary buffers (e.g., PDF/Image).
  * @param {Buffer} buffer The binary content
  * @returns {string} Hex string hash

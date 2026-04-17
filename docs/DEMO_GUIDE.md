@@ -2,7 +2,7 @@
 
 This guide walk you through the full operational lifecycle of the EduCred platform, from starting the blockchain to performing a real-time verification demo.
 
-## 🏁 1. System Preparation
+## 1. System Preparation
 
 Before starting, ensure your system is clean and dependencies are ready.
 
@@ -21,13 +21,13 @@ npm run install:all
 
 ---
 
-## 🚀 2. Launching the Identity Node
+## 2. Launching the Identity Node
 
 The system is equipped with an orchestration script that starts all services in the correct order.
 
 ```bash
 # In the project root
-node start.js
+node scripts/start.js
 ```
 
 **Services will start sequentially:**
@@ -38,7 +38,7 @@ node start.js
 
 ---
 
-## 🎭 3. Demo Sequence (The Golden Path)
+## 3. Demo Sequence (The Golden Path)
 
 ### **Stage 1: Institutional Issuance**
 1. Navigate to **[http://localhost:3000/login](http://localhost:3000/login)**.
@@ -63,7 +63,7 @@ node start.js
 
 ---
 
-## 🛠️ 4. Verification for Demo
+## 4. Verification for Demo
 
 To prove the system's integrity during a demo:
 
@@ -73,7 +73,7 @@ To prove the system's integrity during a demo:
 
 ---
 
-## 📜 5. Troubleshooting
+## 5. Troubleshooting
 - **Blockchain Disconnect**: If Ganache stops, restart with `node start.js`.
 - **IPFS Issues**: Ensure `PINATA_JWT` is set in `server/.env`.
 - **Port Conflicts**: Ensure ports `8545`, `5001`, and `3000` are free.

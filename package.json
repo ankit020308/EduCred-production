@@ -5,15 +5,15 @@
   "main": "index.js",
   "type": "module",
   "scripts": {
-    "dev": "node start.js",
+    "dev": "node scripts/start.js",
     "blockchain": "cd blockchain && npm run node",
     "compile:contracts": "cd blockchain && npm run compile",
     "deploy:contracts": "cd blockchain && npm run deploy",
     "server": "cd server && npm start",
     "client": "cd client && npm run dev",
     "system:reset": "cd server && node scripts/reset-system.js",
-    "start": "node start.js",
-    "all": "node start.js",
+    "start": "node scripts/start.js",
+    "all": "node scripts/start.js",
     "install:all": "npm install && cd server && npm install && cd ../client && npm install && cd ../blockchain && npm install"
   },
   "dependencies": {

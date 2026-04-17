@@ -216,8 +216,11 @@ export const verifyOTP = async (req, res) => {
       return res.status(400).json({ error: 'Security key expired. Request a new one.' });
     }
 
-    // 3. Compare hashed OTP
-    if (user.otp !== hashOTP(otp)) {
+    // 3. Compare hashed OTP using constant-time comparison
+    const expectedOtpHash = Buffer.from(hashOTP(otp), 'utf8');
+    const actualOtpHash = Buffer.from(user.otp, 'utf8');
+
+    if (expectedOtpHash.length !== actualOtpHash.length || !crypto.timingSafeEqual(expectedOtpHash, actualOtpHash)) {
       user.otpAttempts = (user.otpAttempts || 0) + 1;
       await Registry.update('users', { id: user.id }, { otpAttempts: user.otpAttempts });
       const remaining = 3 - user.otpAttempts;
@@ -442,7 +445,10 @@ export const verifyPhoneOTP = async (req, res) => {
 
     const user = Registry.findById('users', req.user.id);
 
-    if (user.otp !== hashOTP(otp)) {
+    const expectedOtpHash = Buffer.from(hashOTP(otp), 'utf8');
+    const actualOtpHash = Buffer.from(user.otp, 'utf8');
+
+    if (expectedOtpHash.length !== actualOtpHash.length || !crypto.timingSafeEqual(expectedOtpHash, actualOtpHash)) {
       return res.status(400).json({ error: 'Invalid mobile security key.' });
     }
 
@@ -486,6 +492,11 @@ export const getMe = async (req, res) => {
  */
 export const createAdmin = async (req, res) => {
   try {
+    // SECURITY CHECK: Only SUPER_ADMIN can create other admins
+    if (!req.user || req.user.role !== 'super_admin') {
+       return res.status(403).json({ error: 'Forbidden: Requires SUPER_ADMIN privileges.' });
+    }
+
     const { name, email: rawEmail, password, role } = req.body;
     const email = rawEmail.toLowerCase();
 

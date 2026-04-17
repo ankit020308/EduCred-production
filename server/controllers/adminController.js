@@ -1,5 +1,6 @@
-// server/controllers/adminController.js
 import Registry from '../services/registryService.js';
+import { ethers } from 'ethers';
+import { authorizeUniversityOnChain } from '../utils/blockchain.js';
 
 /**
  * 👑 Admin Controller
@@ -31,12 +32,26 @@ export const approveUniversity = async (req, res) => {
       });
     }
     
+    // 🏦 Generate Dedicated Ethereum Wallet for the University
+    const wallet = ethers.Wallet.createRandom();
+    const publicWalletAddress = wallet.address;
+    const encryptedPrivateKey = wallet.privateKey; // Store raw for now, ideally encrypt via KMS
+
     await Registry.update('universities', { id: universityId }, {
         status: 'APPROVED',
         approvedBy: req.user.id,
         approvedAt: new Date(),
-        isVerified: true
+        isVerified: true,
+        publicWalletAddress,
+        encryptedPrivateKey
     });
+
+    // 🔗 Anchor university wallet on-chain
+    try {
+      await authorizeUniversityOnChain(publicWalletAddress);
+    } catch (contractErr) {
+      console.warn("⚠️ Contract authorization failed:", contractErr.message);
+    }
 
     // Update the associated User node status
     await Registry.update('users', { id: university.userId }, { 

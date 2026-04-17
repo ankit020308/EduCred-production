@@ -16,8 +16,8 @@ import api from '../services/api';
 import BlockchainBackground from '../components/BlockchainBackground';
 
 const steps = [
-  'Uploading input',
-  'Generating SHA-256 fingerprint',
+  'Analyzing syntax payload',
+  'Extracting structural hash fingerprint',
   'Querying verification source',
   'Resolving certificate metadata',
 ];
@@ -225,7 +225,7 @@ export default function Verifier() {
                         {index < stepIndex && loading ? <CheckCircle2 size={14} /> : index + 1}
                       </div>
                       <p className={`text-[10px] font-black uppercase tracking-widest transition-colors ${index <= stepIndex ? 'text-slate-900' : 'text-slate-300'}`}>
-                        {step === 'Querying verification source' ? 'Blockchain Query' : step === 'Generating SHA-256 fingerprint' ? 'Generating Secure Hash' : step}
+                        {step === 'Querying verification source' ? 'Blockchain Query' : step === 'Extracting structural hash fingerprint' ? 'Extracting Semantic Hash' : step}
                       </p>
                     </div>
                   ))}
@@ -312,7 +312,7 @@ export default function Verifier() {
                   <div className="bg-slate-900 text-white rounded-3xl p-8 relative overflow-hidden group">
                      <div className="flex flex-col md:flex-row items-center justify-between gap-6">
                         <div className="flex-1">
-                          <p className="text-[9px] font-black text-slate-500 uppercase tracking-[0.2em] mb-4">SHA-256 Digital Fingerprint</p>
+                          <p className="text-[9px] font-black text-slate-500 uppercase tracking-[0.2em] mb-4">Structural Data Fingerprint</p>
                           <p className="font-mono text-xs break-all text-blue-400 leading-relaxed bg-white/5 p-4 rounded-xl">{result.hash}</p>
                         </div>
                         <button onClick={copyHash} className="w-12 h-12 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center hover:bg-white/10 transition-all shrink-0">

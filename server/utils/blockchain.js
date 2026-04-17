@@ -117,7 +117,27 @@ export async function storeHashOnChain(certificateHash) {
   return tx.wait();
 }
 
-export async function issueCertificateOnChain(certificateId, certificateHash, certType = 0) {
+export async function authorizeUniversityOnChain(universityAddress) {
+  if (!eduCredContract) {
+    throw new Error('Blockchain service is offline. Authorization aborted.');
+  }
+
+  // Use the correct method `addIssuer` defined in the smart contract
+  if (typeof eduCredContract.addIssuer !== 'function') {
+      console.warn('⚠️ [BLOCKCHAIN]: Smart contract does not support addIssuer yet. Updating required.');
+      return null;
+  }
+
+  try {
+     const tx = await eduCredContract.addIssuer(universityAddress);
+     return await tx.wait();
+  } catch (error) {
+     console.error(`[❌ LEDGER_ERROR]: Failed to authorize university - ${error.message}`);
+     throw error;
+  }
+}
+
+export async function issueCertificateOnChain(certificateId, certificateHash, certType = 0, universityPrivateKey = null) {
   if (!eduCredContract) {
     throw new Error('Blockchain service is offline. Issuance aborted.');
   }
@@ -127,10 +147,17 @@ export async function issueCertificateOnChain(certificateId, certificateHash, ce
   try {
     console.log(`[🔗 LEDGER] Initiating anchor for hash: ${hashBytes}...`);
     
+    // Connect to the University's wallet if provided (true decentralization)
+    let contractToUse = eduCredContract;
+    if (universityPrivateKey) {
+      const uniWallet = new ethers.Wallet(universityPrivateKey, provider);
+      contractToUse = new ethers.Contract(CONTRACT_ADDRESS, CONTRACT_ABI, uniWallet);
+    }
+    
     // Explicitly set gas limit to avoid estimation failures on some L2/Testnets
-    const tx = typeof eduCredContract.storeCertificate === 'function'
-      ? await eduCredContract.storeCertificate(hashBytes, certType)
-      : await eduCredContract.storeHash(hashBytes);
+    const tx = typeof contractToUse.storeCertificate === 'function'
+      ? await contractToUse.storeCertificate(hashBytes, certType)
+      : await contractToUse.storeHash(hashBytes);
     
     console.log(`[⏳ LEDGER] Transaction submitted: ${tx.hash}. Awaiting consensus...`);
     
