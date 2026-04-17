@@ -29,7 +29,6 @@ export default function Landing() {
   ];
 
   return (
-  return (
     <div className="relative min-h-screen bg-[#F9FAFB] text-[#111827] font-sans selection:bg-blue-500/30 overflow-x-hidden">
       <ProtocolBootSequence onComplete={() => setIsBooting(false)} />
       
