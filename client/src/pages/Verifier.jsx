@@ -99,11 +99,11 @@ export default function Verifier() {
   }
 
   return (
-    <div className="relative min-h-screen overflow-x-hidden bg-[#000000] text-slate-300 font-sans selection:bg-cyan-500/30">
-      <div className="fixed inset-0 opacity-20 pointer-events-none z-0">
-        <BlockchainBackground isSurging={loading} />
-      </div>
-      <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[1000px] h-[500px] bg-cyan-400/5 blur-[150px] rounded-full mix-blend-screen pointer-events-none" />
+    <div className="relative min-h-screen overflow-x-hidden bg-[#F8FAFC] text-slate-800 font-sans selection:bg-blue-500/30">
+      
+      {/* 🌌 BACKGROUND GRADIENT */}
+      <div className="fixed inset-0 bg-[#0B132B] pointer-events-none z-0" />
+      <div className="fixed inset-0 hero-gradient pointer-events-none" />
 
       <main className="relative z-10 px-6 pb-24 pt-28">
         <div className="mx-auto max-w-6xl">
@@ -113,26 +113,29 @@ export default function Verifier() {
             transition={transition}
             className="mx-auto max-w-3xl text-center space-y-8"
           >
-            <div className="inline-flex items-center gap-3 rounded-full border border-cyan-400/20 bg-cyan-400/10 px-5 py-2 text-[9px] font-black uppercase tracking-[0.4em] text-cyan-400 shadow-[0_0_15px_rgba(34,211,238,0.1)]">
+            <div className="inline-flex items-center gap-3 rounded-full border border-blue-500/20 bg-blue-500/10 px-5 py-2 text-[10px] font-black uppercase tracking-[0.2em] text-blue-600 shadow-sm">
               <ShieldCheck size={14} className="animate-pulse" />
-              Intelligence Node Active
+              Secure Verification Active
             </div>
             <h1 className="text-6xl md:text-8xl font-black tracking-tighter text-white uppercase leading-[0.9]">
-              Verified <span className="text-cyan-400">Identity.</span>
+              Instant <span className="text-blue-500">Validation.</span>
             </h1>
-            <p className="max-w-xl mx-auto text-slate-500 text-[10px] font-black uppercase tracking-[0.3em] leading-relaxed">
-              Detect valid, revoked, or tampered records across the sovereign ledger with mathematical certainty.
+            <p className="max-w-xl mx-auto text-slate-400 text-[10px] font-black uppercase tracking-[0.3em] leading-relaxed">
+              Verify the authenticity of any EduCred certificate across the global blockchain network.
             </p>
           </motion.div>
 
+          {/* MAIN VERIFIER GRID */}
           <div className="mt-20 grid gap-10 lg:grid-cols-[400px_1fr]">
+            
+            {/* LEFT COLUMN: UPLOAD / INPUT */}
             <motion.section
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ ...transition, delay: 0.05 }}
-              className="glass-pane rounded-[2.5rem] p-8 shadow-2xl scanline-overlay"
+              initial={{ opacity: 0, x: -20 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ ...transition, delay: 0.1 }}
+              className="bg-white rounded-[2.5rem] p-8 shadow-2xl shadow-slate-900/50 border border-slate-100 h-fit"
             >
-              <div className="flex rounded-2xl border border-white/5 bg-[#050505] p-1.5 shadow-inner">
+              <div className="flex p-1 bg-slate-50 border border-slate-100 rounded-2xl mb-8">
                 {['FILE', 'ID'].map((entry) => (
                   <button
                     key={entry}
@@ -142,20 +145,20 @@ export default function Verifier() {
                       setError('');
                       setResult(null);
                     }}
-                    className={`flex-1 rounded-xl py-4 text-[9px] font-black uppercase tracking-[0.3em] transition-all ${
+                    className={`flex-1 rounded-xl py-3.5 text-[10px] font-black uppercase tracking-widest transition-all ${
                       mode === entry
-                        ? 'bg-cyan-400 text-slate-950 shadow-[0_0_20px_rgba(34,211,238,0.3)]'
-                        : 'text-slate-700 hover:text-slate-400'
+                        ? 'bg-white text-blue-600 shadow-sm'
+                        : 'text-slate-400 hover:text-slate-600'
                     }`}
                   >
-                    {entry === 'FILE' ? 'Fingerprint' : 'Identity ID'}
+                    {entry === 'FILE' ? 'File Upload' : 'Certificate ID'}
                   </button>
                 ))}
               </div>
 
-              <form onSubmit={handleVerify} className="mt-6 space-y-6">
+              <form onSubmit={handleVerify} className="space-y-6">
                 {mode === 'FILE' ? (
-                  <label className="block cursor-pointer rounded-3xl border-2 border-dashed border-white/5 bg-[#050505] p-10 text-center transition-all hover:border-cyan-400/40 hover:bg-[#080808] group shadow-inner">
+                  <label className="block cursor-pointer rounded-3xl border-2 border-dashed border-slate-200 bg-slate-50 p-10 text-center transition-all hover:border-blue-500/40 hover:bg-white group">
                     <input
                       type="file"
                       className="hidden"
@@ -166,21 +169,21 @@ export default function Verifier() {
                         setResult(null);
                       }}
                     />
-                    <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-[#080808] text-slate-800 border border-white/5 group-hover:text-cyan-400 group-hover:border-cyan-400/20 transition-all shadow-xl">
+                    <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-white text-slate-400 border border-slate-200 group-hover:text-blue-600 group-hover:border-blue-500/20 transition-all shadow-sm">
                       <FileUp size={24} />
                     </div>
-                    <p className="mt-6 text-[11px] font-black text-white uppercase tracking-widest truncate max-w-[200px] mx-auto">
-                      {file ? file.name : 'Relay Protocol File'}
+                    <p className="mt-6 text-[11px] font-black text-slate-900 uppercase tracking-widest truncate max-w-[200px] mx-auto">
+                      {file ? file.name : 'Select Certificate'}
                     </p>
-                    <p className="mt-2 text-[9px] font-black text-slate-800 uppercase tracking-widest">PDF / PNG / JPG Support</p>
+                    <p className="mt-2 text-[9px] font-black text-slate-400 uppercase tracking-widest">PDF, PNG, JPG supported</p>
                   </label>
                 ) : (
-                  <div className="rounded-3xl border border-white/5 bg-[#050505] p-6 shadow-inner">
-                    <label className="text-[9px] font-black uppercase tracking-[0.3em] text-slate-800">
-                      Identity Identifier
+                  <div className="rounded-3xl border border-slate-200 bg-slate-50 p-6">
+                    <label className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">
+                      Enter Certificate ID
                     </label>
-                    <div className="mt-4 flex items-center gap-4 rounded-xl border border-white/5 bg-[#080808] px-5 py-5 group-focus-within:border-cyan-400/30 transition-all shadow-xl">
-                      <Fingerprint className="text-slate-800 group-focus-within:text-cyan-400 transition-colors" size={20} />
+                    <div className="mt-4 flex items-center gap-4 rounded-xl border border-slate-200 bg-white px-5 py-4 focus-within:border-blue-500 transition-all shadow-sm">
+                      <Fingerprint className="text-slate-300" size={20} />
                       <input
                         value={certificateId}
                         onChange={(event) => {
@@ -188,8 +191,8 @@ export default function Verifier() {
                           setError('');
                           setResult(null);
                         }}
-                        placeholder="EDUCRED-2026-..."
-                        className="w-full bg-transparent text-[10px] font-black tracking-[0.2em] text-white outline-none placeholder:text-slate-800 uppercase"
+                        placeholder="EDU-REC-..."
+                        className="w-full bg-transparent text-[11px] font-black tracking-widest text-slate-900 outline-none placeholder:text-slate-300 uppercase"
                       />
                     </div>
                   </div>
@@ -198,147 +201,138 @@ export default function Verifier() {
                 <button
                   type="submit"
                   disabled={!canSubmit}
-                  className="btn-command btn-blue w-full py-5 shadow-[0_0_30px_rgba(59,130,246,0.2)] disabled:shadow-none"
+                  className="btn-primary w-full py-5 !shadow-blue-500/10"
                 >
                   {loading ? <Loader2 className="animate-spin" size={20} /> : <ShieldCheck size={20} />}
-                  {loading ? 'Initializing Protocol...' : 'Initialize Verification'}
+                  {loading ? 'Verifying...' : 'Start Verification'}
                 </button>
               </form>
 
-              <div className="mt-8 rounded-3xl border border-white/5 bg-[#050505] p-6 shadow-inner">
-                <p className="text-[9px] font-black uppercase tracking-[0.4em] text-slate-800">Telemetry Stages</p>
-                <div className="mt-6 space-y-4">
+              <div className="mt-8 pt-8 border-t border-slate-100">
+                <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 mb-6">Verification Progress</p>
+                <div className="space-y-4">
                   {steps.map((step, index) => (
-                    <div key={step} className="flex items-center gap-4 group/step">
+                    <div key={step} className="flex items-center gap-4">
                       <div
-                        className={`flex h-10 w-10 items-center justify-center rounded-xl text-[10px] font-black border transition-all ${
+                        className={`flex h-8 w-8 items-center justify-center rounded-lg text-[9px] font-black border transition-all ${
                           index <= stepIndex && loading
-                            ? 'bg-cyan-400 border-cyan-400 text-slate-950 shadow-[0_0_15px_rgba(34,211,238,0.4)]'
+                            ? 'bg-blue-600 border-blue-600 text-white shadow-lg'
                             : !loading && index === steps.length - 1 && (result || error)
-                              ? 'bg-emerald-500 border-emerald-500 text-slate-950 shadow-[0_0_15px_rgba(52,211,153,0.4)]'
-                              : 'bg-[#080808] border-white/5 text-slate-800'
+                              ? 'bg-emerald-500 border-emerald-500 text-white shadow-lg'
+                              : 'bg-white border-slate-200 text-slate-300'
                         }`}
                       >
-                        {index < stepIndex && loading ? <CheckCircle2 size={16} /> : `0${index + 1}`}
+                        {index < stepIndex && loading ? <CheckCircle2 size={14} /> : index + 1}
                       </div>
-                      <p className={`text-[10px] font-black uppercase tracking-[0.2em] transition-colors ${index <= stepIndex ? 'text-white' : 'text-slate-800'}`}>{step}</p>
+                      <p className={`text-[10px] font-black uppercase tracking-widest transition-colors ${index <= stepIndex ? 'text-slate-900' : 'text-slate-300'}`}>
+                        {step === 'Querying verification source' ? 'Blockchain Query' : step === 'Generating SHA-256 fingerprint' ? 'Generating Secure Hash' : step}
+                      </p>
                     </div>
                   ))}
                 </div>
               </div>
             </motion.section>
 
+            {/* RIGHT COLUMN: RESULTS */}
             <motion.section
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
               transition={{ ...transition, delay: 0.1 }}
-              className="glass-pane rounded-[2.5rem] p-8 shadow-2xl scanline-overlay relative overflow-hidden h-fit sm:border border-white/5"
+              className="bg-white rounded-[2.5rem] p-8 shadow-2xl shadow-slate-900/50 border border-slate-100 h-fit min-h-[600px]"
             >
               {!result && !error ? (
-                <div className="flex h-full min-h-[500px] flex-col justify-between rounded-3xl border border-white/5 bg-[#050505] p-10 shadow-inner relative overflow-hidden">
-                  <div className="absolute top-0 left-0 w-full h-1/2 bg-cyan-400/5 blur-[80px] pointer-events-none" />
-                  <div className="relative z-10">
-                    <p className="text-[9px] font-black uppercase tracking-[0.5em] text-slate-800">Protocol Capability</p>
-                    <h2 className="mt-6 text-4xl font-black tracking-tighter text-white uppercase leading-none">
-                      Trust <span className="text-cyan-400">Signals.</span>
-                    </h2>
-                    <p className="mt-6 text-[11px] font-black uppercase tracking-[0.2em] leading-relaxed text-slate-700">
-                      EduCred returns bit-perfect hash validation, origin certainty, and blockchain commit verification.
-                    </p>
+                <div className="flex flex-col items-center justify-center h-full min-h-[500px] text-center p-12">
+                  <div className="w-24 h-24 bg-slate-50 rounded-full flex items-center justify-center mb-10 border border-slate-100">
+                    <Search size={40} className="text-slate-300" />
                   </div>
-
-                  <div className="grid gap-4 md:grid-cols-2 mt-10 relative z-10">
-                    <DetailRow label="Authority Origin" value="Institutional Node" />
-                    <DetailRow label="Integrity Guard" value="SHA-256 Collision Logic" />
-                    <DetailRow label="Spatial Archive" value="Distributed Storage (IPFS)" />
-                    <DetailRow label="Commit State" value="Immutable Ledger Anchor" />
-                  </div>
+                  <h2 className="text-4xl font-black text-slate-900 tracking-tight leading-none mb-6">
+                    Awaiting <br/> <span className="text-blue-500">Verification.</span>
+                  </h2>
+                  <p className="text-slate-400 text-sm font-medium leading-relaxed max-w-sm">
+                    Enter a certificate ID or upload a file to perform a secure, blockchain-backed authenticity check.
+                  </p>
                 </div>
               ) : error ? (
-                <div className="rounded-[2rem] border border-rose-500/20 bg-rose-500/10 p-10 shadow-[0_0_50px_rgba(244,63,94,0.1)]">
-                  <div className="flex items-start gap-6">
-                    <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-[#050505] text-rose-500 border border-rose-500/30 shadow-2xl">
-                      <ShieldAlert size={28} />
-                    </div>
-                    <div>
-                      <p className="text-[9px] font-black uppercase tracking-[0.4em] text-rose-500">Verification Failure</p>
-                      <h2 className="mt-4 text-3xl font-black text-white uppercase tracking-tighter leading-none">{error}</h2>
-                    </div>
+                <div className="bg-rose-50 border border-rose-100 rounded-[2rem] p-10 text-center flex flex-col items-center justify-center h-full min-h-[500px]">
+                  <div className="w-20 h-20 bg-rose-600 text-white rounded-3xl flex items-center justify-center mb-8 shadow-xl shadow-rose-600/20">
+                    <ShieldAlert size={32} />
                   </div>
+                  <h2 className="text-3xl font-black text-slate-900 uppercase tracking-tighter mb-4">Verification Error</h2>
+                  <p className="text-rose-600 text-[10px] font-black uppercase tracking-widest">{error}</p>
                 </div>
               ) : (
-                <div className="space-y-8">
-                  <div
-                    className={`rounded-[2rem] p-10 border shadow-2xl relative overflow-hidden ${
-                      result.valid
-                        ? 'border-emerald-500/20 bg-emerald-500/10'
-                        : 'border-rose-500/20 bg-rose-500/10'
-                    }`}
-                  >
-                    <div className="absolute top-0 right-0 w-32 h-32 bg-current opacity-5 blur-[50px] pointer-events-none" />
-                    <div className="flex flex-col gap-8 md:flex-row md:items-center md:justify-between relative z-10">
-                      <div className="flex items-center gap-6">
-                        <div
-                          className={`flex h-20 w-20 items-center justify-center rounded-3xl shadow-2xl transition-transform hover:scale-105 ${
-                            result.valid ? 'bg-emerald-500 text-slate-950 shadow-emerald-500/20' : 'bg-rose-500 text-slate-950 shadow-rose-500/20'
-                          }`}
-                        >
-                          {result.valid ? <ShieldCheck size={36} /> : <ShieldAlert size={36} />}
+                <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                  {/* SUCCESS / FAILURE HEADER */}
+                  <div className={`rounded-[2rem] p-10 border shadow-sm relative overflow-hidden ${
+                      result.valid ? 'border-emerald-100 bg-emerald-50' : 'border-rose-100 bg-rose-50'
+                  }`}>
+                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-8">
+                       <div className="flex items-center gap-6">
+                         <div className={`w-20 h-20 rounded-3xl flex items-center justify-center shadow-xl ${
+                             result.valid ? 'bg-emerald-500 text-white shadow-emerald-500/20' : 'bg-rose-500 text-white shadow-rose-500/20'
+                         }`}>
+                           {result.valid ? <ShieldCheck size={36} /> : <ShieldAlert size={36} />}
+                         </div>
+                         <div>
+                            <p className={`text-[10px] font-black uppercase tracking-[0.2em] mb-2 ${result.valid ? 'text-emerald-600' : 'text-rose-600'}`}>
+                              {result.valid ? 'Record Verified' : 'Invalid Record'}
+                            </p>
+                            <h2 className="text-4xl font-black text-slate-900 tracking-tighter leading-none">
+                              {result.valid ? 'Authentic.' : 'Tampered.'}
+                            </h2>
+                         </div>
+                       </div>
+                       
+                       {result.valid && (
+                         <Link to={`/student/${result.metadata.certificateId}`} className="btn-primary !px-10 !py-5 shadow-emerald-500/10">
+                            View Details
+                         </Link>
+                       )}
+                    </div>
+                  </div>
+
+                  {/* METADATA GRID */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                     {[
+                       { label: "Student Name", value: result.metadata?.studentName },
+                       { label: "Course / Program", value: result.metadata?.course || result.metadata?.programName },
+                       { label: "Issuing Institution", value: result.metadata?.issuer || result.metadata?.universityName },
+                       { label: "Platform Source", value: result.verificationSource },
+                       { label: "Storage Layer", value: result.metadata?.ipfsCid ? 'IPFS (Decentralized)' : 'EduCred Core' },
+                       { label: "Certificate ID", value: result.metadata?.certificateId }
+                     ].map((item, i) => (
+                       <div key={i} className="bg-slate-50 border border-slate-100 rounded-2xl p-6">
+                          <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-2">{item.label}</p>
+                          <p className="text-[13px] font-black text-slate-900 truncate">{item.value || 'N/A'}</p>
+                       </div>
+                     ))}
+                  </div>
+
+                  {/* HASH SECTION */}
+                  <div className="bg-slate-900 text-white rounded-3xl p-8 relative overflow-hidden group">
+                     <div className="flex flex-col md:flex-row items-center justify-between gap-6">
+                        <div className="flex-1">
+                          <p className="text-[9px] font-black text-slate-500 uppercase tracking-[0.2em] mb-4">SHA-256 Digital Fingerprint</p>
+                          <p className="font-mono text-xs break-all text-blue-400 leading-relaxed bg-white/5 p-4 rounded-xl">{result.hash}</p>
                         </div>
-                        <div>
-                          <p className={`text-[9px] font-black uppercase tracking-[0.5em] leading-none ${result.valid ? 'text-emerald-500' : 'text-rose-500'}`}>
-                            {result.valid ? 'Sovereign Record Valid' : 'Record Mismatch'}
-                          </p>
-                          <h2 className="mt-4 text-4xl font-black tracking-tighter text-white uppercase leading-none">
-                            {result.valid ? 'Record Authentic.' : 'Identity Revoked.'}
-                          </h2>
-                        </div>
-                      </div>
-
-                      {result.valid && result.metadata?.certificateId ? (
-                        <Link
-                          to={`/student/${result.metadata.certificateId}`}
-                          className="btn-command btn-blue px-10 shadow-2xl"
-                        >
-                          Open Share Node
-                          <ArrowRight size={18} />
-                        </Link>
-                      ) : null}
-                    </div>
+                        <button onClick={copyHash} className="w-12 h-12 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center hover:bg-white/10 transition-all shrink-0">
+                           {copied ? <CheckCircle2 size={18} className="text-emerald-400" /> : <Copy size={18} />}
+                        </button>
+                     </div>
                   </div>
 
-                  <div className="grid gap-6 md:grid-cols-2">
-                    <DetailRow label="Subject Identity" value={result.metadata?.studentName} />
-                    <DetailRow label="Program Module" value={result.metadata?.course || result.metadata?.programName} />
-                    <DetailRow label="Authority Node" value={result.metadata?.issuer || result.metadata?.universityName} />
-                    <DetailRow label="Protocol Source" value={result.verificationSource || 'Unknown'} />
-                    <DetailRow label="Spatial Storage" value={result.metadata?.ipfsCid ? 'Decentralized Architecture' : 'Local Registry'} />
-                    <DetailRow label="Protocol ID" value={result.metadata?.certificateId} />
-                  </div>
-
-                  <div className="rounded-[2rem] border border-white/5 bg-[#050505] p-8 shadow-inner">
-                    <div className="flex flex-col gap-6 md:flex-row md:items-center md:justify-between">
-                      <div className="flex-1">
-                        <p className="text-[9px] font-black uppercase tracking-[0.4em] text-slate-800">Fingerprint Payload (SHA-256)</p>
-                        <p className="mt-4 break-all font-mono text-[11px] text-cyan-400 tracking-tight leading-relaxed bg-cyan-400/5 p-4 rounded-xl border border-cyan-400/10">{result.hash}</p>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={copyHash}
-                        className="btn-command btn-outline px-8 h-12"
-                      >
-                        <Copy size={16} />
-                        {copied ? 'Captured' : 'Capture Hash'}
-                      </button>
+                  {result.ledgerProof && (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                       <div className="bg-slate-50 border border-slate-100 rounded-2xl p-6">
+                          <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-2">Blockchain Transaction</p>
+                          <p className="text-[10px] font-mono break-all text-slate-600">{result.ledgerProof.transactionHash}</p>
+                       </div>
+                       <div className="bg-slate-50 border border-slate-100 rounded-2xl p-6">
+                          <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-2">Timestamp</p>
+                          <p className="text-[13px] font-black text-slate-900">{result.ledgerProof.anchoredAt || result.ledgerProof.status}</p>
+                       </div>
                     </div>
-                  </div>
-
-                  {result.ledgerProof ? (
-                    <div className="grid gap-4 md:grid-cols-2">
-                      <DetailRow label="Transaction hash" value={result.ledgerProof.transactionHash} />
-                      <DetailRow label="Anchored at" value={result.ledgerProof.anchoredAt || result.ledgerProof.status} />
-                    </div>
-                  ) : null}
+                  )}
                 </div>
               )}
             </motion.section>

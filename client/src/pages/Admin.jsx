@@ -154,52 +154,40 @@ function AdminDashboard() {
       <div className="flex flex-col items-center gap-6">
         <Loader2 className="animate-spin text-cyan-400" size={40} />
         <p className="text-[10px] font-black uppercase tracking-[0.4em] text-slate-600">
-          Synchronizing Protocol...
-        </p>
-      </div>
-    </div>
-  );
-
-  return (
-    <div className="relative min-h-screen bg-[#000000] text-slate-300 font-sans selection:bg-blue-500/30 overflow-hidden">
-
-      {/* 🌌 INTERACTIVE BACKGROUND */}
-      <div className="fixed inset-0 z-0 opacity-20 mix-blend-screen pointer-events-none">
-        <BlockchainBackground />
-      </div>
-
-      {/* AMBIENT GLOW */}
-      <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[1000px] h-[500px] bg-cyan-400/5 blur-[150px] rounded-full mix-blend-screen pointer-events-none" />
+          Synchronizing    <div className="relative min-h-screen bg-[#F8FAFC] text-slate-800 font-sans selection:bg-blue-500/30 overflow-hidden">
+      
+      {/* 🌌 BACKGROUND GRADIENT */}
+      <div className="fixed inset-0 bg-[#0B132B] pointer-events-none z-0" />
+      <div className="fixed inset-0 hero-gradient pointer-events-none" />
 
       {/* ── UNVERIFIED VIEW ────────────────────────────────────────── */}
       {universityStatus !== 'APPROVED' ? (
         <div className="h-screen flex items-center justify-center p-6 relative z-10">
-          <motion.div {...viewTransition} className="bg-[#050505]/90 backdrop-blur-3xl max-w-lg w-full p-12 text-center space-y-8 border border-white/5 rounded-[2rem] shadow-[0_0_100px_rgba(245,158,11,0.05)] relative overflow-hidden">
-            <div className="absolute inset-0 bg-gradient-to-b from-transparent via-amber-500/5 to-transparent h-1 w-full animate-scan" />
-            <div className="w-20 h-20 bg-amber-500/10 rounded-2xl mx-auto flex items-center justify-center text-amber-500 border border-amber-500/20">
+          <motion.div {...viewTransition} className="bg-white max-w-lg w-full p-12 text-center space-y-8 border border-slate-100 rounded-[2rem] shadow-2xl shadow-slate-900/50 relative overflow-hidden">
+            <div className="w-20 h-20 bg-amber-50 rounded-2xl mx-auto flex items-center justify-center text-amber-500 border border-amber-100 shadow-sm">
               <ShieldAlert size={36} />
             </div>
             <div className="space-y-3">
-              <h1 className="text-4xl font-black text-white tracking-tighter uppercase leading-none">
-                Clearance <span className="text-amber-500">Pending.</span>
+              <h1 className="text-4xl font-black text-slate-900 tracking-tighter leading-none">
+                Account under <span className="text-amber-500">review.</span>
               </h1>
-              <p className="text-slate-500 text-xs font-medium leading-relaxed">
-                Your institution is under review by the EduCred governance team.
-                Issuance rights will be granted once approved.
+              <p className="text-slate-500 text-sm font-medium leading-relaxed">
+                Your institution's application is being reviewed by our team.
+                You will be notified once issuance rights are granted.
               </p>
             </div>
-            <div className="pt-8 border-t border-white/5 flex flex-col items-center gap-6">
-              <div className="px-5 py-2.5 rounded-xl bg-[#050505] border border-white/5 flex items-center gap-3 shadow-inner">
+            <div className="pt-8 border-t border-slate-100 flex flex-col items-center gap-6">
+              <div className="px-5 py-2.5 rounded-xl bg-slate-50 border border-slate-100 flex items-center gap-3">
                 <div className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
-                <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest">
-                  Identity State: {universityStatus || 'PENDING'}
+                <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                  Status: {universityStatus || 'PENDING'}
                 </span>
               </div>
               <button
                 onClick={() => { fetchUniversityStatus(); }}
-                className="btn-command btn-outline w-full !py-4"
+                className="w-full flex items-center justify-center gap-3 py-4 px-6 rounded-xl bg-white border border-slate-200 text-[10px] font-black uppercase tracking-widest text-slate-600 hover:bg-slate-50 transition-all font-sans"
               >
-                <RefreshCcw size={16} /> Sync Protocol Status
+                <RefreshCcw size={16} /> Sync Account Status
               </button>
             </div>
           </motion.div>
@@ -212,59 +200,59 @@ function AdminDashboard() {
           {/* HEADER */}
           <motion.div {...viewTransition} className="flex flex-col md:flex-row md:items-end justify-between gap-8">
             <div className="space-y-4">
-              <div className="flex items-center gap-3 px-4 py-2 bg-cyan-500/10 border border-cyan-500/20 rounded-full w-fit">
-                <div className="w-2 h-2 rounded-full bg-cyan-400 animate-pulse" />
-                <span className="text-[9px] font-black text-cyan-400 uppercase tracking-widest">Authority Node Active</span>
+              <div className="flex items-center gap-3 px-4 py-2 bg-blue-500/10 border border-blue-500/20 rounded-full w-fit">
+                <div className="w-2 h-2 rounded-full bg-blue-500 animate-pulse" />
+                <span className="text-[9px] font-black text-blue-600 uppercase tracking-widest">Institution Verified</span>
               </div>
               <h1 className="text-5xl md:text-6xl font-black text-white tracking-tighter leading-none uppercase">
-                Intelligence <span className="text-cyan-400">Hub.</span>
+                Issuer <span className="text-blue-500">Dashboard.</span>
               </h1>
-              <p className="text-slate-500 text-[9px] font-black uppercase tracking-[0.4em] flex items-center gap-3">
-                <Database size={14} className="text-slate-700" /> {user?.universityName || 'Institutional Dashboard'}
+              <p className="text-slate-400 text-[10px] font-black uppercase tracking-[0.4em] flex items-center gap-3">
+                <Database size={14} className="text-slate-600" /> {user?.universityName || 'Institutional Workspace'}
               </p>
             </div>
             <button
               onClick={() => setShowIssueModal(true)}
-              className="btn-command btn-blue px-10 shadow-[0_0_30px_rgba(59,130,246,0.3)]"
+              className="btn-primary px-10 !shadow-blue-500/20"
             >
-              Issue Certificate <ArrowRight size={16} />
+              Issue Certificate <Plus size={20} />
             </button>
           </motion.div>
 
           {/* INSIGHTS GRID */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
             {[
-              { icon: Activity, label: 'Total Issued', val: stats.total, color: 'text-cyan-400', bg: 'bg-cyan-500/10', border: 'border-cyan-500/20' },
-              { icon: ShieldCheck, label: 'Confirmed', val: stats.confirmed, color: 'text-cyan-400', bg: 'bg-cyan-500/10', border: 'border-cyan-500/20' },
-              { icon: Clock, label: 'Pending', val: stats.pending, color: 'text-amber-400', bg: 'bg-amber-500/10', border: 'border-amber-500/20' },
-              { icon: Zap, label: 'Revoked', val: stats.failed, color: 'text-rose-400', bg: 'bg-rose-500/10', border: 'border-rose-500/20' },
+              { icon: Activity, label: 'Total Issued', val: stats.total, color: 'text-blue-600', bg: 'bg-blue-50', border: 'border-blue-100' },
+              { icon: ShieldCheck, label: 'Confirmed', val: stats.confirmed, color: 'text-emerald-600', bg: 'bg-emerald-50', border: 'border-emerald-100' },
+              { icon: Clock, label: 'Pending Sync', val: stats.pending, color: 'text-amber-600', bg: 'bg-amber-50', border: 'border-amber-100' },
+              { icon: Zap, label: 'Revoked', val: stats.failed, color: 'text-rose-600', bg: 'bg-rose-50', border: 'border-rose-100' },
             ].map((s, i) => (
               <motion.div
                 key={i} {...viewTransition} transition={{ delay: i * 0.1 }}
-                className="glass-pane p-8 rounded-[2.5rem] group hover:border-cyan-400/30 transition-all shadow-2xl"
+                className="bg-white p-8 rounded-[2.5rem] border border-slate-100 shadow-2xl shadow-slate-900/10 group hover:border-blue-500/30 transition-all"
               >
-                <div className={`w-12 h-12 rounded-2xl ${s.bg} ${s.border} border mb-6 flex items-center justify-center shadow-inner`}>
+                <div className={`w-12 h-12 rounded-2xl ${s.bg} ${s.border} border mb-6 flex items-center justify-center shadow-sm`}>
                   <s.icon className={s.color} size={22} />
                 </div>
-                <span className="text-4xl font-black text-white tracking-tighter mb-2 block">{s.val}</span>
-                <span className="text-[10px] font-black text-slate-500 uppercase tracking-[0.3em]">{s.label}</span>
+                <span className="text-4xl font-black text-slate-900 tracking-tighter mb-2 block">{s.val}</span>
+                <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{s.label}</span>
               </motion.div>
             ))}
           </div>
 
           {/* LEDGER TABLE */}
-          <motion.div {...viewTransition} transition={{ delay: 0.3 }} className="glass-pane rounded-[2.5rem] overflow-hidden shadow-2xl scanline-overlay sm:border border-white/10">
-            <div className="p-8 border-b border-white/5 flex flex-col md:flex-row md:items-center justify-between gap-6 bg-[#050505]/60">
+          <motion.div {...viewTransition} transition={{ delay: 0.3 }} className="bg-white rounded-[2.5rem] shadow-2xl shadow-slate-900/10 border border-slate-100 overflow-hidden">
+            <div className="p-8 border-b border-slate-50 flex flex-col md:flex-row md:items-center justify-between gap-6 bg-slate-50/50">
               <div className="flex items-center gap-4">
-                <Database className="text-cyan-400" size={24} />
-                <h3 className="text-[11px] font-black uppercase tracking-[0.4em] text-white">Institutional Ledger</h3>
+                <Database className="text-blue-600" size={24} />
+                <h3 className="text-[11px] font-black uppercase tracking-widest text-slate-900">Certificate History</h3>
               </div>
-              <div className="relative group/search w-full md:w-80">
-                <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-700 group-focus-within/search:text-cyan-400 transition-colors" size={16} />
+              <div className="relative group w-full md:w-80">
+                <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300 group-focus-within:text-blue-500 transition-colors" size={16} />
                 <input
-                  placeholder="SEARCH IDENTITY OR COURSE..."
+                  placeholder="SEARCH RECIPIENT..."
                   value={search} onChange={(e) => setSearch(e.target.value)}
-                  className="w-full bg-[#050505] border border-white/10 rounded-xl py-4 pl-12 pr-4 text-[10px] font-black text-white outline-none focus:border-cyan-400/40 transition-all placeholder:text-slate-800 uppercase tracking-widest shadow-inner focus:bg-[#080808]"
+                  className="w-full bg-white border border-slate-200 rounded-xl py-4 pl-12 pr-4 text-[10px] font-black text-slate-900 outline-none focus:border-blue-500 transition-all shadow-sm uppercase tracking-widest"
                 />
               </div>
             </div>
@@ -272,77 +260,75 @@ function AdminDashboard() {
             <div className="overflow-x-auto">
               <table className="w-full text-left border-collapse">
                 <thead>
-                  <tr className="border-b border-white/[0.06] bg-[#020202] text-[10px] font-bold uppercase tracking-[0.2em] text-slate-500">
-                    <th className="px-8 py-5">Student</th>
-                    <th className="px-8 py-5">Course</th>
-                    <th className="px-8 py-5">Status</th>
-                    <th className="px-8 py-5">Hash Fingerprint</th>
-                    <th className="px-8 py-5 text-right">Issued</th>
+                  <tr className="bg-slate-50/50 text-[10px] font-black uppercase tracking-widest text-slate-400">
+                    <th className="px-8 py-5 border-b border-slate-100">Recipient</th>
+                    <th className="px-8 py-5 border-b border-slate-100">Program</th>
+                    <th className="px-8 py-5 border-b border-slate-100">Status</th>
+                    <th className="px-8 py-5 border-b border-slate-100">Audit ID</th>
+                    <th className="px-8 py-5 border-b border-slate-100 text-right">Issued Date</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-white/[0.04]">
+                <tbody className="divide-y divide-slate-50">
                   {filtered.length === 0 ? (
                     <tr>
                       <td colSpan="5" className="px-8 py-24 text-center">
-                        <div className="flex flex-col items-center gap-6 text-slate-800">
-                          <div className="w-16 h-16 bg-white/[0.02] rounded-2xl flex items-center justify-center border border-white/5">
-                            <Database size={32} className="opacity-20" />
+                        <div className="flex flex-col items-center gap-6 text-slate-300">
+                          <div className="w-16 h-16 bg-slate-50 rounded-2xl flex items-center justify-center border border-slate-100">
+                            <Database size={32} />
                           </div>
-                          <p className="text-[10px] font-black uppercase tracking-[0.4em]">
-                            Global Ledger is Vacant
-                          </p>
+                          <p className="text-[10px] font-black uppercase tracking-widest">No records found</p>
                           <button
                             onClick={() => setShowIssueModal(true)}
-                            className="btn-command btn-outline px-10"
+                            className="text-blue-600 font-bold hover:underline"
                           >
-                            Initialize Issuance
+                            Generate First Certificate
                           </button>
                         </div>
                       </td>
                     </tr>
                   ) : (
                     filtered.map((cert) => (
-                      <tr key={cert._id} className="group hover:bg-[#111111] transition-colors duration-300">
-                        <td className="px-8 py-5">
+                      <tr key={cert._id} className="group hover:bg-slate-50 transition-colors">
+                        <td className="px-8 py-6">
                           <div className="flex items-center gap-4">
-                            <div className="w-10 h-10 bg-[#050505] rounded-lg flex items-center justify-center text-slate-400 font-extrabold border border-white/5 group-hover:border-cyan-400/30 group-hover:text-cyan-400 transition-colors text-xs shadow-inner uppercase">
+                            <div className="w-10 h-10 bg-slate-100 rounded-lg flex items-center justify-center text-slate-400 font-black border border-slate-200 group-hover:bg-blue-600 group-hover:text-white transition-all text-xs uppercase">
                               {cert.studentName?.charAt(0)}
                             </div>
                             <div>
-                              <p className="text-white font-black text-[11px] tracking-widest uppercase">{cert.studentName}</p>
-                              <p className="text-slate-700 text-[9px] font-black uppercase tracking-widest mt-1">{cert.studentEmail}</p>
+                              <p className="text-slate-900 font-black text-[11px] tracking-widest uppercase">{cert.studentName}</p>
+                              <p className="text-slate-400 text-[9px] font-black uppercase tracking-widest mt-1">{cert.studentEmail}</p>
                             </div>
                           </div>
                         </td>
-                        <td className="px-8 py-5">
-                          <span className="text-slate-400 text-[10px] font-bold uppercase tracking-widest">{cert.course}</span>
+                        <td className="px-8 py-6">
+                          <span className="text-slate-500 text-[11px] font-bold uppercase tracking-widest">{cert.course}</span>
                         </td>
-                        <td className="px-8 py-5">
-                          <div className="flex items-center gap-3">
-                            <StatusBadge status={cert.status} />
-                            {cert.ipfsCid && (
-                              <div className="flex items-center gap-1.5 px-2 py-0.5 bg-cyan-400/10 border border-cyan-400/20 rounded-md shadow-[0_0_10px_rgba(34,211,238,0.1)]">
-                                <span className="text-[8px] font-black text-cyan-400 uppercase tracking-tighter">Decentralized</span>
-                              </div>
-                            )}
-                          </div>
+                        <td className="px-8 py-6">
+                           <div className="flex items-center gap-2">
+                             <StatusBadge status={cert.status} />
+                             {cert.ipfsCid && (
+                               <div className="px-2 py-0.5 bg-blue-50 text-blue-600 text-[8px] font-black uppercase tracking-tighter rounded border border-blue-100">
+                                 IPFS
+                               </div>
+                             )}
+                           </div>
                         </td>
-                        <td className="px-8 py-5">
+                        <td className="px-8 py-6">
                           <button
                             onClick={() => copyToClipboard(cert.certificateHash || cert._id, cert._id)}
-                            className="flex items-center gap-3 bg-[#050505] px-4 py-2 rounded-xl border border-white/5 hover:border-cyan-400/20 transition-all group/copy shadow-inner"
+                            className="flex items-center gap-3 bg-slate-50 px-4 py-2 rounded-xl border border-slate-100 group/copy hover:bg-white hover:border-blue-200 transition-all shadow-sm"
                           >
-                            <span className="text-[10px] font-mono text-slate-700 group-hover/copy:text-cyan-400 transition-colors truncate w-32">
+                            <span className="text-[10px] font-mono text-slate-400 group-hover/copy:text-blue-600 transition-colors truncate w-32">
                               {cert.certificateHash?.slice(0, 14) || cert._id.slice(0, 14)}...
                             </span>
                             {copiedId === cert._id
-                              ? <Check size={12} className="text-cyan-400" />
-                              : <Copy size={12} className="text-slate-800 group-hover/copy:text-cyan-400 transition-colors" />
+                              ? <Check size={12} className="text-emerald-500" />
+                              : <Copy size={12} className="text-slate-300 group-hover/copy:text-blue-600 transition-colors" />
                             }
                           </button>
                         </td>
-                        <td className="px-8 py-5 text-right">
-                          <span className="text-slate-700 text-[9px] font-black uppercase tracking-widest">{new Date(cert.createdAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}</span>
+                        <td className="px-8 py-6 text-right">
+                          <span className="text-slate-400 text-[9px] font-black uppercase tracking-widest">{new Date(cert.createdAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}</span>
                         </td>
                       </tr>
                     ))
@@ -358,122 +344,130 @@ function AdminDashboard() {
       <AnimatePresence>
         {showIssueModal && (
           <div className="fixed inset-0 z-[100] flex items-center justify-center p-6">
-            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => { setShowIssueModal(false); setIssuedResult(null); }} className="absolute inset-0 bg-black/70 backdrop-blur-xl" />
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => { setShowIssueModal(false); setIssuedResult(null); }} className="absolute inset-0 bg-[#0B132B]/60 backdrop-blur-md" />
             <motion.div
               initial={{ scale: 0.95, opacity: 0, y: 20 }} animate={{ scale: 1, opacity: 1, y: 0 }} exit={{ scale: 0.95, opacity: 0, y: 20 }}
-              className="relative w-full max-w-xl glass-pane rounded-[2.5rem] overflow-hidden shadow-[0_0_100px_rgba(0,0,0,0.8)] scanline-overlay"
+              className="relative w-full max-w-xl bg-white rounded-[2.5rem] overflow-hidden shadow-2xl border border-slate-100"
             >
-              <div className="p-8 border-b border-white/5 flex items-center justify-between bg-[#050505]/80">
+              <div className="p-8 border-b border-slate-50 flex items-center justify-between bg-slate-50/50">
                 <div>
-                  <h2 className="text-2xl font-black text-white tracking-tighter uppercase leading-none">Issue <span className="text-cyan-400">Credential.</span></h2>
-                  <p className="text-slate-600 text-[9px] font-black uppercase tracking-[0.4em] mt-2">Blockchain-Anchored Protocol</p>
+                  <h2 className="text-2xl font-black text-slate-900 tracking-tighter uppercase leading-none">Issue <span className="text-blue-600">Certificate.</span></h2>
+                  <p className="text-slate-400 text-[10px] font-black uppercase tracking-widest mt-2">Secure Academic Registry</p>
                 </div>
-                <button onClick={() => { setShowIssueModal(false); setIssuedResult(null); }} className="w-10 h-10 rounded-xl bg-[#080808] hover:bg-rose-500/10 border border-white/10 flex items-center justify-center text-slate-500 hover:text-rose-500 transition-all">
+                <button onClick={() => { setShowIssueModal(false); setIssuedResult(null); }} className="w-10 h-10 rounded-xl bg-white hover:bg-rose-50 border border-slate-200 flex items-center justify-center text-slate-400 hover:text-rose-500 transition-all shadow-sm">
                   <X size={18} />
                 </button>
               </div>
 
               {issuedResult ? (
-                /* ── SUCCESS STATE ── */
                   <div className="p-12 space-y-8 text-center relative overflow-hidden">
-                    <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full h-1/2 bg-cyan-400/10 blur-[80px] pointer-events-none" />
                     <div className="space-y-4 relative z-10">
-                      <div className="w-20 h-20 bg-[#050505] rounded-3xl mx-auto flex items-center justify-center text-cyan-400 border border-cyan-400/20 shadow-[0_0_40px_rgba(34,211,238,0.2)]">
+                      <div className="w-20 h-20 bg-emerald-50 rounded-3xl mx-auto flex items-center justify-center text-emerald-600 border border-emerald-100 shadow-xl shadow-emerald-500/10">
                         <CheckCircle2 size={36} />
                       </div>
-                      <h3 className="text-2xl font-black text-white tracking-tighter uppercase leading-none">Identity Anchored.</h3>
-                      <p className="text-slate-600 text-[9px] font-black uppercase tracking-[0.4em] max-w-xs mx-auto leading-relaxed">
-                        Credential fingerprint has been permanently committed to the sovereign ledger.
+                      <h3 className="text-2xl font-black text-slate-900 tracking-tighter uppercase leading-none">Record Anchored.</h3>
+                      <p className="text-slate-400 text-[10px] font-black uppercase tracking-widest max-w-xs mx-auto leading-relaxed">
+                        The certificate has been securely registered on the blockchain.
                       </p>
                     </div>
 
-                    {/* Certificate ID — copyable */}
-                    <div className="bg-[#050505] border border-white/5 rounded-2xl p-6 space-y-4 relative z-10 shadow-inner">
-                      <p className="text-[9px] font-black text-slate-800 uppercase tracking-[0.4em]">Protocol Identifier</p>
-                      <p className="text-cyan-400 font-mono text-[11px] break-all tracking-tight bg-cyan-400/5 py-3 px-4 rounded-xl border border-cyan-400/10 select-all">{issuedResult.certificateId}</p>
+                    <div className="bg-slate-50 border border-slate-100 rounded-2xl p-6 space-y-4 relative z-10">
+                      <p className="text-[10px] font-black text-slate-300 uppercase tracking-widest">Public identifier</p>
+                      <p className="text-blue-600 font-mono text-[11px] break-all tracking-tight bg-white py-3 px-4 rounded-xl border border-slate-100 select-all">{issuedResult.certificateId}</p>
                       <div className="flex gap-3 pt-2">
                         <button
                           onClick={() => copyToClipboard(String(issuedResult.certificateId), 'result')}
-                          className="flex-1 flex items-center justify-center gap-2 py-4 bg-[#080808] border border-white/5 rounded-xl text-[9px] font-black uppercase tracking-[0.3em] text-slate-500 hover:text-white hover:border-white/20 transition-all shadow-xl"
+                          className="flex-1 flex items-center justify-center gap-2 py-4 bg-white border border-slate-200 rounded-xl text-[10px] font-black uppercase tracking-widest text-slate-500 hover:bg-slate-50 transition-all"
                         >
-                          {copiedId === 'result' ? <Check size={14} className="text-cyan-400" /> : <Copy size={14} />}
+                          {copiedId === 'result' ? <Check size={14} className="text-emerald-500" /> : <Copy size={14} />}
                           Copy ID
                         </button>
                         <a
                           href={`/verify/${issuedResult.certificateId}`}
                           target="_blank" rel="noopener noreferrer"
-                          className="flex-1 flex items-center justify-center gap-2 py-4 bg-cyan-400/10 border border-cyan-400/20 rounded-xl text-[9px] font-black uppercase tracking-[0.3em] text-cyan-400 hover:bg-cyan-400/20 transition-all shadow-xl"
+                          className="flex-1 flex items-center justify-center gap-2 py-4 bg-blue-600 rounded-xl text-[10px] font-black uppercase tracking-widest text-white hover:bg-blue-700 transition-all shadow-lg shadow-blue-500/20"
                         >
-                          <ExternalLink size={14} /> View Node
+                          <ExternalLink size={14} /> View Record
                         </a>
                       </div>
                     </div>
 
-                    <button onClick={() => { setShowIssueModal(false); setIssuedResult(null); }} className="btn-command btn-blue w-full">
-                      Return to Command Deck
+                    <button onClick={() => { setShowIssueModal(false); setIssuedResult(null); }} className="btn-primary w-full">
+                      Back to Dashboard
                     </button>
                   </div>
               ) : (
-                /* ── UPLOAD FORM ── */
                 <form onSubmit={handleIssue} className="p-10 space-y-6">
                   <div className="space-y-4">
-                    <div className="relative group/field">
+                    <div className="space-y-2">
+                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Student Full Name</label>
                       <input
-                        placeholder="STUDENT IDENTIFIER (FULL NAME)" required value={formData.studentName}
+                        required value={formData.studentName}
                         onChange={(e) => setFormData({ ...formData, studentName: e.target.value })}
-                        className="w-full bg-[#050505] border border-white/10 rounded-xl py-4 px-6 text-[11px] font-black text-white outline-none focus:border-cyan-400/50 transition-all placeholder:text-slate-800 uppercase tracking-widest shadow-inner"
+                        className="w-full bg-slate-50 border border-slate-200 rounded-xl py-4 px-6 text-[11px] font-bold text-slate-900 outline-none focus:bg-white focus:border-blue-500 transition-all shadow-sm uppercase tracking-widest"
+                        placeholder="E.G. JOHN DOE"
                       />
                     </div>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <input
-                        placeholder="NETWORK EMAIL" type="email" required value={formData.studentEmail}
-                        onChange={(e) => setFormData({ ...formData, studentEmail: e.target.value })}
-                        className="w-full bg-[#050505] border border-white/10 rounded-xl py-4 px-6 text-[11px] font-black text-white outline-none focus:border-cyan-400/50 transition-all placeholder:text-slate-800 uppercase tracking-widest shadow-inner"
-                      />
-                      <input
-                        placeholder="TELEMETRY (+91...)" type="tel" required value={formData.studentPhone}
-                        onChange={(e) => setFormData({ ...formData, studentPhone: e.target.value })}
-                        className="w-full bg-[#050505] border border-white/10 rounded-xl py-4 px-6 text-[11px] font-black text-white outline-none focus:border-cyan-400/50 transition-all placeholder:text-slate-800 uppercase tracking-widest shadow-inner"
+                      <div className="space-y-2">
+                         <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Email Address</label>
+                         <input
+                          type="email" required value={formData.studentEmail}
+                          onChange={(e) => setFormData({ ...formData, studentEmail: e.target.value })}
+                          className="w-full bg-slate-50 border border-slate-200 rounded-xl py-4 px-6 text-[11px] font-bold text-slate-900 outline-none focus:bg-white focus:border-blue-500 transition-all shadow-sm uppercase tracking-widest"
+                          placeholder="EMAIL@UNIVERSITY.COM"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                         <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Contact Number</label>
+                         <input
+                          type="tel" required value={formData.studentPhone}
+                          onChange={(e) => setFormData({ ...formData, studentPhone: e.target.value })}
+                          className="w-full bg-slate-50 border border-slate-200 rounded-xl py-4 px-6 text-[11px] font-bold text-slate-900 outline-none focus:bg-white focus:border-blue-500 transition-all shadow-sm uppercase tracking-widest"
+                          placeholder="+91..."
+                        />
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                       <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Course / Program Title</label>
+                       <input
+                        required value={formData.course}
+                        onChange={(e) => setFormData({ ...formData, course: e.target.value })}
+                        className="w-full bg-slate-50 border border-slate-200 rounded-xl py-4 px-6 text-[11px] font-bold text-slate-900 outline-none focus:bg-white focus:border-blue-500 transition-all shadow-sm uppercase tracking-widest"
+                        placeholder="E.G. BACHELOR OF COMPUTER SCIENCE"
                       />
                     </div>
-                    <input
-                      placeholder="COURSE MODULE / PROGRAM" required value={formData.course}
-                      onChange={(e) => setFormData({ ...formData, course: e.target.value })}
-                      className="w-full bg-[#050505] border border-white/10 rounded-xl py-4 px-6 text-[11px] font-black text-white outline-none focus:border-cyan-400/50 transition-all placeholder:text-slate-800 uppercase tracking-widest shadow-inner"
-                    />
                   </div>
 
-                  {/* DROP ZONE */}
                   <div
                     onClick={() => fileInputRef.current.click()}
                     className={`w-full h-40 border-2 border-dashed rounded-[2rem] flex flex-col items-center justify-center gap-4 transition-all cursor-pointer group relative overflow-hidden
-                      ${formData.file ? 'border-cyan-400 shadow-[0_0_30px_rgba(34,211,238,0.15)] bg-cyan-400/[0.03]' : 'border-white/5 bg-[#050505] hover:border-cyan-400/40 hover:bg-[#080808]'}`}
+                      ${formData.file ? 'border-blue-500 bg-blue-50 shadow-lg shadow-blue-500/5' : 'border-slate-200 bg-slate-50 hover:border-blue-500/30 hover:bg-white'}`}
                   >
                     <input type="file" ref={fileInputRef} onChange={(e) => setFormData({ ...formData, file: e.target.files[0] })} className="hidden" accept=".pdf,.jpg,.jpeg,.png" />
                     {formData.file ? (
-                      <div className="flex flex-col items-center gap-3 text-cyan-400 relative z-10">
-                        <div className="w-12 h-12 rounded-full bg-cyan-400/10 flex items-center justify-center">
+                      <div className="flex flex-col items-center gap-3 text-blue-600 relative z-10">
+                        <div className="w-12 h-12 rounded-2xl bg-blue-600 text-white flex items-center justify-center shadow-lg shadow-blue-500/20">
                           <CheckCircle2 size={24} />
                         </div>
-                        <span className="text-[10px] font-black uppercase tracking-widest">{formData.file.name}</span>
+                        <span className="text-[11px] font-black uppercase tracking-widest">{formData.file.name}</span>
                       </div>
                     ) : (
                       <>
-                        <Upload size={24} className="text-slate-800 group-hover:text-cyan-400 transition-colors" />
-                        <span className="text-[10px] font-black text-slate-700 uppercase tracking-[0.4em] group-hover:text-cyan-400/50 transition-colors">Relay Certificate File</span>
+                        <div className="w-12 h-12 rounded-2xl bg-white border border-slate-200 flex items-center justify-center text-slate-400 group-hover:text-blue-500 transition-all shadow-sm">
+                           <Upload size={24} />
+                        </div>
+                        <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest group-hover:text-blue-500/60 transition-colors">Select certificate file</span>
                       </>
                     )}
                   </div>
 
                   <button
                     disabled={issuing || !formData.file}
-                    className="btn-command btn-blue w-full mt-4"
+                    className="btn-primary w-full mt-4 !py-5"
                   >
-                    {issuing ? <Loader2 size={18} className="animate-spin" /> : <><ShieldCheck size={18} /> Initialize Anchor Protocol</>}
+                    {issuing ? <Loader2 size={22} className="animate-spin" /> : <><ShieldCheck size={20} /> Finalize and Issue</>}
                   </button>
-                  <p className="text-center text-[9px] font-black text-slate-900 uppercase tracking-[0.4em] flex items-center justify-center gap-2">
-                    <ShieldCheck size={12} className="text-cyan-400/50" /> Sovereignty Protocol Engaged
-                  </p>
                 </form>
               )}
             </motion.div>

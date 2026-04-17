@@ -1,6 +1,6 @@
 import { BrowserRouter as Router, Routes, Route, Navigate, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Suspense, lazy, useEffect, useRef } from 'react';
+import { Suspense, lazy, useEffect, useRef, useState } from 'react';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { BlockchainProvider } from './context/BlockchainContext';
 import { ToastProvider, useToast } from './components/Toast';
@@ -9,6 +9,7 @@ import ErrorBoundary from './components/ErrorBoundary';
 import ProtectedRoute from './components/ProtectedRoute';
 import Navbar from './components/Navbar';
 import NotFound from './pages/NotFound';
+import ProtocolBootSequence from './components/ProtocolBootSequence';
 
 const Landing = lazy(() => import('./pages/Landing'));
 const Login = lazy(() => import('./pages/Login'));
@@ -29,12 +30,7 @@ const Onboarding = lazy(() => import('./pages/Onboarding'));
 const VerifyOTP = lazy(() => import('./pages/VerifyOTP'));
 const Profile = lazy(() => import('./pages/Profile'));
 
-import PixelGridBackground from './components/PixelGridBackground';
 import StudentDashboard from './components/StudentDashboard';
-import HyperCursor from './components/HyperCursor';
-import ProtocolBootSequence from './components/ProtocolBootSequence';
-import BlockchainBackground from './components/BlockchainBackground';
-import { useState } from 'react';
 
 /**
  * Listens for globally intercepted unhandled promise rejections.
@@ -52,7 +48,6 @@ function GlobalErrorListener() {
       } else if (msg === 'network_timeout') {
         toast.error('Network request timed out. Check your connection.');
       }
-      // All other errors are handled by individual components
     };
 
     window.addEventListener('apiError', handleApiError);
@@ -63,13 +58,12 @@ function GlobalErrorListener() {
 }
 
 /**
- * Handles Google OAuth redirect callback — reads tokens from URL params,
- * persists them, then redirects to the correct dashboard.
+ * Handles Google OAuth redirect callback
  */
 function OAuthSuccess() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
-  const { setSessionFromOAuth, logout } = useAuth();
+  const { setSessionFromOAuth } = useAuth();
   const hasInitialized = useRef(false);
 
   useEffect(() => {
@@ -82,39 +76,29 @@ function OAuthSuccess() {
       const role = searchParams.get('role');
       const name = searchParams.get('name');
 
-      // In the new decentralized architecture, tokens are securely held in httpOnly cookies.
-      // We no longer expect them in the URL query string.
       try {
         await setSessionFromOAuth(access, refresh, { role: role || 'student', name: name || 'User' });
-        
         const roleNorm = (role || 'student').toLowerCase();
         
-        // Strict deterministic routing based on Sapphire protocol standards
         if (roleNorm === 'university') return navigate('/university-node', { replace: true });
         if (roleNorm === 'admin' || roleNorm === 'super_admin') return navigate('/sys-admin', { replace: true });
         if (roleNorm === 'pending') return navigate('/onboarding', { replace: true });
-        
-        // Default to student portal
         return navigate('/student-portal', { replace: true });
       } catch (err) {
-        console.error('[🔥 OAUTH_HYDRATION_ERROR] Failed to establish session:', err);
+        console.error('[🔥 OAUTH_HYDRATION_ERROR]', err);
         navigate('/auth/error?reason=session_hydration_failed', { replace: true });
       }
     };
     initSession();
-  }, [searchParams, navigate, setSessionFromOAuth, logout]);
+  }, [searchParams, navigate, setSessionFromOAuth]);
 
   return (
-    <div className="h-screen flex items-center justify-center bg-black text-white">
+    <div className="h-screen flex items-center justify-center bg-[#F8FAFC]">
       <div className="flex flex-col items-center gap-6">
         <div className="relative">
-          <div className="absolute inset-0 border-4 border-blue-500/20 rounded-full animate-ping" />
-          <div className="h-16 w-16 border-4 border-blue-500 border-t-transparent rounded-full animate-spin shadow-[0_0_30px_rgba(59,130,246,0.4)]" />
+          <div className="h-12 w-12 border-4 border-blue-500/20 border-t-blue-500 rounded-full animate-spin" />
         </div>
-        <div className="space-y-2 text-center">
-          <p className="text-[12px] font-black uppercase tracking-[0.4em] text-blue-400 animate-pulse">Establishing SECURE Session</p>
-          <p className="text-[9px] font-bold uppercase tracking-[0.2em] text-slate-500">Synchronizing Identity Protocol...</p>
-        </div>
+        <p className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-400">Securing Session...</p>
       </div>
     </div>
   );
@@ -122,13 +106,10 @@ function OAuthSuccess() {
 
 /**
  * Role-Based Navigation Component
- * Redirects users to their specific dashboard based on their role.
  */
 function DashboardRedirect() {
   const { user } = useAuth();
-
   if (!user) return <Navigate to="/login" replace />;
-
   const role = (user.role || 'student').toLowerCase();
   if (role === 'admin' || role === 'super_admin') return <Navigate to="/sys-admin" replace />;
   if (role === 'university') return <Navigate to="/university-node" replace />;
@@ -138,7 +119,6 @@ function DashboardRedirect() {
 
 /**
  * Navigation Wrapper
- * Conditionally hides the global Navbar on the landing page (/), auth pages, and dashboards.
  */
 const NavigationWrapper = () => {
   const location = useLocation();
@@ -155,8 +135,8 @@ const NavigationWrapper = () => {
       <main className="flex-1 w-full">
         <AnimatePresence mode="wait">
           <Suspense fallback={
-            <div className="flex items-center justify-center min-h-[60vh] relative z-50">
-              <div className="h-10 w-10 border-4 border-blue-500 border-t-transparent rounded-full animate-spin shadow-[0_0_15px_rgba(59,130,246,0.5)]" />
+            <div className="flex items-center justify-center min-h-[60vh]">
+              <div className="h-10 w-10 border-4 border-blue-500 border-t-transparent rounded-full animate-spin" />
             </div>
           }>
             <Routes>
@@ -169,67 +149,17 @@ const NavigationWrapper = () => {
               <Route path="/verify" element={<ErrorBoundary><Verifier /></ErrorBoundary>} />
               <Route path="/verify/:id" element={<ErrorBoundary><Verifier /></ErrorBoundary>} />
               <Route path="/ledger" element={<ErrorBoundary><Ledger /></ErrorBoundary>} />
-              {/* Public student view - requires ID param from sharing */}
               <Route path="/student/:id" element={<ErrorBoundary><Student /></ErrorBoundary>} />
               <Route path="/privacy" element={<Privacy />} />
               <Route path="/terms" element={<Terms />} />
               <Route path="/contact" element={<Contact />} />
-
-              <Route path="/onboarding" element={
-                <ProtectedRoute roles={['pending']}>
-                  <Onboarding />
-                </ProtectedRoute>
-              } />
-
-              {/* Role-Based Routes */}
+              <Route path="/onboarding" element={<ProtectedRoute roles={['pending']}><Onboarding /></ProtectedRoute>} />
               <Route path="/dashboard" element={<DashboardRedirect />} />
-
-              <Route
-                path="/sys-admin"
-                element={
-                  <ProtectedRoute roles={['admin', 'super_admin']}>
-                    <ErrorBoundary><SystemAdmin /></ErrorBoundary>
-                  </ProtectedRoute>
-                }
-              />
-
-              <Route
-                path="/sys-admin/workbench"
-                element={
-                  <ProtectedRoute roles={['super_admin']}>
-                    <ErrorBoundary><AIWorkbench /></ErrorBoundary>
-                  </ProtectedRoute>
-                }
-              />
-
-              <Route
-                path="/university-node"
-                element={
-                  <ProtectedRoute roles={['university']}>
-                    <ErrorBoundary><Admin /></ErrorBoundary>
-                  </ProtectedRoute>
-                }
-              />
-
-              <Route
-                path="/student-portal"
-                element={
-                  <ProtectedRoute roles={['student']}>
-                    <ErrorBoundary><StudentDashboard /></ErrorBoundary>
-                  </ProtectedRoute>
-                }
-              />
-
-              <Route
-                path="/profile"
-                element={
-                  <ProtectedRoute roles={['student', 'university', 'admin', 'super_admin']}>
-                    <ErrorBoundary><Profile /></ErrorBoundary>
-                  </ProtectedRoute>
-                }
-              />
-
-              {/* 404 catch-all */}
+              <Route path="/sys-admin" element={<ProtectedRoute roles={['admin', 'super_admin']}><ErrorBoundary><SystemAdmin /></ErrorBoundary></ProtectedRoute>} />
+              <Route path="/sys-admin/workbench" element={<ProtectedRoute roles={['super_admin']}><ErrorBoundary><AIWorkbench /></ErrorBoundary></ProtectedRoute>} />
+              <Route path="/university-node" element={<ProtectedRoute roles={['university']}><ErrorBoundary><Admin /></ErrorBoundary></ProtectedRoute>} />
+              <Route path="/student-portal" element={<ProtectedRoute roles={['student']}><ErrorBoundary><StudentDashboard /></ErrorBoundary></ProtectedRoute>} />
+              <Route path="/profile" element={<ProtectedRoute roles={['student', 'university', 'admin', 'super_admin']}><ErrorBoundary><Profile /></ErrorBoundary></ProtectedRoute>} />
               <Route path="*" element={<NotFound />} />
             </Routes>
           </Suspense>
@@ -240,9 +170,7 @@ const NavigationWrapper = () => {
 };
 
 function App() {
-  const [hasBooted, setHasBooted] = useState(() => {
-    return sessionStorage.getItem('educred_booted') === 'true';
-  });
+  const [hasBooted, setHasBooted] = useState(() => sessionStorage.getItem('educred_booted') === 'true');
 
   const handleBootComplete = () => {
     setHasBooted(true);
@@ -254,26 +182,12 @@ function App() {
       <BlockchainProvider>
         <AuthProvider>
           <Router>
-            <HyperCursor />
             {!hasBooted && <ProtocolBootSequence onComplete={handleBootComplete} />}
-            
-            <AnimatePresence>
-              {hasBooted && (
-                <motion.div
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  transition={{ duration: 1 }}
-                >
-                  <div className="fixed inset-0 z-0 opacity-40 mix-blend-screen pointer-events-none">
-                    <BlockchainBackground />
-                  </div>
-                  
-                  <div className="relative z-10 min-h-screen w-full flex flex-col text-white overflow-x-hidden font-sans">
-                    <NavigationWrapper />
-                  </div>
-                </motion.div>
-              )}
-            </AnimatePresence>
+            {hasBooted && (
+                <div className="relative z-10 min-h-screen w-full flex flex-col text-white overflow-x-hidden font-sans">
+                  <NavigationWrapper />
+                </div>
+            )}
           </Router>
         </AuthProvider>
       </BlockchainProvider>

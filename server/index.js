@@ -157,6 +157,14 @@ app.use('/api/requests', requestRoutes);
 app.use('/api/ledger', ledgerRoutes);
 app.use('/api/ai', aiRoutes);
 
+app.get('/', (req, res) => {
+  res.status(200).json({
+    message: 'EduCred Protocol Node: Online',
+    timestamp: new Date().toISOString(),
+    documentation: 'https://github.com/ankit020308/EduCred-production'
+  });
+});
+
 // ─── Health Check ─────────────────────────────────────
 app.get('/api/health', async (req, res) => {
   const bcInfo = getBlockchainRuntimeInfo();

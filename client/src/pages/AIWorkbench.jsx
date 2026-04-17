@@ -128,65 +128,62 @@ export default function AIWorkbench() {
   };
 
   return (
-    <div className="relative min-h-screen bg-[#000000] text-slate-300 font-sans selection:bg-cyan-500/30 overflow-hidden">
+    <div className="relative min-h-screen bg-[#F8FAFC] text-slate-800 font-sans selection:bg-blue-500/30 overflow-hidden">
 
-      {/* 🌌 NEURAL NETWORK BACKGROUND */}
-      <div className="fixed inset-0 opacity-20 pointer-events-none z-0">
-        <BlockchainBackground />
-      </div>
-
-      <div className="absolute inset-0 z-0 bg-[radial-gradient(circle_at_top,#14345f_0%,#000000_60%,#000000_100%)] pointer-events-none" />
+      {/* 🌌 BACKGROUND GRADIENT */}
+      <div className="fixed inset-0 bg-[#0B132B] pointer-events-none z-0" />
+      <div className="fixed inset-0 hero-gradient pointer-events-none" />
 
       <div className="container max-w-[1400px] mx-auto px-6 pt-32 pb-24 relative z-10 space-y-12">
 
         {/* HEADER SECTION */}
         <motion.div {...containerTransition} className="flex flex-col md:flex-row md:items-end justify-between gap-12">
-          <div className="space-y-8">
-            <div className="flex items-center gap-4 px-5 py-2 bg-cyan-400/10 border border-cyan-400/20 rounded-full w-fit shadow-[0_0_20px_rgba(34,211,238,0.1)]">
-              <div className="w-2 h-2 rounded-full bg-cyan-400 animate-pulse" />
-              <span className="text-[9px] font-black text-white uppercase tracking-[0.4em]">Neural Workbench Beta</span>
+          <div className="space-y-6">
+            <div className="flex items-center gap-4 px-4 py-1.5 bg-blue-500/10 border border-blue-500/20 rounded-full w-fit">
+              <div className="w-2 h-2 rounded-full bg-blue-500 animate-pulse" />
+              <span className="text-[9px] font-black text-blue-600 uppercase tracking-widest">Enterprise AI Builder</span>
             </div>
             <h1 className="text-6xl md:text-[5.5rem] font-black text-white tracking-tighter leading-[0.9] uppercase">
-              Intelligence <span className="text-cyan-400">Labs.</span>
+              Feature <span className="text-blue-500">Workbench.</span>
             </h1>
-            <p className="text-cyan-400/60 text-[10px] font-black uppercase tracking-[0.4em] flex items-center gap-4">
-              <Cpu size={14} className="text-cyan-400/40" /> Human-in-the-Loop Feature Engineering
+            <p className="text-slate-400 text-[10px] font-black uppercase tracking-[0.4em] flex items-center gap-4">
+              <Cpu size={14} className="text-blue-500/60" /> Advanced Feature Generation & Code Review
             </p>
           </div>
 
           <div className="flex gap-4">
             <button
               onClick={() => { setGeneratedOutput(null); setPrompt(''); }}
-              className="h-14 w-14 rounded-2xl bg-cyan-400/5 border border-white/5 backdrop-blur-md flex items-center justify-center text-cyan-400/40 hover:text-cyan-400 transition-all shadow-inner group"
+              className="h-14 w-14 rounded-2xl bg-white/5 border border-white/10 backdrop-blur-md flex items-center justify-center text-white/40 hover:text-blue-500 transition-all shadow-xl group"
             >
               <RefreshCcw size={20} className="group-hover:rotate-180 transition-transform duration-500" />
             </button>
-            <div className="h-14 px-8 rounded-2xl bg-cyan-400/5 border border-white/5 flex items-center gap-4 text-white/40 shadow-inner group hover:text-cyan-400 transition-colors cursor-pointer">
+            <div className="h-14 px-8 rounded-2xl bg-white/5 border border-white/10 flex items-center gap-4 text-white/40 shadow-xl group hover:text-blue-500 transition-colors cursor-pointer">
               <History size={20} className="opacity-20 group-hover:opacity-100" />
-              <span className="text-[10px] font-black uppercase tracking-widest">Audit Logs</span>
+              <span className="text-[10px] font-black uppercase tracking-widest">History</span>
             </div>
           </div>
         </motion.div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 items-start">
 
-          {/* 🧩 REQUEST ARCHITECT (Left Panel) */}
+          {/* 🧩 CONFIGURATION (Left Panel) */}
           <motion.div
             {...containerTransition}
             transition={{ delay: 0.1 }}
             className="lg:col-span-5 space-y-8"
           >
-            <div className="glass-pane p-10 rounded-[2.5rem] border border-white/5 space-y-10 relative overflow-hidden scanline-overlay">
-              <div className="absolute top-0 right-0 w-32 h-32 bg-cyan-400/5 blur-[60px] rounded-full" />
+            <div className="bg-white p-10 rounded-[2.5rem] border border-slate-100 shadow-2xl shadow-slate-900/10 space-y-10 relative overflow-hidden">
+              <div className="absolute top-0 right-0 w-32 h-32 bg-blue-500/5 blur-[60px] rounded-full" />
 
-              <div className="space-y-6">
+              <div className="space-y-8">
                 <div className="flex items-center gap-5">
-                  <div className="p-3 bg-cyan-400/10 rounded-2xl border border-cyan-400/20 shadow-inner">
-                    <Zap className="text-cyan-400" size={24} />
+                  <div className="p-3 bg-blue-50 rounded-2xl border border-blue-100 shadow-sm">
+                    <Zap className="text-blue-600" size={24} />
                   </div>
                   <div>
-                    <h3 className="text-[11px] font-black uppercase tracking-[0.3em] text-white leading-none">Objective Specification</h3>
-                    <p className="text-[9px] text-cyan-400/40 mt-2 font-black uppercase tracking-widest">Protocol Alignment Matrix</p>
+                    <h3 className="text-[11px] font-black uppercase tracking-widest text-slate-900 leading-none">AI Operation</h3>
+                    <p className="text-[9px] text-slate-400 mt-2 font-black uppercase tracking-widest">Select logic generation mode</p>
                   </div>
                 </div>
 
@@ -196,67 +193,66 @@ export default function AIWorkbench() {
                     <button
                       key={mode}
                       onClick={() => setSelectedMode(mode)}
-                      className={`py-4 px-6 rounded-xl text-[9px] font-black uppercase tracking-[0.3em] transition-all border
+                      className={`py-4 px-6 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all border
                         ${selectedMode === mode
-                          ? 'bg-cyan-400 border-cyan-400 text-black shadow-lg shadow-cyan-400/20'
-                          : 'bg-[#050505] border-white/5 text-slate-600 hover:text-white hover:bg-[#080808]'}`}
+                          ? 'bg-blue-600 border-blue-700 text-white shadow-lg shadow-blue-500/20'
+                          : 'bg-slate-50 border-slate-100 text-slate-400 hover:text-slate-900 hover:bg-slate-100'}`}
                     >
-                      {mode.replace('_', ' ')}
+                      {mode.replace(/_/g, ' ')}
                     </button>
                   ))}
                 </div>
 
                 {/* File Path */}
                 <div className="space-y-4">
-                  <span className="text-[9px] font-black text-cyan-400/40 uppercase tracking-[0.4em] ml-1">Target Context Registry</span>
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Target File Path</label>
                   <div className="relative group">
-                    <FileCode className="absolute left-5 top-1/2 -translate-y-1/2 text-cyan-900 group-focus-within:text-cyan-400 transition-colors" size={18} />
+                    <FileCode className="absolute left-5 top-1/2 -translate-y-1/2 text-slate-300 group-focus-within:text-blue-500 transition-colors" size={18} />
                     <input
                       value={filePath}
                       onChange={(e) => setFilePath(e.target.value)}
                       placeholder="e.g. server/controllers/certificateController.js"
-                      className="w-full bg-[#050505] border border-white/5 rounded-2xl py-5 pl-14 pr-6 text-[10px] font-black tracking-widest text-white outline-none focus:border-cyan-400/40 transition-all placeholder:text-blue-900 uppercase shadow-inner"
+                      className="w-full bg-slate-50 border border-slate-200 rounded-xl py-5 pl-14 pr-6 text-sm font-medium text-slate-900 outline-none focus:border-blue-500 transition-all shadow-sm"
                     />
                   </div>
                 </div>
 
                 {/* Prompt Area */}
                 <div className="space-y-4">
-                  <span className="text-[9px] font-black text-cyan-400/40 uppercase tracking-[0.4em] ml-1">Feature Manifest Description</span>
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Feature Description</label>
                   <textarea
                     value={prompt}
                     onChange={(e) => setPrompt(e.target.value)}
                     rows={6}
-                    placeholder="Describe the feature or optimization. AI will analyze the code and propose a Git Diff..."
-                    className="w-full bg-[#050505] border border-white/5 rounded-[2rem] p-8 text-[11px] font-black uppercase tracking-widest text-slate-300 outline-none focus:border-cyan-400/40 transition-all placeholder:text-blue-900 shadow-inner resize-none leading-relaxed"
+                    placeholder="Describe the functionality you'd like the AI to generate..."
+                    className="w-full bg-slate-50 border border-slate-200 rounded-[2rem] p-8 text-sm font-medium text-slate-900 outline-none focus:border-blue-500 transition-all shadow-sm resize-none leading-relaxed"
                   />
                 </div>
 
                 <button
                   onClick={handleGenerate}
                   disabled={isGenerating || !prompt.trim()}
-                  className="btn-command btn-blue w-full h-16 shadow-[0_0_30px_rgba(59,130,246,0.2)] disabled:shadow-none"
+                  className="btn-primary w-full h-16 shadow-blue-500/20"
                 >
                   {isGenerating ? (
                     <>
                       <Loader2 size={24} className="animate-spin" />
-                      Synthesizing Logic...
+                      Generating Logic...
                     </>
                   ) : (
                     <>
                       <Play size={20} fill="currentColor" />
-                      Initiate Synthesis Protocol
+                      Generate Enhancement
                     </>
                   )}
                 </button>
               </div>
             </div>
 
-            <div className="glass-pane p-5 border border-amber-500/10 bg-amber-500/[0.02] flex gap-4">
-              <ShieldAlert className="text-amber-500 flex-shrink-0" size={20} />
-              <p className="text-[9px] text-amber-500/70 leading-relaxed font-bold uppercase tracking-widest">
-                The Intelligence Engine is constrained by strict security filters.
-                Shell commands and destructive FS operations will be blocked.
+            <div className="bg-amber-50 border border-amber-100 p-6 rounded-[2rem] flex gap-5 shadow-sm">
+              <ShieldAlert className="text-amber-500 flex-shrink-0" size={24} />
+              <p className="text-[10px] text-amber-700/80 leading-relaxed font-black uppercase tracking-widest">
+                AI enhancements are reviewed by our security filters. Destructive operations are restricted.
               </p>
             </div>
           </motion.div>
@@ -268,12 +264,14 @@ export default function AIWorkbench() {
                 <motion.div
                   key="empty"
                   initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-                  className="h-full flex flex-col items-center justify-center border border-dashed border-white/5 rounded-[2.5rem] bg-white/[0.01] text-center space-y-6"
+                  className="h-full flex flex-col items-center justify-center border-2 border-dashed border-slate-100 rounded-[2.5rem] bg-white/50 text-center space-y-6"
                 >
-                  <Terminal className="text-cyan-400/20" size={64} />
+                  <div className="w-20 h-20 bg-slate-50 rounded-3xl flex items-center justify-center text-slate-200 border border-slate-100">
+                    <Terminal size={40} />
+                  </div>
                   <div className="space-y-2">
-                    <p className="text-[10px] font-black text-cyan-400/40 uppercase tracking-[0.4em]">Awaiting Instruction</p>
-                    <p className="text-[9px] text-cyan-400/20 uppercase tracking-widest leading-loose">Cognitive review matrix ready for synchronization</p>
+                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Awaiting Input</p>
+                    <p className="text-[11px] text-slate-300 font-medium max-w-xs mx-auto">Configure your feature request to start building.</p>
                   </div>
                 </motion.div>
               ) : isGenerating ? (
@@ -283,78 +281,77 @@ export default function AIWorkbench() {
                   className="h-full flex flex-col items-center justify-center space-y-10"
                 >
                   <div className="relative">
-                    <div className="absolute inset-0 border-4 border-cyan-400/20 rounded-full animate-ping" />
-                    <div className="h-24 w-24 border-b-2 border-cyan-400 rounded-full animate-spin shadow-[0_0_30px_rgba(34,211,238,0.2)]" />
+                    <div className="absolute inset-0 border-4 border-blue-500/10 rounded-full animate-ping" />
+                    <div className="h-24 w-24 border-b-2 border-blue-600 rounded-full animate-spin shadow-xl shadow-blue-500/20" />
                   </div>
-                  <div className="text-center space-y-3 animate-pulse">
-                    <p className="text-[12px] font-black text-cyan-400 uppercase tracking-[0.6em]">Neural Handshake</p>
-                    <p className="text-[9px] text-cyan-400/40 uppercase tracking-[0.3em] font-black">Scanning Repository Context Protocol...</p>
+                  <div className="text-center space-y-3">
+                    <p className="text-[12px] font-black text-slate-900 uppercase tracking-widest">AI Agent Analysis</p>
+                    <p className="text-[10px] text-slate-400 uppercase tracking-widest font-black animate-pulse">Scanning application context...</p>
                   </div>
                 </motion.div>
               ) : (
                 <motion.div
                   key="output"
                   {...diffTransition}
-                  className="flex flex-col h-full space-y-6"
+                  className="flex flex-col h-full space-y-8"
                 >
-                  <div className="flex-1 flex flex-col bg-[#050505] border border-white/5 rounded-[2.5rem] overflow-hidden shadow-2xl scanline-overlay sm:border">
-                    <div className="p-8 border-b border-white/5 flex items-center justify-between bg-[#080808]/60 backdrop-blur-md">
+                  <div className="flex-1 flex flex-col bg-white border border-slate-100 rounded-[2.5rem] overflow-hidden shadow-2xl shadow-slate-900/10 h-full">
+                    <div className="p-8 border-b border-slate-50 flex items-center justify-between bg-slate-50/50">
                       <div className="flex items-center gap-4">
-                        <div className="w-2 h-2 rounded-full bg-cyan-400 shadow-[0_0_15px_rgba(34,211,238,0.6)] animate-pulse" />
-                        <span className="text-[10px] font-black uppercase tracking-[0.4em] text-cyan-400">Proposed Diff Matrix</span>
-                        <span className="text-[10px] text-cyan-400/20">|</span>
-                        <span className="text-[10px] font-black text-white uppercase tracking-widest truncate max-w-[200px]">{filePath}</span>
+                        <div className="w-2.5 h-2.5 rounded-full bg-blue-500 shadow-lg shadow-blue-500/40 animate-pulse" />
+                        <span className="text-[10px] font-black uppercase tracking-widest text-slate-900">Review Changes</span>
+                        <div className="h-4 w-px bg-slate-200 mx-2" />
+                        <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest truncate max-w-[200px]">{filePath}</span>
                       </div>
-                      <div className="flex gap-2">
-                        <div className="px-4 py-1.5 bg-cyan-400/10 border border-cyan-400/20 rounded-xl text-[8px] font-black text-white uppercase tracking-[0.3em] shadow-inner">
-                          Confidence: {(generatedOutput.confidence * 100).toFixed(0)}%
-                        </div>
+                      <div className="px-5 py-2 bg-blue-50 text-blue-600 text-[9px] font-black uppercase tracking-widest rounded-xl border border-blue-100 shadow-sm">
+                        Confidence: {(generatedOutput.confidence * 100).toFixed(0)}%
                       </div>
                     </div>
 
-                    <div className="flex-1 overflow-y-auto bg-black p-4 scrollbar-hide">
-                      {renderDiff(generatedOutput.patch || 'No changes required for this request.')}
-                      <div className="p-10 bg-[#080808]/40 border-t border-white/5 space-y-8 backdrop-blur-md">
-                        <div className="space-y-4">
-                          <h4 className="text-[9px] font-black uppercase tracking-[0.5em] text-cyan-400/40">Intelligence Narrative Protocol</h4>
-                          <p className="text-[11px] text-slate-400 leading-relaxed font-black uppercase tracking-widest bg-[#050505] p-6 rounded-2xl border border-white/5 shadow-inner">
-                            {generatedOutput.explanation}
-                          </p>
-                        </div>
+                    <div className="flex-1 overflow-y-auto bg-slate-950 p-6 font-mono text-sm leading-relaxed">
+                      {renderDiff(generatedOutput.patch || 'No changes required.')}
+                    </div>
 
-                        {generatedOutput.risks?.length > 0 && (
-                          <div className="bg-rose-500/5 border border-rose-500/10 p-6 rounded-[2rem] flex gap-5 shadow-inner">
-                            <AlertTriangle className="text-rose-500 flex-shrink-0" size={24} />
-                            <div className="space-y-3">
-                              <p className="text-[9px] font-black text-rose-500 uppercase tracking-[0.4em]">Collision Risk Assessment</p>
-                              <ul className="space-y-2">
-                                {generatedOutput.risks.map((risk, i) => (
-                                  <li key={i} className="text-[9px] text-slate-700 font-black uppercase tracking-widest flex items-center gap-3">
-                                    <div className="w-1 h-1 bg-rose-500 rounded-full" />
-                                    {risk}
-                                  </li>
-                                ))}
-                              </ul>
-                            </div>
+                    <div className="p-10 border-t border-slate-100 space-y-8 bg-slate-50/30">
+                      <div className="space-y-4">
+                        <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">AI Implementation Summary</label>
+                        <p className="text-[12px] text-slate-600 leading-relaxed font-medium bg-white p-8 rounded-3xl border border-slate-100 shadow-sm">
+                          {generatedOutput.explanation}
+                        </p>
+                      </div>
+
+                      {generatedOutput.risks?.length > 0 && (
+                        <div className="bg-rose-50 border border-rose-100 p-8 rounded-3xl flex gap-6 shadow-sm">
+                          <AlertTriangle className="text-rose-500 flex-shrink-0" size={24} />
+                          <div className="space-y-3">
+                            <p className="text-[10px] font-black text-rose-500 uppercase tracking-widest">Risk Assessment</p>
+                            <ul className="space-y-2">
+                              {generatedOutput.risks.map((risk, i) => (
+                                <li key={i} className="text-[11px] text-slate-600 font-bold uppercase tracking-widest flex items-center gap-3">
+                                  <div className="w-1.5 h-1.5 bg-rose-500 rounded-full" />
+                                  {risk}
+                                </li>
+                              ))}
+                            </ul>
                           </div>
-                        )}
-
-                        <div className="flex gap-4 pt-6 border-t border-white/5">
-                          <button
-                            onClick={() => setGeneratedOutput(null)}
-                            className="btn-command btn-outline flex-1 h-16"
-                          >
-                            Discard
-                          </button>
-                          <button
-                            disabled={isApplying || !generatedOutput.patch}
-                            onClick={handleApply}
-                            className="btn-command btn-blue flex-[2] h-16 shadow-[0_0_30px_rgba(59,130,246,0.22)]"
-                          >
-                            {isApplying ? <Loader2 className="animate-spin" size={20} /> : <HardDrive size={20} />}
-                            Anchor to Production
-                          </button>
                         </div>
+                      )}
+
+                      <div className="flex gap-4 pt-4">
+                        <button
+                          onClick={() => setGeneratedOutput(null)}
+                          className="flex-1 h-16 rounded-xl border border-slate-200 text-[10px] font-black uppercase tracking-widest text-slate-500 hover:bg-slate-50 transition-all font-sans"
+                        >
+                          Discard
+                        </button>
+                        <button
+                          disabled={isApplying || !generatedOutput.patch}
+                          onClick={handleApply}
+                          className="flex-[2] btn-primary h-16 !shadow-blue-500/20"
+                        >
+                          {isApplying ? <Loader2 className="animate-spin" size={20} /> : <HardDrive size={20} />}
+                          Apply Changes
+                        </button>
                       </div>
                     </div>
                   </div>

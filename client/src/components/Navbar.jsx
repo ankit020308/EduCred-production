@@ -1,8 +1,12 @@
 import { useState, useEffect } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
-import { ShieldCheck, Menu, LogOut, LayoutDashboard, Globe, Search, User as UserIcon, Cpu } from 'lucide-react';
+import { ShieldCheck, Menu, LogOut, LayoutDashboard, Globe, Search, User as UserIcon } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
+/**
+ * 🏢 PROFESSIONAL NAVBAR
+ * Clean, standard enterprise SaaS navigation following the Trustworthy Tech aesthetic.
+ */
 export default function Navbar() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
@@ -26,143 +30,123 @@ export default function Navbar() {
   }, [location.pathname]);
 
   const navLinks = [
-    { to: '/verify', label: 'Protocol Verification', icon: Search },
-    { to: '/ledger', label: 'Genesis Ledger', icon: Globe },
-    ...(user?.role?.toLowerCase() === 'super_admin' ? [
-      { to: '/sys-admin/workbench', label: 'AI Labs', icon: Cpu }
-    ] : [])
+    { to: '/verify', label: 'Verify', icon: Search },
+    { to: '/ledger', label: 'Ledger', icon: Globe },
   ];
 
   return (
-    <nav className={`fixed top-0 left-0 right-0 z-[100] transition-all duration-700 ${
-      scrolled ? 'py-4' : 'py-8'
+    <nav className={`fixed top-0 left-0 right-0 z-[100] transition-all duration-500 ${
+      scrolled ? 'py-4 bg-[#0B132B]/90 backdrop-blur-xl border-b border-white/5' : 'py-8 bg-transparent'
     }`}>
-      <div className="container max-w-7xl mx-auto px-6">
-        <div className={`glass-pane relative flex items-center justify-between px-8 py-3 transition-all duration-700 ${
-          scrolled ? 'rounded-[2rem] border-white/10 shadow-[0_0_80px_rgba(0,0,0,0.9)] bg-black/60 backdrop-blur-3xl' : 'rounded-3xl border-transparent bg-transparent shadow-none'
-        }`}>
-          
-          {/* 🕋 LOGO SYSTEM */}
-          <div className="relative z-10 flex items-center gap-4 cursor-pointer" onClick={() => navigate('/')}>
-            <div className="w-12 h-12 bg-[#0A0A0A] border border-cyan-400/20 rounded-2xl flex items-center justify-center shadow-[0_0_30px_rgba(34,211,238,0.15)] group hover:border-cyan-400 transition-all duration-700">
-              <Hexagon className="text-cyan-400 group-hover:rotate-90 transition-transform duration-700" size={24} />
-            </div>
-            <div>
-              <span className="text-2xl font-black text-white tracking-tighter block uppercase">Edu<span className="text-cyan-400">Cred</span></span>
-              <span className="text-[9px] font-black uppercase tracking-[0.4em] text-slate-800">Global Authentication Node</span>
-            </div>
+      <div className="container max-w-7xl mx-auto px-6 flex items-center justify-between">
+        
+        {/* LOGO */}
+        <div className="flex items-center gap-3 cursor-pointer group" onClick={() => navigate('/')}>
+          <div className="w-10 h-10 bg-blue-600 rounded-xl flex items-center justify-center shadow-lg shadow-blue-500/20 group-hover:scale-105 transition-all">
+            <ShieldCheck className="text-white" size={20} />
           </div>
-
-          {/* 🧭 NAVIGATION NODES */}
-          <div className="hidden lg:flex items-center gap-12">
-            <div className="flex items-center gap-10">
-              {navLinks.map(({ to, label, icon: Icon }) => (
-                <Link
-                  key={to}
-                  to={to}
-                  className={`text-[9px] font-black uppercase tracking-[0.3em] transition-all flex items-center gap-2 group ${
-                    location.pathname === to ? 'text-cyan-400' : 'text-slate-800 hover:text-white'
-                  }`}
-                >
-                  <Icon size={12} className="group-hover:animate-pulse" />
-                  {label}
-                </Link>
-              ))}
-            </div>
-
-            <div className="w-px h-6 bg-white/10" />
-
-            {/* 👤 IDENTITY SLOTS */}
-            {user ? (
-              <div className="flex items-center gap-6">
-                <button 
-                  onClick={() => navigate('/dashboard')}
-                  className="btn-command btn-blue !px-6 !py-3 flex items-center gap-3"
-                >
-                  <LayoutDashboard size={14} />
-                  Terminal
-                </button>
-                <div className="flex items-center gap-4">
-                    <button
-                      onClick={() => navigate('/profile')}
-                      className="w-10 h-10 rounded-xl glass-pane flex items-center justify-center hover:border-cyan-400/30 transition-all shadow-inner"
-                    >
-                      <UserIcon size={18} className="text-slate-800 hover:text-cyan-400 transition-colors" />
-                    </button>
-                    <button
-                      onClick={handleLogout}
-                      className="text-dim hover:text-rose-500 transition-colors"
-                    >
-                      <LogOut size={18} />
-                    </button>
-                </div>
-              </div>
-            ) : (
-              <div className="flex items-center gap-10">
-                <Link to="/login" className="text-[9px] font-black uppercase tracking-[0.4em] text-slate-800 hover:text-white transition-colors">
-                  Authorize
-                </Link>
-                <Link to="/signup">
-                  <button className="btn-command btn-blue !px-8 !py-3.5 shadow-[0_0_20px_rgba(59,130,246,0.2)]">
-                    Initiate
-                  </button>
-                </Link>
-              </div>
-            )}
-          </div>
-
-          {/* 📱 MOBILE OVERRIDE */}
-          <button
-            onClick={() => setMobileOpen((current) => !current)}
-            className="lg:hidden w-10 h-10 rounded-xl glass-pane flex items-center justify-center text-white border-white/10"
-          >
-            <Menu size={20} />
-          </button>
-
-          {mobileOpen ? (
-            <div className="absolute left-4 right-4 top-[calc(100%+12px)] rounded-[2.5rem] border border-white/5 bg-[#050505]/95 p-6 shadow-2xl backdrop-blur-3xl lg:hidden scanline-overlay sm:border">
-              <div className="flex flex-col gap-3">
-                {navLinks.map(({ to, label }) => (
-                  <Link
-                    key={to}
-                    to={to}
-                    className={`rounded-2xl px-6 py-4 text-[10px] font-black uppercase tracking-[0.3em] transition-all ${
-                      location.pathname === to ? 'bg-cyan-400/10 text-cyan-400 border border-cyan-400/20' : 'text-slate-700 hover:bg-white/[0.03]'
-                    }`}
-                  >
-                    {label}
-                  </Link>
-                ))}
-
-                {user ? (
-                  <>
-                    <button
-                      onClick={() => navigate('/dashboard')}
-                      className="btn-command btn-blue w-full !py-4"
-                    >
-                      Terminal Access
-                    </button>
-                    <button
-                      onClick={handleLogout}
-                      className="rounded-2xl border border-white/5 bg-[#111111] px-6 py-4 text-center text-[9px] font-black uppercase tracking-[0.3em] text-slate-800"
-                    >
-                      Terminate Session
-                    </button>
-                  </>
-                ) : (
-                  <>
-                    <Link to="/login" className="rounded-2xl border border-white/5 bg-[#111111] px-6 py-4 text-center text-[9px] font-black uppercase tracking-[0.3em] text-slate-800">
-                      Authorize
-                    </Link>
-                    <Link to="/signup" className="btn-command btn-blue w-full !py-4">
-                      Initiate Protocol
-                    </Link>
-                  </>
-                )}
-              </div>
-            </div>
-          ) : null}
+          <span className="text-xl font-bold text-white tracking-tight uppercase">Edu<span className="text-blue-500">Cred</span></span>
         </div>
+
+        {/* DESKTOP NAVIGATION */}
+        <div className="hidden lg:flex items-center gap-10">
+          <div className="flex items-center gap-8">
+            {navLinks.map(({ to, label }) => (
+              <Link
+                key={to}
+                to={to}
+                className={`text-[12px] font-bold uppercase tracking-widest transition-all ${
+                  location.pathname === to ? 'text-blue-500' : 'text-slate-400 hover:text-white'
+                }`}
+              >
+                {label}
+              </Link>
+            ))}
+          </div>
+
+          <div className="w-px h-5 bg-white/10" />
+
+          {user ? (
+            <div className="flex items-center gap-6">
+              <button 
+                onClick={() => navigate('/dashboard')}
+                className="btn-primary !px-5 !py-2.5 !text-[11px]"
+              >
+                <LayoutDashboard size={14} />
+                Dashboard
+              </button>
+              <div className="flex items-center gap-4">
+                  <button
+                    onClick={() => navigate('/profile')}
+                    className="w-9 h-9 rounded-lg bg-white/5 border border-white/10 flex items-center justify-center hover:bg-white/10 transition-all"
+                  >
+                    <UserIcon size={16} className="text-slate-400 hover:text-white" />
+                  </button>
+                  <button
+                    onClick={handleLogout}
+                    className="text-slate-500 hover:text-rose-500 transition-colors"
+                  >
+                    <LogOut size={16} />
+                  </button>
+              </div>
+            </div>
+          ) : (
+            <div className="flex items-center gap-8">
+              <Link to="/login" className="text-[12px] font-bold uppercase tracking-widest text-slate-400 hover:text-white transition-colors">
+                Log In
+              </Link>
+              <Link to="/signup">
+                <button className="btn-primary !px-6 !py-2.5 !text-[11px]">
+                  Get Started
+                </button>
+              </Link>
+            </div>
+          )}
+        </div>
+
+        {/* MOBILE MENU BUTTON */}
+        <button
+          onClick={() => setMobileOpen((current) => !current)}
+          className="lg:hidden w-10 h-10 rounded-lg bg-white/5 border border-white/10 flex items-center justify-center text-white"
+        >
+          <Menu size={20} />
+        </button>
+
+        {/* MOBILE MENU */}
+        <AnimatePresence>
+            {mobileOpen && (
+                <motion.div 
+                    initial={{ opacity: 0, y: -20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -20 }}
+                    className="absolute left-4 right-4 top-[calc(100%+8px)] bg-[#0F172A] border border-white/10 rounded-2xl p-6 shadow-2xl backdrop-blur-3xl lg:hidden flex flex-col gap-4"
+                >
+                    {navLinks.map(({ to, label }) => (
+                        <Link
+                            key={to}
+                            to={to}
+                            className={`rounded-xl px-6 py-4 text-[11px] font-bold uppercase tracking-widest transition-all ${
+                                location.pathname === to ? 'bg-blue-500/10 text-blue-500' : 'text-slate-400 hover:bg-white/5'
+                            }`}
+                        >
+                            {label}
+                        </Link>
+                    ))}
+                    <div className="h-px bg-white/5 my-2" />
+                    {user ? (
+                        <>
+                            <button onClick={() => navigate('/dashboard')} className="btn-primary w-full">Dashboard</button>
+                            <button onClick={handleLogout} className="w-full py-4 text-[11px] font-bold uppercase tracking-widest text-slate-500">Log Out</button>
+                        </>
+                    ) : (
+                        <>
+                            <button onClick={() => navigate('/login')} className="w-full py-4 text-[11px] font-bold uppercase tracking-widest text-slate-400">Log In</button>
+                            <button onClick={() => navigate('/signup')} className="btn-primary w-full">Get Started</button>
+                        </>
+                    )}
+                </motion.div>
+            )}
+        </AnimatePresence>
       </div>
     </nav>
   );

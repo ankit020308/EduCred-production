@@ -1,26 +1,27 @@
 @import "tailwindcss";
 
 /* ──────────────────────────────────────────────────────────────────────────
-   💠 MASTER DESIGN SYSTEM: BASE LAYER
+   🏛️ MASTER DESIGN SYSTEM: ENTERPRISE LAYER
    ────────────────────────────────────────────────────────────────────────── */
 @layer base {
   :root {
-    /* 🕋 OBSIDIAN-SERIES PALETTE (Web3 Midnight Focus) */
-    --color-bg-deep: #000000;
-    --color-bg-matte: #030303;
-    --color-bg-surface: #0a0a0a;
-    --color-bg-elevated: #121212;
-
-    /* 💎 NEON ACCENT ARCHITECTURE */
-    --color-cyan-vivid: #22d3ee;
-    --color-blue-vivid: #3b82f6;
-    --color-indigo-vivid: #6366f1;
-    --color-border-subtle: rgba(255, 255, 255, 0.04);
-    --color-border-bright: rgba(255, 255, 255, 0.12);
+    /* ✨ TRUSTWORTHY PALETTE (Stripe/Vercel Aesthetic) */
+    --color-bg-deep: #0B132B;      /* Deep Navy */
+    --color-bg-canvas: #F8FAFC;    /* Off-white canvas */
+    --color-bg-matte: #ffffff;     /* Pure white Surface */
+    --color-bg-light: #F1F5F9;     /* Light Gray */
+    
+    --color-primary: #2563EB;      /* Enterprise Blue */
+    --color-primary-hover: #1D4ED8;
+    --color-accent: #38BDF8;       /* Sky Blue */
+    
+    --color-border: rgba(15, 23, 42, 0.08);
+    --color-border-dark: rgba(255, 255, 255, 0.1);
+    --color-text-main: #1E293B;    /* Slate 800 */
+    --color-text-muted: #64748B;   /* Slate 500 */
 
     /* 📄 PREMIUM TYPOGRAPHY */
-    --font-sans: 'Inter', system-ui, sans-serif;
-    --font-mono: 'Geist Mono', 'SF Mono', monospace;
+    --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
   }
 
   html {
@@ -31,7 +32,7 @@
   body {
     margin: 0;
     background-color: var(--color-bg-deep);
-    color: #ffffff;
+    color: #F8FAFC;
     font-family: var(--font-sans);
     -webkit-font-smoothing: antialiased;
     letter-spacing: -0.01em;
@@ -39,206 +40,63 @@
 }
 
 /* ──────────────────────────────────────────────────────────────────────────
-   🪄 UTILITIES: HIGH-END SURFACE SYSTEMS
+   🪄 UTILITIES: PROFESSIONAL SURFACE SYSTEMS
    ────────────────────────────────────────────────────────────────────────── */
 
 @utility glass-pane {
-  background: rgba(10, 10, 10, 0.6);
-  backdrop-filter: blur(48px) saturate(180%);
-  border: 1px solid var(--color-border-subtle);
+  background: rgba(255, 255, 255, 0.7);
+  backdrop-filter: blur(24px) saturate(180%);
+  border: 1px solid var(--color-border);
   position: relative;
   overflow: hidden;
-
-  /* Subtle noise texture overlay */
-  &::before {
-    content: "";
-    position: absolute;
-    inset: 0;
-    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E");
-    opacity: 0.02;
-    pointer-events: none;
-  }
 }
 
-@utility glow-cyan {
-  box-shadow: 0 0 100px -20px rgba(34, 211, 238, 0.12);
+@utility saas-card {
+  background: var(--color-bg-matte);
+  border: 1px solid var(--color-border);
+  border-radius: 1.5rem;
+  box-shadow: 
+    0 10px 40px -10px rgba(15, 23, 42, 0.1),
+    0 1px 2px rgba(15, 23, 42, 0.05);
+  transition: all 0.3s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
-@utility glow-border-animated {
-  &::after {
-    content: "";
-    position: absolute;
-    inset: -1px;
-    background: conic-gradient(from 0deg, transparent 70%, var(--color-cyan-vivid) 100%);
-    mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
-    mask-composite: exclude;
-    padding: 1px;
-    border-radius: inherit;
-    animation: rotate-glow 4s linear infinite;
-    opacity: 0;
-    transition: opacity 0.4s ease;
-  }
-  
-  &:hover::after {
-    opacity: 1;
-  }
+@utility btn-primary {
+  @apply bg-blue-600 text-white font-bold px-8 py-3.5 rounded-xl 
+         hover:bg-blue-500 hover:scale-[1.02] active:scale-95 
+         transition-all duration-300 shadow-xl shadow-blue-900/20 
+         flex items-center justify-center gap-2;
 }
 
-@keyframes rotate-glow {
-  from { transform: rotate(0deg); }
-  to { transform: rotate(360deg); }
+@utility btn-secondary {
+  @apply border border-white/10 bg-white/5 text-white font-semibold 
+         px-8 py-3.5 rounded-xl hover:bg-white/10 hover:border-white/20 
+         active:scale-95 transition-all duration-300 flex items-center justify-center gap-2;
 }
 
-/* Linear-style Grid & Mesh */
-@utility mesh-grid {
-  background-image:
-    linear-gradient(rgba(255, 255, 255, 0.03) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
-  background-size: 40px 40px;
+@utility hero-gradient {
+  background: radial-gradient(circle at 50% 10%, rgba(37, 99, 235, 0.12) 0%, transparent 60%);
 }
 
-@utility text-premium-tight {
-  letter-spacing: -0.04em;
-  line-height: 0.95;
+@utility text-glow-blue {
+  text-shadow: 0 0 30px rgba(37, 99, 235, 0.4);
 }
 
-@utility shimmer {
-  background: linear-gradient(
-    90deg,
-    rgba(255,255,255,0) 0%,
-    rgba(255,255,255,0.05) 50%,
-    rgba(255,255,255,0) 100%
-  );
-  background-size: 200% 100%;
-  animation: shimmer 2s ease-in-out infinite;
-}
-
-/* ──────────────────────────────────────────────────────────────────────────
-   🔳 COMPONENTS: REUSABLE UI ELEMENTS
-   ────────────────────────────────────────────────────────────────────────── */
-
-  /* The "Command" style button used in Login/Signup/Admin */
-  .btn-command {
-    @apply uppercase tracking-widest font-bold text-[10px] px-8 py-4 rounded-xl transition-all duration-500 active:scale-95 flex items-center justify-center gap-3;
-  }
-
-  .btn-blue {
-    @apply bg-blue-600 text-white hover:bg-blue-500 hover:scale-[1.02] border border-blue-400/20 shadow-[0_0_30px_rgba(59,130,246,0.3)];
-  }
-
-  .btn-cyan {
-    @apply bg-cyan-600 text-black font-black hover:bg-cyan-500 hover:scale-[1.02] border border-cyan-400/20 shadow-[0_0_30px_rgba(34,211,238,0.3)];
-  }
-
-  .btn-outline {
-    @apply border border-white/10 bg-white/[0.02] text-white hover:bg-white hover:text-black hover:border-white transition-all duration-300;
-  }
-
-  /* Glass Card variation for Admin & Dashboards */
-  .glass-card {
-    @apply bg-[#0A0A0A]/80 backdrop-blur-3xl border border-white/[0.06] rounded-[2.5rem] p-8 shadow-2xl relative overflow-hidden;
-  }
-
-  .scanline-overlay {
-    position: relative;
-    &::after {
-      content: "";
-      position: absolute;
-      inset: 0;
-      background: linear-gradient(
-        to bottom,
-        transparent,
-        transparent 50%,
-        rgba(34, 211, 238, 0.03) 50%,
-        rgba(34, 211, 238, 0.03)
-      );
-      background-size: 100% 4px;
-      pointer-events: none;
-      z-index: 10;
-    }
-  }
-
-/* ──────────────────────────────────────────────────────────────────────────
-   🌀 QUANTUM MOTION: HIGH-FIDELITY ANIMATIONS
-   ────────────────────────────────────────────────────────────────────────── */
-/* ──────────────────────────────────────────────────────────────────────────
-   🧬 NARRATIVE FX: GLITCH & HOLOGRAMS
-   ────────────────────────────────────────────────────────────────────────── */
-
-@utility text-glitch {
-  position: relative;
-  &:hover {
-    &::before, &::after {
-      content: attr(data-text);
-      position: absolute;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
-      z-index: -1;
-    }
-    &::before {
-      color: #0ff;
-      animation: glitch-anim 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94) both infinite;
-    }
-    &::after {
-      color: #f0f;
-      animation: glitch-anim 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94) reverse both infinite;
-    }
-  }
-}
-
-@keyframes glitch-anim {
-  0% { transform: translate(0); }
-  20% { transform: translate(-2px, 2px); }
-  40% { transform: translate(-2px, -2px); }
-  60% { transform: translate(2px, 2px); }
-  80% { transform: translate(2px, -2px); }
-  100% { transform: translate(0); }
-}
-
-@utility holographic-edge {
-  background: linear-gradient(
-    45deg,
-    rgba(34, 211, 238, 0.2) 0%,
-    rgba(99, 102, 241, 0.2) 50%,
-    rgba(34, 211, 238, 0.2) 100%
-  );
-  background-size: 200% 200%;
-  animation: holographic-slide 4s linear infinite;
-}
-
-@keyframes holographic-slide {
-  0% { background-position: 0% 50%; }
-  100% { background-position: 200% 50%; }
-}
-
-/* SVG Path Flow animation for Schematics */
-.path-flow {
-  stroke-dasharray: 10, 10;
-  animation: flow 1s linear infinite;
-}
-
-@keyframes flow {
-  from { stroke-dashoffset: 20; }
-  to { stroke-dashoffset: 0; }
-}
-
-/* 🎨 SCROLLBAR THEME (CHROME/SAFARI) */
+/* 🎨 SCROLLBAR THEME */
 ::-webkit-scrollbar {
-  width: 6px;
+  width: 8px;
 }
 
 ::-webkit-scrollbar-track {
-  background: #000000;
+  background: var(--color-bg-deep);
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #1a1a1a;
+  background: #334155;
   border-radius: 10px;
-  border: 1px solid #000000;
+  border: 2px solid var(--color-bg-deep);
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #252525;
+  background: #475569;
 }
