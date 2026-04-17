@@ -1,0 +1,79 @@
+<svg width="800" height="1100" viewBox="0 0 800 1100" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Background Layer -->
+  <rect width="800" height="1100" fill="#F8FAFC"/>
+  
+  <!-- Outer Border -->
+  <rect x="20" y="20" width="760" height="1060" rx="12" fill="white" stroke="#E2E8F0" stroke-width="1"/>
+  <rect x="40" y="40" width="720" height="1020" rx="8" stroke="#0B132B" stroke-width="2" stroke-opacity="0.1"/>
+  
+  <!-- Inner Frame with Sapphire Gradients -->
+  <path d="M60 60H740V1040H60V60Z" fill="white"/>
+  <rect x="65" y="65" width="670" height="970" rx="4" stroke="url(#paint0_linear)" stroke-width="4"/>
+  
+  <!-- Content: University Header -->
+  <g opacity="0.9">
+    <circle cx="400" cy="180" r="45" fill="#0B132B"/>
+    <path d="M385 165L400 150L415 165V195L400 210L385 195V165Z" fill="#60A5FA"/>
+    <path d="M400 150V210" stroke="white" stroke-width="1" stroke-opacity="0.2"/>
+  </g>
+  
+  <text fill="#0B132B" xml:space="preserve" style="white-space: pre" font-family="Inter" font-size="14" font-weight="900" letter-spacing="0.4em" text-anchor="middle"><tspan x="400" y="270">GLOBAL UNIVERSITY OF ADVANCED TECHNOLOGY</tspan></text>
+  
+  <!-- Main Title -->
+  <text fill="#0B132B" xml:space="preserve" style="white-space: pre" font-family="Outfit" font-size="52" font-weight="900" letter-spacing="-0.04em" text-anchor="middle"><tspan x="400" y="380">CERTIFICATE</tspan></text>
+  <text fill="#0B132B" xml:space="preserve" style="white-space: pre" font-family="Outfit" font-size="52" font-weight="900" letter-spacing="-0.04em" text-anchor="middle"><tspan x="400" y="440">OF ACHIEVEMENT</tspan></text>
+  
+  <text fill="#94A3B8" xml:space="preserve" style="white-space: pre" font-family="Inter" font-size="12" font-weight="700" letter-spacing="0.1em" text-anchor="middle"><tspan x="400" y="490">THIS SIGNIFIES THAT</tspan></text>
+  
+  <!-- Student Name -->
+  <text fill="#1E40AF" xml:space="preserve" style="white-space: pre" font-family="Outfit" font-size="44" font-weight="800" text-anchor="middle"><tspan x="400" y="580">ALEXANDER J. STERLING</tspan></text>
+  <line x1="250" y1="600" x2="550" y2="600" stroke="#E2E8F0" stroke-width="2"/>
+  
+  <text fill="#475569" xml:space="preserve" style="white-space: pre" font-family="Inter" font-size="14" font-weight="500" letter-spacing="0.05em" text-anchor="middle"><tspan x="400" y="640">HAS SUCCESSFULLY COMPLETED ALL REQUIREMENTS FOR THE DEGREE</tspan></text>
+  
+  <!-- Degree Name -->
+  <text fill="#0B132B" xml:space="preserve" style="white-space: pre" font-family="Outfit" font-size="28" font-weight="900" letter-spacing="0.1em" text-anchor="middle"><tspan x="400" y="700">MASTER OF SCIENCE IN</tspan></text>
+  <text fill="#0B132B" xml:space="preserve" style="white-space: pre" font-family="Outfit" font-size="28" font-weight="900" letter-spacing="0.1em" text-anchor="middle"><tspan x="400" y="740">ARTIFICIAL INTELLIGENCE</tspan></text>
+  
+  <!-- Metadata Layer (Sapphire Footer) -->
+  <rect x="65" y="850" width="670" height="185" fill="#F1F5F9" fill-opacity="0.5"/>
+  
+  <!-- Blockchain Hash -->
+  <text fill="#94A3B8" xml:space="preserve" style="white-space: pre" font-family="Inter" font-size="10" font-weight="900" letter-spacing="0.2em"><tspan x="110" y="900">CRYPTOGRAPHIC PROOF</tspan></text>
+  <rect x="110" y="920" width="400" height="40" rx="8" fill="white" stroke="#E2E8F0"/>
+  <text fill="#60A5FA" xml:space="preserve" style="white-space: pre" font-family="Monaco" font-size="10" font-weight="700"><tspan x="130" y="945">0x76E2A3...9B4D1C2E0F5A1C2D3E4F5B6A7</tspan></text>
+  
+  <!-- QR Code Mockup -->
+  <rect x="580" y="890" width="100" height="100" rx="12" fill="white" stroke="#E2E8F0"/>
+  <rect x="595" y="905" width="20" height="20" fill="#0B132B"/>
+  <rect x="645" y="905" width="20" height="20" fill="#0B132B"/>
+  <rect x="595" y="955" width="20" height="20" fill="#0B132B"/>
+  <rect x="625" y="925" width="30" height="30" stroke="#0B132B" stroke-width="2"/>
+  
+  <!-- Seal -->
+  <circle cx="400" cy="850" r="60" fill="url(#paint1_radial)" stroke="#FBBF24" stroke-width="2"/>
+  <path d="M400 810V890" stroke="#FBBF24" stroke-width="1" stroke-dasharray="4 4"/>
+  <path d="M360 850H440" stroke="#FBBF24" stroke-width="1" stroke-dasharray="4 4"/>
+  <text fill="white" xml:space="preserve" style="white-space: pre" font-family="Inter" font-size="10" font-weight="900" letter-spacing="0.1em" text-anchor="middle"><tspan x="400" y="854">VERIFIED</tspan></text>
+  
+  <!-- Signatures -->
+  <g opacity="0.7">
+    <line x1="120" y1="800" x2="300" y2="800" stroke="#0B132B" stroke-width="1"/>
+    <text fill="#0B132B" xml:space="preserve" style="white-space: pre" font-family="Inter" font-size="10" font-weight="700" text-anchor="middle"><tspan x="210" y="820">REGISTRAR GENERAL</tspan></text>
+    
+    <line x1="500" y1="800" x2="680" y2="800" stroke="#0B132B" stroke-width="1"/>
+    <text fill="#0B132B" xml:space="preserve" style="white-space: pre" font-family="Inter" font-size="10" font-weight="700" text-anchor="middle"><tspan x="590" y="820">UNIVERSITY CHANCELLOR</tspan></text>
+  </g>
+  
+  <defs>
+    <linearGradient id="paint0_linear" x1="65" y1="65" x2="735" y2="1035" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#1D4ED8"/>
+      <stop offset="0.5" stop-color="#60A5FA"/>
+      <stop offset="1" stop-color="#1D4ED8"/>
+    </linearGradient>
+    <radialGradient id="paint1_radial" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(400 850) rotate(90) scale(60)">
+      <stop stop-color="#3B82F6"/>
+      <stop offset="1" stop-color="#1E3A8A"/>
+    </radialGradient>
+  </defs>
+</svg>

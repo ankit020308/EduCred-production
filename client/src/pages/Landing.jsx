@@ -103,9 +103,9 @@ export default function Landing() {
                       <div className="absolute -inset-1 bg-gradient-to-r from-blue-600 to-cyan-500 rounded-[2.5rem] blur opacity-20 group-hover:opacity-30 transition duration-1000"></div>
                       <div className="relative saas-card rounded-[2rem] border-[#D1D5DB] overflow-hidden shadow-2xl">
                          <img 
-                            src="/Users/minorproject/.gemini/antigravity/brain/55c9efde-99af-4b93-b746-4ec9f5ff71f1/verified_certificate_mockup_v2_1776318548794.png" 
-                            alt="Verified Credential Mockup"
-                            className="w-full h-auto object-cover"
+                            src="/mockup_certificate.svg" 
+                            alt="EduCred Verified Certificate Mockup"
+                            className="w-full h-auto object-contain p-8"
                          />
                       </div>
                       

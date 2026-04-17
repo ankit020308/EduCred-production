@@ -31,6 +31,7 @@ export default function Signup() {
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [showWaitlist, setShowWaitlist] = useState(false);
 
   const handleNext = (e) => {
     e.preventDefault();
@@ -47,6 +48,14 @@ export default function Signup() {
     setLoading(true);
     try {
       const result = await register(form);
+      
+      // 🎓 Special handling for University Waitlist
+      if (form.role === 'university') {
+        setShowWaitlist(true);
+        setLoading(false);
+        return;
+      }
+
       if (result?.requiresVerification) {
         navigate(`/verify-otp?email=${encodeURIComponent(form.email)}`);
       } else {
@@ -253,6 +262,64 @@ export default function Signup() {
           </p>
         </div>
       </div>
+
+      <AnimatePresence>
+        {showWaitlist && (
+          <WaitlistModal onClose={() => navigate('/login')} />
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}
+
+// ─── 🛡️ WAITLIST MODAL COMPONENT ──────────────────────────────────────────────
+function WaitlistModal({ onClose }) {
+  return (
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-6">
+      <motion.div 
+        initial={{ opacity: 0 }} 
+        animate={{ opacity: 1 }} 
+        exit={{ opacity: 0 }}
+        className="absolute inset-0 bg-[#0B132B]/60 backdrop-blur-xl"
+      />
+      
+      <motion.div
+        initial={{ scale: 0.9, opacity: 0, y: 30 }}
+        animate={{ scale: 1, opacity: 1, y: 0 }}
+        className="relative bg-white rounded-[3rem] p-12 md:p-16 max-w-md w-full shadow-2xl border border-white/20 overflow-hidden"
+      >
+        {/* Decorative Sapphire Background Element */}
+        <div className="absolute top-0 right-0 w-40 h-40 bg-blue-500/5 blur-3xl rounded-full translate-x-10 -translate-y-10" />
+        
+        <div className="relative z-10 text-center space-y-8">
+          <div className="w-24 h-24 bg-blue-50 rounded-[2.5rem] flex items-center justify-center mx-auto shadow-inner border border-blue-100/50">
+            <motion.div
+              animate={{ rotate: [0, 10, -10, 0] }}
+              transition={{ duration: 4, repeat: Infinity }}
+            >
+              <ShieldCheck className="text-blue-600" size={48} />
+            </motion.div>
+          </div>
+          
+          <div className="space-y-4">
+            <h2 className="text-3xl font-black text-slate-900 tracking-tight leading-none uppercase">
+              Added to <span className="text-blue-500">Waitlist.</span>
+            </h2>
+            <p className="text-slate-500 text-xs font-bold uppercase tracking-[0.2em] leading-relaxed italic opacity-80">
+              Your institutional identity has been registered in our registry. Please wait for the EduCred admin team to verify and approve your laboratory node.
+            </p>
+          </div>
+          
+          <div className="h-px w-20 bg-slate-100 mx-auto" />
+          
+          <button
+            onClick={() => onClose()}
+            className="btn-primary w-full h-16 !shadow-blue-500/20 group"
+          >
+            Acknowledge & Exit <ArrowRight className="group-hover:translate-x-1 transition-transform" size={20} />
+          </button>
+        </div>
+      </motion.div>
     </div>
   );
 }

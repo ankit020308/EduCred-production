@@ -124,10 +124,19 @@ export const register = async (req, res) => {
     try {
       await sendOTP(email, otp);
     } catch (error) {
-      await Registry.delete('universities', { userId: user.id });
-      await Registry.delete('students', { userId: user.id });
-      await Registry.delete('users', { id: user.id });
-      return res.status(502).json({ error: 'OTP email delivery failed. Check SMTP settings and try again.' });
+      console.warn(`[⚠️ SMTP_FAILURE] Could not deliver OTP to ${email}:`, error.message);
+      
+      // If it's a university registration, we allow it to proceed to the "Waitlist" flow
+      // even if email fails, as they require manual admin approval anyway.
+      if (role !== 'university') {
+        await Registry.delete('universities', { userId: user.id });
+        await Registry.delete('students', { userId: user.id });
+        await Registry.delete('users', { id: user.id });
+        return res.status(502).json({ error: 'OTP email delivery failed. Check SMTP settings and try again.' });
+      }
+      
+      // For universities, we log the OTP so it can be manually verified if needed
+      console.log(`[🚀 WAITLIST_BYPASS] University ${universityName} registered. Manual activation required. OTP: ${otp}`);
     }
 
     await logAudit(req, 'NODE_REGISTRATION', 'SUCCESS', 'New identity node provisioned.', { userId: user.id, role: user.role });
