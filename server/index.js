@@ -140,11 +140,23 @@ app.use(cors(corsOptions));
 
 const apiLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, 
-  max: 1000, // Elevated for dev
-  skip: (req) => !isProduction || req.ip === '::1' || req.ip === '127.0.0.1', 
-  message: { success: false, message: 'Too many requests from this IP, please try again later.' },
+  max: isProduction ? 100 : 1000, 
+  skip: (req) => !isProduction && (req.ip === '::1' || req.ip === '127.0.0.1'), 
+  message: { success: false, message: 'Too many requests from this IP.' },
   standardHeaders: true,
   legacyHeaders: false,
+});
+
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 20, 
+  message: { success: false, message: 'Too many authentication attempts. Please try again in 15 minutes.' },
+});
+
+const otpLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 5,
+  message: { success: false, message: 'Too many OTP attempts. Please wait before requesting another.' },
 });
 
 app.use(express.json());
@@ -171,8 +183,10 @@ if (!isProduction) {
 
 // ─── Routes ───────────────────────────────────────────
 app.use('/api', apiLimiter); 
+app.use('/api/auth', authLimiter, authRoutes); // Apply strict auth limits
+app.use('/api/auth/verify-otp', otpLimiter, authRoutes); // Shared route but stricter limit for OTP
+
 app.use('/auth', authRoutes); 
-app.use('/api/auth', authRoutes);
 app.use('/api/certificates', certificateRoutes);
 app.use('/api/universities', universityRoutes);
 app.use('/api/user', userRoutes);
@@ -272,22 +286,14 @@ if (process.env.NODE_ENV !== 'test') {
   
           // Step 3: Launch Node
           server = httpServer.listen(PORT, '0.0.0.0', async () => {
-            console.log(`[BACKEND] Server running on port ${PORT}`);
-            console.log(`[BACKEND] EduCred Node Active [HYBRID-SQL]`);
+            console.log(`\n🚀 [EDuCRED NODE] Startup Complete`);
+            console.log(`📡 Network: http://localhost:${PORT}`);
+            console.log(`🗄️  Storage: ${Registry.isSimulation ? 'MEMORY (SIM)' : 'AUTHORITATIVE (SQL)'}`);
+            console.log(`🔗 Ledger:  ${getBlockchainRuntimeInfo().mode === 'LIVE' ? 'SEP-LIVE' : 'MOCK-SIM'}`);
+            console.log(`📦 Assets:  ${isPinataConfigured() ? 'DECENTRALIZED (PINATA)' : 'LOCAL (UPLOADS)'}`);
+            console.log(`━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`);
   
-            // Check blockchain contract state
-            try {
-              const bcInfo = getBlockchainRuntimeInfo();
-              if (bcInfo.contractAddress) {
-                console.log(`[BLOCKCHAIN] Connected to contract at ${bcInfo.contractAddress}`);
-              } else {
-                console.log(`[BLOCKCHAIN] Warning: No active contract address found. Run deployment script.`);
-              }
-            } catch (bcError) {
-              console.warn(`[BLOCKCHAIN] ⚠️ External ledger unreachable: ${bcError.message}`);
-              console.info(`[BLOCKCHAIN] 🚀 Falling back to SIMULATION MODE (Mock Provider).`);
-            }
-  
+            // Background Connectivity Check
             if (isPinataConfigured()) {
               try {
                 const isIpfsReady = await testPinataConnection();

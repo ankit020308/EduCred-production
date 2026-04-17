@@ -42,28 +42,37 @@ class RegistryService {
             // Explicitly verify connection
             await sequelize.authenticate();
             
-            // Sync models (Safe by default, alter handles schema diffs)
-            const syncMode = process.env.DB_FORCE_SYNC === 'true' ? { force: true } : { alter: true };
-            await sequelize.sync(syncMode);
+            // 🛡️ SQLite Resilience: 'alter: true' can fail on a fresh SQLite DB if tables are missing.
+            // We perform a standard sync first to ensure the schema exists.
+            const forceSync = process.env.DB_FORCE_SYNC === 'true';
+            const isProduction = process.env.NODE_ENV === 'production';
+            
+            if (forceSync) {
+                console.warn('⚠️ [Registry] FORCE SYNC ENABLED. Wiping database...');
+                await sequelize.sync({ force: true });
+            } else {
+                try {
+                    // Try to sync/alter schema
+                    await sequelize.sync({ alter: true });
+                } catch (syncErr) {
+                    if (syncErr.message.includes('no such table') && !isProduction) {
+                        console.info('🛠️ [Registry] Fresh SQLite detected. Performing initial schema build...');
+                        await sequelize.sync(); // Basic sync to create tables
+                    } else {
+                        throw syncErr;
+                    }
+                }
+            }
             
             console.log('✅ [Registry] SQL storage layer active & synced.');
             this.isSimulation = false;
             return true;
         } catch (error) {
-            // Production MUST have a functional database
-            if (process.env.NODE_ENV === 'production') {
-                console.error(`[Registry_CRITICAL] 🚨 Database connection failed: ${error.message}`);
-                throw new Error('Database connection failed. Registry cannot initialize in production.');
-            }
-
-            // Development fallback to Simulation Mode
-            console.warn(`⚠️ [Registry] Database connection failed: ${error.message}`);
+            console.error(`[Registry_CRITICAL] 🚨 Database connection failed: ${error.message}`);
             if (error.original) {
-                console.warn(`🔍 [Detail]: ${error.original.code} - ${error.original.address}:${error.original.port}`);
+                console.error(`🔍 [Detail]: ${error.original.code} - ${error.original.address}:${error.original.port}`);
             }
-            console.info('🚀 [Registry] Falling back to SIMULATION MODE (In-Memory).');
-            this.isSimulation = true;
-            return true; 
+            throw new Error('Database connection failed. EduCred requires an active database to run.');
         }
     }
 

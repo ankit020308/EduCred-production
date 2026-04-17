@@ -17,11 +17,19 @@
 
 import { PinataSDK } from 'pinata';
 import dotenv from 'dotenv';
+import path from 'path';
+import { fileURLToPath } from 'url';
 
-dotenv.config();
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+// 🛡️ Ensure root .env is loaded
+dotenv.config({ path: path.join(__dirname, '../../.env') });
+const isProduction = process.env.NODE_ENV === 'production';
 
 const PINATA_JWT     = process.env.PINATA_JWT;
 const PINATA_GATEWAY = process.env.PINATA_GATEWAY || 'gateway.pinata.cloud';
+
 
 // ─── Singleton Pinata Client ──────────────────────────────────────────────────
 
@@ -84,25 +92,37 @@ export async function uploadFileToPinata(buffer, filename, keyvalueMetadata = {}
 
   console.log(`[📦 IPFS] Pinning "${filename}" (${buffer.length} bytes) to Pinata...`);
 
-  try {
-    const result = await pinata.upload.public.file(file)
-      .name(filename)
-      .keyvalues({
-        source: 'EduCred',
-        uploadedAt: new Date().toISOString(),
-        ...Object.fromEntries(
-          Object.entries(keyvalueMetadata).map(([k, v]) => [k, String(v)])
-        ),
-      });
+  const uploadWithRetry = async (attempt = 0) => {
+    try {
+      return await pinata.upload.public.file(file)
+        .name(filename)
+        .keyvalues({
+          source: 'EduCred',
+          uploadedAt: new Date().toISOString(),
+          ...Object.fromEntries(
+            Object.entries(keyvalueMetadata).map(([k, v]) => [k, String(v)])
+          ),
+        });
+    } catch (error) {
+      if (attempt < 3) {
+        const delay = Math.pow(2, attempt) * 1000;
+        console.warn(`[⚠️ IPFS] Upload failed, retrying in ${delay}ms... (${attempt + 1}/3)`);
+        await new Promise(r => setTimeout(r, delay));
+        return uploadWithRetry(attempt + 1);
+      }
+      throw error;
+    }
+  };
 
+  try {
+    const result = await uploadWithRetry();
     const cid = result.cid;
     const url = getIPFSUrl(cid);
-
     console.log(`[✅ IPFS] Success. CID: ${cid}`);
     return { cid, url };
-  } catch (uploadErr) {
-    console.error(`[❌ IPFS_ERROR]: Pinata upload failed - ${uploadErr.message}`);
-    throw uploadErr;
+  } catch (err) {
+    console.error(`[❌ IPFS] Final upload failure for "${filename}":`, err.message);
+    throw err;
   }
 }
 
@@ -124,19 +144,36 @@ export async function uploadJSONToPinata(jsonData, pinName) {
 
   console.log(`[📦 IPFS_JSON_UPLOAD] Pinning metadata JSON: "${pinName}"...`);
 
-  const result = await pinata.upload.public.json(jsonData)
-    .name(pinName || 'EduCred-Metadata')
-    .keyvalues({
-      source:    'EduCred',
-      type:      'certificate-metadata',
-      uploadedAt: new Date().toISOString(),
-    });
+  const uploadWithRetry = async (attempt = 0) => {
+    try {
+      return await pinata.upload.public.json(jsonData)
+        .name(pinName || 'EduCred-Metadata')
+        .keyvalues({
+          source:    'EduCred',
+          type:      'certificate-metadata',
+          uploadedAt: new Date().toISOString(),
+        });
+    } catch (error) {
+      if (attempt < 3) {
+        const delay = Math.pow(2, attempt) * 1000;
+        console.warn(`[⚠️ IPFS_JSON] Upload failed, retrying in ${delay}ms... (${attempt + 1}/3)`);
+        await new Promise(r => setTimeout(r, delay));
+        return uploadWithRetry(attempt + 1);
+      }
+      throw error;
+    }
+  };
 
-  const cid = result.cid;
-  const url = getIPFSUrl(cid);
-
-  console.log(`[✅ IPFS_JSON_SUCCESS] Metadata pinned. CID: ${cid}`);
-  return { cid, url };
+  try {
+    const result = await uploadWithRetry();
+    const cid = result.cid;
+    const url = getIPFSUrl(cid);
+    console.log(`[✅ IPFS_JSON_SUCCESS] Metadata pinned. CID: ${cid}`);
+    return { cid, url };
+  } catch (err) {
+    console.error(`[❌ IPFS_JSON_ERROR]: Metadata upload failed - ${err.message}`);
+    throw err;
+  }
 }
 
 /**

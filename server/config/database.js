@@ -1,52 +1,42 @@
-// server/config/database.js
 import { Sequelize } from 'sequelize';
-import dotenv from 'dotenv';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-dotenv.config({ path: path.join(__dirname, '../.env') });
+const dbUrl = process.env.DATABASE_URL || 'sqlite://storage/educred.sqlite';
+const isProduction = process.env.NODE_ENV === 'production';
 
-const dbUrl = process.env.DATABASE_URL || 'postgres://postgres:password@localhost:5432/educred';
+let sequelize;
 
-/**
- * 🏛️ Sequelize Production Configuration
- * 
- * Handles connection pooling, dialect-specific optimizations,
- * and standard transaction isolation levels.
- */
-const sequelize = new Sequelize(dbUrl, {
-    dialect: 'postgres',
-    logging: process.env.NODE_ENV === 'development' ? (msg) => console.log(`[DB]: ${msg.substring(0, 100)}...`) : false,
-    dialectOptions: {
-        connectTimeout: 60000,
-        ssl: process.env.NODE_ENV === 'production' ? {
-            require: true,
-            rejectUnauthorized: false
-        } : false
-    },
-    pool: {
-        max: 5,
-        min: 0,
-        acquire: 60000,
-        idle: 10000
-    },
-    define: {
-        timestamps: true,
-        freezeTableName: true
-    },
-    retry: {
-        match: [
-            /ConnectionError/,
-            /ConnectionRefusedError/,
-            /ConnectionTimedOutError/,
-            /SequelizeConnectionError/,
-            /SequelizeConnectionRefusedError/
-        ],
-        max: 3
-    }
-});
+if (dbUrl.includes('sqlite')) {
+    // 🛡️ Resolve path relative to the server/ directory
+    const storagePath = path.resolve(__dirname, '../storage/educred.sqlite');
+    console.info(`[DB] Authoritative SQLite storage: ${storagePath}`);
+    
+    sequelize = new Sequelize({
+        dialect: 'sqlite',
+        storage: storagePath,
+        logging: false,
+        define: {
+            timestamps: true,
+            freezeTableName: true
+        }
+    });
+} else {
+    // Postgres Production Config
+    sequelize = new Sequelize(dbUrl, {
+        dialect: 'postgres',
+        logging: false,
+        dialectOptions: {
+            ssl: isProduction ? { require: true, rejectUnauthorized: false } : false
+        },
+        define: {
+            timestamps: true,
+            freezeTableName: true
+        }
+    });
+}
 
 export default sequelize;
