@@ -69,7 +69,9 @@ const hashOTP = (otp) => crypto.createHash('sha256').update(otp).digest('hex');
 export const register = async (req, res) => {
   try {
 
+    const { error } = registrationSchema.validate(req.body);
     if (error) return res.status(400).json({ error: error.details[0].message });
+
 
     const { name, email: rawEmail, password, role, universityName } = req.body;
     const email = rawEmail.toLowerCase();
