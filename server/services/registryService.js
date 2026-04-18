@@ -100,6 +100,7 @@ class RegistryService {
 
   async insert(collection, document, options = {}) {
     const Model = this._getModel(collection);
+    console.log(`[Registry] [INSERT] Collection: ${collection}`);
     const { _id, ...cleanDoc } = document;
     const result = await Model.create(cleanDoc, options);
     return result.get({ plain: true });

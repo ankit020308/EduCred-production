@@ -95,6 +95,12 @@ const hashOTP = (otp) => crypto.createHash('sha256').update(otp).digest('hex');
 
 export const register = async (req, res) => {
   try {
+    // 🔍 DIAGNOSTIC: Scrub payload for safe logging
+    const scrubbedPayload = { ...req.body };
+    if (scrubbedPayload.password) scrubbedPayload.password = '[REDACTED]';
+    console.log(`[DIAGNOSTIC] Starting registration protocol for: ${req.body.email || 'unknown'}`);
+    console.log(`[DIAGNOSTIC] Payload Summary:`, scrubbedPayload);
+
     const { error } = registrationSchema.validate(req.body);
     if (error) {
       console.warn(`[AUTH] [VALIDATION_FAILURE] Registration invalid: ${error.details[0].message}`);
@@ -106,6 +112,7 @@ export const register = async (req, res) => {
 
     const existing = await Registry.findOne('users', { email });
     if (existing) {
+      console.warn(`[DIAGNOSTIC] Registration aborted: Email ${email} already registered.`);
       return res.status(400).json({ error: 'An account with this email already exists.' });
     }
 
@@ -116,6 +123,7 @@ export const register = async (req, res) => {
     const hashedOtp = hashOTP(otp);
     const hashedPassword = await bcrypt.hash(password, 10);
 
+    console.log(`[DIAGNOSTIC] Handshaking with SQL layer: Provisioning primary User node...`);
     const user = await Registry.insert('users', {
       name,
       email,
@@ -128,10 +136,13 @@ export const register = async (req, res) => {
       lastOtpResend: new Date(),
       isEmailVerified: false
     });
+    console.log(`[DIAGNOSTIC] User node provisioned successfully. ID: ${user.id}`);
 
     if (role === 'university') {
       const { documents, description } = req.body;
       const isInstitutional = email.endsWith('.edu') || email.endsWith('.ac.in');
+      
+      console.log(`[DIAGNOSTIC] Provisioning University node for ${universityName}...`);
       await Registry.insert('universities', {
         name: universityName,
         email,
@@ -142,12 +153,16 @@ export const register = async (req, res) => {
         status: 'PENDING',
         isVerified: false,
       });
+      console.log(`[DIAGNOSTIC] University node attached successfully.`);
     } else {
       await Registry.insert('students', { name, userId: user.id });
+      console.log(`[DIAGNOSTIC] Student node attached successfully.`);
     }
 
     try {
+      console.log(`[DIAGNOSTIC] Dispatching activation link to ${email}...`);
       await sendOTP(email, otp);
+      console.log(`[DIAGNOSTIC] Activation link delivered.`);
     } catch (error) {
       console.warn(`[⚠️ SMTP_FAILURE] Could not deliver OTP to ${email}:`, error.message);
       await Registry.delete('universities', { userId: user.id });
@@ -164,9 +179,12 @@ export const register = async (req, res) => {
       requiresVerification: true
     });
   } catch (err) {
-    console.error('[AUTH] [ERROR] Registration failure:', err);
-    await logAudit(req, 'AUTH_REGISTRATION', 'FAILURE', 'Account provisioning failed.', { email: req.body.email, error: err.message });
-    res.status(500).json({ error: 'Registration failed.', details: err.message });
+    // 🚨 DETAILED DIAGNOSTIC: Log Sequelize field-level errors
+    const errorMessage = err.errors ? err.errors.map(e => `${e.path}: ${e.message}`).join(', ') : err.message;
+    console.error(`[DIAGNOSTIC] [CRITICAL_FAILURE] Step failed. Details: ${errorMessage}`);
+    
+    await logAudit(req, 'AUTH_REGISTRATION', 'FAILURE', 'Account provisioning failed.', { email: req.body.email, error: errorMessage });
+    res.status(500).json({ error: 'Registration failed.', details: errorMessage });
   }
 };
 
@@ -528,6 +546,11 @@ export const createAdmin = async (req, res) => {
  */
 export const completeOnboarding = async (req, res) => {
   try {
+    // 🔍 DIAGNOSTIC: Scrub payload for safe logging
+    const scrubbedPayload = { ...req.body };
+    console.log(`[DIAGNOSTIC] Starting onboarding completion for User ID: ${req.user.id}`);
+    console.log(`[DIAGNOSTIC] Payload Summary:`, scrubbedPayload);
+
     const { error } = onboardingSchema.validate(req.body);
     if (error) {
       console.warn(`[AUTH] [ONBOARDING_VALIDATION_FAILURE]: ${error.details[0].message}`);
@@ -543,6 +566,7 @@ export const completeOnboarding = async (req, res) => {
     const user = req.user;
 
     if (user.role !== 'pending') {
+      console.warn(`[DIAGNOSTIC] Onboarding aborted: Identity already established (role: ${user.role})`);
       return res.status(400).json({ error: 'Identity protocol already established.' });
     }
 
@@ -550,9 +574,11 @@ export const completeOnboarding = async (req, res) => {
     if (role === 'university') {
       // Safety check: ensure we have a name before hitting the DB constraint
       if (!resolvedUniversityName) {
+        console.warn(`[DIAGNOSTIC] Onboarding failed: Missing institution name.`);
         return res.status(400).json({ error: 'Institution Name is required to complete setup.' });
       }
 
+      console.log(`[DIAGNOSTIC] Finalizing University protocol for: ${resolvedUniversityName}`);
       update.universityName = resolvedUniversityName;
 
       const isInstitutional = user.email.endsWith('.edu') || user.email.endsWith('.ac.in');
@@ -567,15 +593,19 @@ export const completeOnboarding = async (req, res) => {
           isFlagged: !isInstitutional,
           status: 'PENDING'
         });
+        console.log(`[DIAGNOSTIC] University node successfully provisioned through SQL hybrid layer.`);
       } catch (dbErr) {
-        console.error('[❌ DB_ERROR] Failed to provision university node:', dbErr.message);
+        const errorMessage = dbErr.errors ? dbErr.errors.map(e => `${e.path}: ${e.message}`).join(', ') : dbErr.message;
+        console.error('[❌ DB_ERROR] [ONBOARDING_FAILURE] Failed to provision university node:', errorMessage);
         return res.status(500).json({ 
           error: 'Failed to create institution profile. Database constraint violation.',
-          details: dbErr.message 
+          details: errorMessage 
         });
       }
     } else {
+      console.log(`[DIAGNOSTIC] Finalizing Student protocol for user...`);
       await Registry.insert('students', { name: user.name, userId: user.id });
+      console.log(`[DIAGNOSTIC] Student node successfully provisioned.`);
     }
 
     await Registry.update('users', { id: user.id }, update);
@@ -591,7 +621,8 @@ export const completeOnboarding = async (req, res) => {
       }
     });
   } catch (err) {
-    console.error('Onboarding complete error:', err);
-    res.status(500).json({ error: 'Onboarding failed.' });
+    const errorMessage = err.errors ? err.errors.map(e => `${e.path}: ${e.message}`).join(', ') : err.message;
+    console.error(`[DIAGNOSTIC] [CRITICAL_FAILURE] Onboarding failed. Details: ${errorMessage}`);
+    res.status(500).json({ error: 'Onboarding failed.', details: errorMessage });
   }
 };
