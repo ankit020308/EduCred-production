@@ -1,7 +1,7 @@
 // server/controllers/systemController.js
 import Registry from '../services/registryService.js';
 import { logAudit } from '../utils/logger.js';
-import { blockchainMode } from '../utils/blockchain.js';
+import { getBlockchainRuntimeInfo } from '../utils/blockchain.js';
 
 /**
  * 🛰️ System Controller
@@ -13,6 +13,7 @@ import { blockchainMode } from '../utils/blockchain.js';
  */
 export const getSystemStats = async (req, res) => {
     try {
+        const blockchainMode = getBlockchainRuntimeInfo().mode;
         const totalCertificates = await Registry.count('certificates');
         let credentialsSecured = totalCertificates.toString();
         
@@ -60,6 +61,7 @@ export const getSystemStats = async (req, res) => {
  */
 export const getTickerData = async (req, res) => {
     try {
+        const blockchainMode = getBlockchainRuntimeInfo().mode;
         const events = [];
         const recentCerts = await Registry.find('certificates');
         const limitedCerts = recentCerts.slice(-5);

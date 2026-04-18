@@ -3,14 +3,14 @@ import fs from 'fs';
 import dotenv from 'dotenv';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { decryptSecret } from './keyVault.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// 🛡️ Ensure root .env is loaded
 dotenv.config({ path: path.join(__dirname, '../../.env') });
-const isProduction = process.env.NODE_ENV === 'production';
 
+const CONFIRMATION_TIMEOUT_MS = 60000;
 
 function loadContractMetadata() {
   const metadataPath = path.join(__dirname, 'EduCred.json');
@@ -21,7 +21,7 @@ function loadContractMetadata() {
   try {
     return JSON.parse(fs.readFileSync(metadataPath, 'utf-8'));
   } catch (error) {
-    console.error('❌ [BLOCKCHAIN]: Failed to read synced contract metadata -', error.message);
+    console.error('[BLOCKCHAIN] [ERROR] Failed to read synced contract metadata -', error.message);
     return null;
   }
 }
@@ -34,7 +34,8 @@ const CONTRACT_ABI = contractMetadata?.abi || null;
 
 let provider = null;
 let wallet = null;
-let eduCredContract = null;
+let readOnlyContract = null;
+let serverSignerContract = null;
 let runtimeMode = 'OFFLINE';
 
 function normalizeHash(certificateHash) {
@@ -50,6 +51,54 @@ function normalizeHash(certificateHash) {
   return prefixed;
 }
 
+function requireReadContract() {
+  if (!provider || !readOnlyContract) {
+    throw new Error('Blockchain service is offline. Ledger access is unavailable.');
+  }
+
+  return readOnlyContract;
+}
+
+function requireServerSignerContract() {
+  if (!provider || !serverSignerContract || !wallet) {
+    throw new Error('Blockchain signer is unavailable. Check RPC_URL, CONTRACT_ADDRESS, and PRIVATE_KEY.');
+  }
+
+  return serverSignerContract;
+}
+
+function buildUniversitySignerContract(encryptedPrivateKey) {
+  if (!provider || !CONTRACT_ADDRESS || !CONTRACT_ABI) {
+    throw new Error('Blockchain service is offline. Institution signing is unavailable.');
+  }
+
+  if (!encryptedPrivateKey) {
+    throw new Error('Institution signer is not configured.');
+  }
+
+  const privateKey = decryptSecret(encryptedPrivateKey);
+  const signer = new ethers.Wallet(privateKey, provider);
+  return new ethers.Contract(CONTRACT_ADDRESS, CONTRACT_ABI, signer);
+}
+
+async function waitForConfirmedReceipt(tx, operationLabel) {
+  const receipt = await Promise.race([
+    tx.wait(1),
+    new Promise((_, reject) => {
+      setTimeout(
+        () => reject(new Error(`${operationLabel} confirmation timed out after ${CONFIRMATION_TIMEOUT_MS}ms.`)),
+        CONFIRMATION_TIMEOUT_MS
+      );
+    }),
+  ]);
+
+  if (!receipt || receipt.status !== 1) {
+    throw new Error(`${operationLabel} failed before final on-chain confirmation.`);
+  }
+
+  return receipt;
+}
+
 async function initializeContract() {
   if (!CONTRACT_ADDRESS || !CONTRACT_ABI || !RPC_URL) {
     const missing = [];
@@ -57,14 +106,14 @@ async function initializeContract() {
     if (!CONTRACT_ABI) missing.push('CONTRACT_ABI');
     if (!RPC_URL) missing.push('RPC_URL');
 
-    console.error(`❌ [BLOCKCHAIN]: Missing critical configuration: ${missing.join(', ')}`);
+    console.error(`[BLOCKCHAIN] [ERROR] Missing critical configuration: ${missing.join(', ')}`);
+    runtimeMode = 'OFFLINE';
     return;
   }
 
   const tempProvider = new ethers.JsonRpcProvider(RPC_URL);
 
   try {
-    // Basic connectivity check
     await Promise.race([
       tempProvider.getBlockNumber(),
       new Promise((_, reject) =>
@@ -73,151 +122,113 @@ async function initializeContract() {
     ]);
 
     provider = tempProvider;
-    
-    // Initialize contract (Read-Only by default)
-    eduCredContract = new ethers.Contract(CONTRACT_ADDRESS, CONTRACT_ABI, provider);
+    readOnlyContract = new ethers.Contract(CONTRACT_ADDRESS, CONTRACT_ABI, provider);
 
     if (PRIVATE_KEY) {
       wallet = new ethers.Wallet(PRIVATE_KEY, provider);
-      eduCredContract = eduCredContract.connect(wallet);
-      console.log('✅ [BLOCKCHAIN]: Authoritative ledger connected (RW Mode)');
+      serverSignerContract = new ethers.Contract(CONTRACT_ADDRESS, CONTRACT_ABI, wallet);
+      console.log('[BLOCKCHAIN] [SUCCESS] Authoritative ledger connected (RW Mode)');
     } else {
-      console.log('✅ [BLOCKCHAIN]: Authoritative ledger connected (Read-Only Mode)');
+      wallet = null;
+      serverSignerContract = null;
+      console.log('[BLOCKCHAIN] [SUCCESS] Authoritative ledger connected (Read-Only Mode)');
     }
 
     runtimeMode = 'LIVE';
   } catch (error) {
-    try { tempProvider.destroy(); } catch { }
+    try {
+      tempProvider.destroy();
+    } catch {
+      // no-op
+    }
+
     provider = null;
     wallet = null;
-    eduCredContract = null;
+    readOnlyContract = null;
+    serverSignerContract = null;
     runtimeMode = 'OFFLINE';
-    console.error('❌ [BLOCKCHAIN_CRITICAL]: Failed to connect to ledger -', error.message);
+    console.error('[BLOCKCHAIN] [SECURITY] Failed to connect to secure ledger -', error.message);
   }
 }
 
 await initializeContract();
 
-export const blockchainMode = runtimeMode;
-
 export function getBlockchainRuntimeInfo() {
   return {
-    mode: blockchainMode,
+    mode: runtimeMode,
     rpcUrl: RPC_URL,
     contractAddress: CONTRACT_ADDRESS,
     chainId: contractMetadata?.chainId || null,
+    hasWriteSigner: Boolean(wallet),
   };
 }
 
 export async function storeHashOnChain(certificateHash) {
-  if (!eduCredContract) {
-    throw new Error('Blockchain service is offline. Transaction aborted.');
-  }
-
-  const hashBytes = normalizeHash(certificateHash);
-  const tx = await eduCredContract.storeHash(hashBytes);
-  return tx.wait();
+  const contract = requireServerSignerContract();
+  const tx = await contract.storeHash(normalizeHash(certificateHash));
+  return waitForConfirmedReceipt(tx, 'Certificate hash anchoring');
 }
 
 export async function authorizeUniversityOnChain(universityAddress) {
-  if (!eduCredContract) {
-    throw new Error('Blockchain service is offline. Authorization aborted.');
+  const contract = requireServerSignerContract();
+  if (typeof contract.addIssuer !== 'function') {
+    throw new Error('Smart contract does not support issuer authorization.');
   }
 
-  // Use the correct method `addIssuer` defined in the smart contract
-  if (typeof eduCredContract.addIssuer !== 'function') {
-      console.warn('⚠️ [BLOCKCHAIN]: Smart contract does not support addIssuer yet. Updating required.');
-      return null;
-  }
-
-  try {
-     const tx = await eduCredContract.addIssuer(universityAddress);
-     return await tx.wait();
-  } catch (error) {
-     console.error(`[❌ LEDGER_ERROR]: Failed to authorize university - ${error.message}`);
-     throw error;
-  }
+  const tx = await contract.addIssuer(universityAddress);
+  return waitForConfirmedReceipt(tx, 'University authorization');
 }
 
-export async function issueCertificateOnChain(certificateId, certificateHash, certType = 0, universityPrivateKey = null) {
-  if (!eduCredContract) {
-    throw new Error('Blockchain service is offline. Issuance aborted.');
-  }
+export async function issueCertificateOnChain(
+  certificateId,
+  certificateHash,
+  certType = 0,
+  encryptedUniversityPrivateKey
+) {
+  void certificateId;
 
   const hashBytes = normalizeHash(certificateHash);
-  
-  try {
-    console.log(`[🔗 LEDGER] Initiating anchor for hash: ${hashBytes}...`);
-    
-    // Connect to the University's wallet if provided (true decentralization)
-    let contractToUse = eduCredContract;
-    if (universityPrivateKey) {
-      const uniWallet = new ethers.Wallet(universityPrivateKey, provider);
-      contractToUse = new ethers.Contract(CONTRACT_ADDRESS, CONTRACT_ABI, uniWallet);
-    }
-    
-    // Explicitly set gas limit to avoid estimation failures on some L2/Testnets
-    const tx = typeof contractToUse.storeCertificate === 'function'
-      ? await contractToUse.storeCertificate(hashBytes, certType)
-      : await contractToUse.storeHash(hashBytes);
-    
-    console.log(`[⏳ LEDGER] Transaction submitted: ${tx.hash}. Awaiting consensus...`);
-    
-    // Increased confirmation wait for Sepolia reliability
-    const receipt = await Promise.race([
-      tx.wait(1),
-      new Promise((_, reject) => 
-        setTimeout(() => reject(new Error('Consensus Timeout: Transaction taking too long on Sepolia')), 60000)
-      )
-    ]);
+  const contract = buildUniversitySignerContract(encryptedUniversityPrivateKey);
 
-    console.log(`[✅ LEDGER] Hash anchored successfully in block ${receipt.blockNumber}`);
-    return receipt;
-  } catch (error) {
-    console.error(`[❌ LEDGER_ERROR]: ${error.message}`);
-    throw error;
-  }
+  const tx = typeof contract.storeCertificate === 'function'
+    ? await contract.storeCertificate(hashBytes, certType)
+    : await contract.storeHash(hashBytes);
+
+  return waitForConfirmedReceipt(tx, 'Certificate issuance');
 }
 
 export async function verifyHashOnChain(certificateHash) {
-  if (!eduCredContract) {
-    throw new Error('Blockchain service is offline. Verification impossible.');
-  }
-
-  try {
-    return await eduCredContract.verifyHash(normalizeHash(certificateHash));
-  } catch (error) {
-    console.error('❌ [BLOCKCHAIN]: Verify failed -', error.message);
-    throw error;
-  }
+  const contract = requireReadContract();
+  return contract.verifyHash(normalizeHash(certificateHash));
 }
 
 export async function verifyHashDetailsOnChain(certificateHash) {
-  if (!eduCredContract || typeof eduCredContract.verifyHashFull !== 'function') {
-    throw new Error('Blockchain service is offline or contract incompatible.');
+  const contract = requireReadContract();
+  if (typeof contract.verifyHashFull !== 'function') {
+    throw new Error('Smart contract does not support detailed verification.');
   }
 
-  try {
-    const [exists, revoked, issuer, timestamp] = await eduCredContract.verifyHashFull(
-      normalizeHash(certificateHash)
-    );
-    return {
-      exists,
-      revoked,
-      issuer,
-      timestamp: Number(timestamp),
-    };
-  } catch (error) {
-    console.error('❌ [BLOCKCHAIN]: Full verification failed -', error.message);
-    throw error;
-  }
+  const [exists, revoked, issuer, timestamp] = await contract.verifyHashFull(
+    normalizeHash(certificateHash)
+  );
+
+  return {
+    exists,
+    revoked,
+    issuer,
+    timestamp: Number(timestamp),
+  };
 }
 
-export async function revokeHashOnChain(certificateHash, reasonCode = 0) {
-  if (!eduCredContract || typeof eduCredContract.revokeHash !== 'function') {
-    throw new Error('Blockchain service is offline or revocation not supported.');
+export async function revokeHashOnChain(certificateHash, reasonCode = 0, encryptedUniversityPrivateKey = null) {
+  const contract = encryptedUniversityPrivateKey
+    ? buildUniversitySignerContract(encryptedUniversityPrivateKey)
+    : requireServerSignerContract();
+
+  if (typeof contract.revokeHash !== 'function') {
+    throw new Error('Blockchain revocation is not supported by the deployed contract.');
   }
 
-  const tx = await eduCredContract.revokeHash(normalizeHash(certificateHash), reasonCode);
-  return tx.wait();
+  const tx = await contract.revokeHash(normalizeHash(certificateHash), reasonCode);
+  return waitForConfirmedReceipt(tx, 'Certificate revocation');
 }

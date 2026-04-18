@@ -1,18 +1,19 @@
-import Queue from 'bull';
-import dotenv from 'dotenv';
-dotenv.config();
+/**
+ * Queue subsystem is intentionally disabled in this deployment profile.
+ * Callers must fail loudly instead of pretending work was queued.
+ */
+export const certificateQueue = {
+    on: () => {
+        throw new Error('Certificate queue is unavailable.');
+    },
+    add: () => {
+        throw new Error('Certificate queue is unavailable.');
+    },
+    getJob: () => {
+        throw new Error('Certificate queue is unavailable.');
+    }
+};
 
-const redisUrl = process.env.REDIS_URL || 'redis://127.0.0.1:6379';
-export const certificateQueue = new Queue('certificate-issuance', redisUrl);
-
-export async function enqueueCertificateJob(jobData) {
-    // Add job to the Bull queue
-    const job = await certificateQueue.add(jobData, {
-        attempts: 3,
-        backoff: {
-            type: 'exponential',
-            delay: 1000
-        }
-    });
-    return job;
-}
+export const enqueueCertificateJob = async () => {
+    throw new Error('Certificate queue is unavailable.');
+};

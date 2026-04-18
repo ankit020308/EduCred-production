@@ -40,23 +40,23 @@ export default function Terms() {
             {[
               { 
                 icon: Network, 
-                title: "Account Usage", 
-                text: "EduCred provides secure digital verification services. Users must operate within the legal boundaries of their respective institutions and jurisdictions." 
+                title: "I. User Accountability", 
+                text: "EduCred provides institutional-grade digital verification infrastructure. Users are responsible for maintaining compliance with regional legal frameworks and institutional policies." 
               },
               { 
                 icon: ShieldAlert, 
-                title: "Data Accuracy", 
-                text: "Issuers are responsible for the accuracy of all submitted records. Fraudulent or incorrect data may result in account suspension." 
+                title: "II. Attestation Fidelity", 
+                text: "Issuing institutions bear sole responsibility for the veracity of submitted academic records. Submission of fraudulent data is grounds for immediate credential revocation and account deactivation." 
               },
               { 
                 icon: Cpu, 
-                title: "Record Integrity", 
-                text: "All verified records anchored to the platform are permanent and intended to provide long-term proof of achievement." 
+                title: "III. Immutability Clause", 
+                text: "All verified attestations anchored to the ledger are considered permanent record-of-truth. This ensures long-term non-repudiation of achievement for all stakeholders." 
               },
               { 
                 icon: Activity, 
-                title: "Limitation of Liability", 
-                text: "EduCred is a service interface. We are not liable for errors in third-party information or institutional data entry." 
+                title: "IV. Disclaimer of Warranty", 
+                text: "EduCred acts as a decentralized service interface. We disclaim liability for inaccuracies arising from third-party data entry or external institutional misconfigurations." 
               }
             ].map((section, idx) => (
               <div key={idx} className="space-y-4">
@@ -70,9 +70,9 @@ export default function Terms() {
           </div>
 
           <div className="pt-16 border-t border-slate-50 space-y-8">
-            <h2 className="text-2xl font-black text-slate-900 tracking-tighter uppercase">Service Updates</h2>
+            <h2 className="text-2xl font-black text-slate-900 tracking-tighter uppercase">Governance Updates</h2>
             <p className="text-slate-500 text-[11px] font-semibold uppercase tracking-widest leading-relaxed max-w-2xl">
-              These terms may be updated as the platform evolves. Users are encouraged to periodically review these terms to ensure continued compliance with our standards.
+              EduCred reserves the right to modify these terms to align with evolving regulatory and technological standards. Stakeholders are encouraged to review these governance protocols regularly.
             </p>
             <div className="flex items-center gap-4 text-[10px] font-black uppercase tracking-widest text-blue-600 cursor-pointer hover:gap-6 transition-all group">
                View Latest Version <RefreshCcw size={14} className="group-hover:rotate-180 transition-transform" />

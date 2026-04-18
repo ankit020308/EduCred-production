@@ -1,86 +1,78 @@
-# EduCred: Enterprise Academic Infrastructure
+# EduCred: Master Hardening Edition
+### Enterprise Blockchain Credential Infrastructure
 
-EduCred is a production-grade, decentralized platform designed for the secure issuance and verification of academic credentials. By leveraging the Ethereum blockchain as an authoritative immutable ledger and IPFS for distributed storage, EduCred eliminates certificate fraud and solves the "Single Point of Failure" risk inherent in centralized registrar systems.
-
----
-
-## Core Philosophy
-
-Traditional verification systems rely on binary file hashing or manual database lookups. EduCred introduces **Structural Hashing**, a deterministic data fingerprinting model that ensures certificates remain verifiable even if the underlying PDF formatting or container is altered. Authenticity is anchored on-chain and signed by sovereign university wallets, ensuring absolute non-repudiation.
+EduCred is a hardened, production-grade digital credentialing platform that leverages blockchain technology to ensure the authenticity, immutability, and public verifiability of academic records.
 
 ---
 
-## Key Features
+## 🛡️ Master Architecture & Hardening
 
-*   Institutional Sovereignty: Each university controls its own blockchain identity and signing keys.
-*   Structural Integrity: Deterministic JSON hashing ensures semantic data validity.
-*   Asynchronous Pipeline: High-performance background processing using BullMQ and Redis.
-*   Distributed Storage: Peer-to-peer file persistence via IPFS.
-*   Trustless Verification: Public portal for instant, zero-trust validation of academic claims.
+The current version of EduCred has been integrated with the **Master Hardening Protocol**, ensuring enterprise-grade resilience and non-repudiation.
+
+### 1. Fail-Fast Blockchain Integrity
+The system employs a strict, fail-fast blockchain service (`server/utils/blockchain.js`). Unlike legacy prototypes, this edition:
+- Eliminates all mock receipts and fallbacks.
+- Requires explicit on-chain confirmation before database finalization.
+- Automatically transitions to **OFFLINE (Safe Mode)** if the RPC provider fails, protecting system state.
+
+### 2. Secure KeyVault (AES-256-GCM)
+Institutional signing keys are never stored in plaintext. The `keyVault.js` integration provides:
+- **AES-256-GCM Encryption**: Industry-standard authenticated encryption for all sensitive signers.
+- **Environment Gating**: Decryption requires a restricted `WALLET_ENCRYPTION_KEY`, ensuring split-knowledge security.
+- **Strict Validation**: Malformed or legacy plaintext secrets are immediately rejected with security alerts.
+
+### 3. Migration-Based Schema Management
+Runtime schema mutations have been disabled in favor of a robust, manual migration workflow.
+- **apply-hardening-migration.js**: An idempotent script that ensures unique constraints and audit tables are correctly initialized.
+- **Idempotency**: All operations (table creation, index enforcement) are existence-checked to prevent deployment collisions.
 
 ---
 
-## Technical Stack
+## 🚀 Key Features
 
-*   Frontend: React, Tailwind CSS, Framer Motion
-*   Backend: Node.js, Express, BullMQ
-*   Persistence: PostgreSQL (Registry), Redis (Job Queue), IPFS (Files)
-*   Blockchain: Solidity, Ethereum (Sepolia Testnet), Ethers.js
+- **Institutional Issuance**: Secure Institution Portals verified by system administrators.
+- **Trustless Verification**: Public portal supporting file-based and ID-based cryptographic verification.
+- **Real-Time Visibility**: Live blockchain status monitoring directly from the dashboard.
+- **Decentralized Anchoring**: Direct anchoring of SHA-256 hashes to the Ethereum ledger.
 
 ---
 
-## Project Structure
+## 🛠️ System Stack
 
-```text
-/EduCred
-├── /client      # React Enterprise UI & Dashboards
-├── /server      # API Gateway & BullMQ Background Workers
-├── /blockchain  # Smart Contracts & Ledger Configuration
-├── /docs        # Technical Specifications & Architecture Reports
-├── /scripts     # Full-Stack Orchestration & System Diagnostics
-└── /deploy      # Infrastructure-as-code & Cloud Configs
+- **Frontend**: React (Vite) + Sapphire Design System (Vanilla CSS).
+- **Backend**: Node.js (Express) + Sequelize ORM.
+- **Blockchain**: Solidity + Ethers.js v6.
+- **Real-Time**: Socket.io for institutional event streaming.
+
+---
+
+## 📦 Deployment & Setup
+
+### 1. Environment Configuration
+Populate `.env` based on `.env.example`. **Critical production variables:**
+- `WALLET_ENCRYPTION_KEY`: A 32-character secure salt for signers.
+- `RPC_URL`: Your authoritative blockchain RPC provider.
+- `PRIVATE_KEY`: The master system treasury key.
+
+### 2. Initialization
+```bash
+# 1. Install dependencies
+npm install
+
+# 2. Apply hardening migration
+node server/scripts/apply-hardening-migration.js
+
+# 3. Launch platform
+npm run dev
 ```
 
 ---
 
-## Getting Started
+## 🔒 Security Model
 
-### Prerequisites
-
-*   Node.js (v18+)
-*   Redis (running on localhost:6379)
-*   Sepolia testnet ETH (for institutional wallets)
-
-### Installation
-
-1. Clone the repository:
-   ```bash
-   git clone https://github.com/ankit020308/EduCred.git
-   cd EduCred
-   ```
-
-2. Install all dependencies:
-   ```bash
-   npm run install:all
-   ```
-
-3. Launch the full-stack environment:
-   ```bash
-   npm start
-   ```
+- **Non-Repudiation**: Every record is cryptographically tied to an authorized institution.
+- **Privacy First**: No PII is stored on-chain; only hashes are public.
+- **Zero-Trust Verification**: Recounting bits to ensure bit-perfect verification matches on-chain state.
 
 ---
-
-## Documentation
-
-Comprehensive guides are available in the `docs/` directory:
-*   Architecture Blueprint: [ARCHITECTURE.md](docs/ARCHITECTURE.md)
-*   Security Analysis Report: [ANALYSIS_REPORT.md](docs/ANALYSIS_REPORT.md)
-*   Manual Demo Guide: [DEMO_GUIDE.md](docs/DEMO_GUIDE.md)
-
----
-
-## Author
-
-Ankit  
-BTech Computer Science | Blockchain Infrastructure Enthusiast
+© 2026 EduCred. *Authenticity should be verifiable, not dependent on trust.*

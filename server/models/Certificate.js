@@ -59,7 +59,8 @@ const Certificate = sequelize.define('Certificate', {
     },
     certificateHash: {
         type: DataTypes.STRING,
-        allowNull: false
+        allowNull: false,
+        unique: true
     },
     blockchainTxHash: {
         type: DataTypes.STRING,
@@ -98,11 +99,11 @@ const Certificate = sequelize.define('Certificate', {
         defaultValue: 'Degree Certificate'
     },
     metadata: {
-        type: DataTypes.JSONB,
+        type: DataTypes.JSON,
         defaultValue: {}
     },
     workflowLog: {
-        type: DataTypes.JSONB,
+        type: DataTypes.JSON,
         defaultValue: []
     }
 }, {

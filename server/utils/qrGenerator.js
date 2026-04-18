@@ -15,8 +15,9 @@ dotenv.config();
  */
 export const generateVerificationQR = async (certificateId) => {
     try {
-        const clientUrl = process.env.CLIENT_URL || 'http://localhost:3000';
-        const verifyUrl = `${clientUrl}/verify?id=${certificateId}`;
+        const clientUrlEnv = process.env.CLIENT_URL || 'http://localhost:3000';
+        const primaryClientUrl = clientUrlEnv.split(',')[0].trim();
+        const verifyUrl = `${primaryClientUrl}/verify?id=${certificateId}`;
 
         // Highly-accessible, high-trust QR design
         const qrDataUri = await QRCode.toDataURL(verifyUrl, {

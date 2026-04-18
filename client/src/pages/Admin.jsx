@@ -150,7 +150,7 @@ function AdminDashboard() {
       <div className="flex flex-col items-center gap-6">
         <Loader2 className="animate-spin text-blue-600" size={40} />
         <p className="text-[11px] font-black uppercase tracking-widest text-slate-400">
-          Updating Records...
+          Updating Portal Data...
         </p>
       </div>
     </div>
@@ -168,7 +168,7 @@ function AdminDashboard() {
             </div>
             <div className="space-y-3">
               <h1 className="text-4xl font-black text-slate-900 tracking-tighter leading-none uppercase">
-                Account under <span className="text-amber-500">review.</span>
+                Institution portal under <span className="text-amber-500">review.</span>
               </h1>
               <p className="text-slate-500 text-[11px] font-black uppercase tracking-widest leading-relaxed opacity-60">
                 Your institution's application is being reviewed.
@@ -201,13 +201,13 @@ function AdminDashboard() {
             <div className="space-y-4">
               <div className="flex items-center gap-3 px-6 py-2 bg-blue-500/10 border border-blue-500/20 rounded-full w-fit">
                 <div className="w-2 h-2 rounded-full bg-blue-500 animate-pulse" />
-                <span className="text-[10px] font-black text-blue-100 uppercase tracking-widest">Institution Verified</span>
+                <span className="text-[10px] font-black text-blue-100 uppercase tracking-widest">Portal Verified</span>
               </div>
               <h1 className="text-5xl md:text-7xl font-black text-slate-900 tracking-tighter leading-none uppercase">
-                Issuer <span className="text-blue-600">Portal.</span>
+                Institution <span className="text-blue-600">Portal.</span>
               </h1>
               <p className="text-slate-400 text-[10px] font-black uppercase tracking-widest flex items-center gap-3">
-                <Database size={14} className="text-blue-600" /> {user?.universityName || 'Administrative Dashboard'}
+                <Database size={14} className="text-blue-600" /> {user?.universityName || 'Institution Dashboard'}
               </p>
             </div>
           </motion.div>
@@ -215,8 +215,8 @@ function AdminDashboard() {
           {/* INSIGHTS GRID */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
             {[
-              { icon: FileText, label: 'Total Issued', val: stats.total, color: 'text-blue-600', bg: 'bg-blue-50', border: 'border-blue-100' },
-              { icon: CheckCircle2, label: 'Verified', val: stats.confirmed, color: 'text-emerald-600', bg: 'bg-emerald-50', border: 'border-emerald-100' },
+              { icon: FileText, label: 'Total Secured', val: stats.total, color: 'text-blue-600', bg: 'bg-blue-50', border: 'border-blue-100' },
+              { icon: CheckCircle2, label: 'On-Chain', val: stats.confirmed, color: 'text-emerald-600', bg: 'bg-emerald-50', border: 'border-emerald-100' },
               { icon: Clock, label: 'Processing', val: stats.pending, color: 'text-amber-600', bg: 'bg-amber-50', border: 'border-amber-100' },
               { icon: ShieldAlert, label: 'Revoked', val: stats.failed, color: 'text-rose-600', bg: 'bg-rose-50', border: 'border-rose-100' },
             ].map((s, i) => (
@@ -238,7 +238,7 @@ function AdminDashboard() {
             <div className="p-10 border-b border-slate-50 flex flex-col md:flex-row md:items-center justify-between gap-8 bg-slate-50/30">
               <div className="flex items-center gap-4">
                 <History className="text-blue-600" size={24} />
-                <h3 className="text-[12px] font-black uppercase tracking-widest text-slate-900">Certificate History</h3>
+                <h3 className="text-[12px] font-black uppercase tracking-widest text-slate-900">Issuance Records</h3>
               </div>
               <div className="relative group w-full md:w-96">
                 <Search className="absolute left-6 top-1/2 -translate-y-1/2 text-slate-300 group-focus-within:text-blue-600 transition-colors" size={18} />
@@ -334,8 +334,8 @@ function AdminDashboard() {
             >
               <div className="p-10 border-b border-slate-50 flex items-center justify-between bg-slate-50/50">
                 <div>
-                  <h2 className="text-3xl font-black text-slate-900 tracking-tighter uppercase leading-none">Issue <span className="text-blue-600">Records.</span></h2>
-                  <p className="text-slate-400 text-[10px] font-black uppercase tracking-widest mt-3 underline decoration-blue-500/30 underline-offset-4">Academic Verification Engine</p>
+                  <h2 className="text-3xl font-black text-slate-900 tracking-tighter uppercase leading-none">Secure <span className="text-blue-600">Issuance.</span></h2>
+                  <p className="text-slate-400 text-[10px] font-black uppercase tracking-widest mt-3 underline decoration-blue-500/30 underline-offset-4">Blockchain Verification Engine</p>
                 </div>
                 <button 
                   onClick={() => { setShowIssueModal(false); setIssuedResult(null); }} 
@@ -352,14 +352,14 @@ function AdminDashboard() {
                       <div className="w-24 h-24 bg-emerald-50 rounded-[2rem] mx-auto flex items-center justify-center text-emerald-600 border border-emerald-100 shadow-xl shadow-emerald-500/10">
                         <CheckCircle2 size={40} />
                       </div>
-                      <h3 className="text-3xl font-black text-slate-900 tracking-tighter uppercase leading-none">Issuance <span className="text-emerald-600">Complete.</span></h3>
+                      <h3 className="text-3xl font-black text-slate-900 tracking-tighter uppercase leading-none">Anchor <span className="text-emerald-600">Complete.</span></h3>
                       <p className="text-slate-400 text-[11px] font-black uppercase tracking-widest max-w-xs mx-auto leading-relaxed italic">
-                        The academic record has been successfully verified and anchored to the registry.
+                        The academic record has been successfully verified and secured on-chain.
                       </p>
                     </div>
 
                     <div className="bg-slate-50 border border-slate-100 rounded-3xl p-8 space-y-4 relative z-10">
-                      <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Certificate Identifier</p>
+                      <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Certificate ID</p>
                       <p className="text-blue-600 font-bold text-[12px] break-all tracking-tight bg-white py-4 px-6 rounded-2xl border border-slate-100 select-all uppercase">{issuedResult.certificateId}</p>
                       <div className="flex gap-4 pt-4">
                         <button

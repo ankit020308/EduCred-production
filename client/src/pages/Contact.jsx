@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Send, Loader2, ShieldCheck, Radio } from 'lucide-react';
+import api from '../services/api';
+import { useToast } from '../components/Toast';
 import BlockchainBackground from '../components/BlockchainBackground';
 
 const viewTransition = {
@@ -10,18 +12,27 @@ const viewTransition = {
 };
 
 export default function Contact() {
+  const { toast } = useToast();
   const [form, setForm] = useState({ name: '', email: '', message: '' });
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
-    setTimeout(() => {
+    try {
+      const response = await api.post('/api/support/contact', form);
+      if (response.data.success) {
+        setSuccess(true);
+        setForm({ name: '', email: '', message: '' });
+      } else {
+        toast.error(response.data.message || 'Submission failed.');
+      }
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Failed to connect to support server.');
+    } finally {
       setLoading(false);
-      setSuccess(true);
-      setForm({ name: '', email: '', message: '' });
-    }, 1500);
+    }
   };
 
   return (

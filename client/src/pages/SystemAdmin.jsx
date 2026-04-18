@@ -100,7 +100,7 @@ function SystemAdminDashboard() {
       <div className="flex flex-col items-center gap-12">
         <Loader2 className="animate-spin text-[#60A5FA]" size={64} />
         <p className="text-[#4B5563] font-black uppercase tracking-[0.3em] text-[12px] italic opacity-60">
-          Updating System Registry...
+          Updating System Accounts...
         </p>
       </div>
     </div>
@@ -119,7 +119,7 @@ function SystemAdminDashboard() {
               <span className="text-[10px] font-black text-[#60A5FA] uppercase tracking-[0.2em]">Platform Administrator</span>
             </div>
             <h1 className="text-6xl md:text-8xl font-black text-[#2C2F33] tracking-tighter leading-none uppercase">
-              System <span className="opacity-30 italic">Registry.</span>
+              Issuer <span className="opacity-30 italic">Accounts.</span>
             </h1>
             <p className="text-[#4B5563] text-[11px] font-black uppercase tracking-[0.3em] flex items-center gap-6 italic opacity-80">
               <Activity size={18} className="text-[#60A5FA]" /> Session: {user?.name || 'Authorized Admin'}
@@ -137,10 +137,10 @@ function SystemAdminDashboard() {
         {/* STATS */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-10">
           {[
-            { label: 'Total Institutions', val: stats.total, icon: Users, color: 'text-[#2C2F33]', bg: 'bg-[#F3F4F6]', border: 'border-[#E5E7EB]' },
+            { label: 'Total Portals', val: stats.total, icon: Users, color: 'text-[#2C2F33]', bg: 'bg-[#F3F4F6]', border: 'border-[#E5E7EB]' },
             { label: 'Pending Review', val: stats.pending, icon: Clock, color: 'text-amber-600', bg: 'bg-amber-50', border: 'border-amber-100' },
-            { label: 'Verified Issuers', val: stats.approved, icon: CheckCircle2, color: 'text-emerald-600', bg: 'bg-emerald-50', border: 'border-emerald-100' },
-            { label: 'Deactivated Nodes', val: stats.rejected, icon: ShieldAlert, color: 'text-rose-600', bg: 'bg-rose-50', border: 'border-rose-100' }
+            { label: 'Verified Portals', val: stats.approved, icon: CheckCircle2, color: 'text-emerald-600', bg: 'bg-emerald-50', border: 'border-emerald-100' },
+            { label: 'Inactive Accounts', val: stats.rejected, icon: ShieldAlert, color: 'text-rose-600', bg: 'bg-rose-50', border: 'border-rose-100' }
           ].map((s, i) => (
             <motion.div
               key={i} {...viewTransition}
@@ -181,7 +181,7 @@ function SystemAdminDashboard() {
             <div className="relative w-full lg:w-[550px] group">
               <Search className="absolute left-8 top-1/2 -translate-y-1/2 text-[#D1D5DB] group-focus-within:text-[#60A5FA] transition-colors" size={24} />
               <input
-                placeholder="SEARCH REGISTRY..."
+                placeholder="SEARCH PORTALS..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="w-full h-18 bg-white border border-[#E5E7EB] rounded-[2.5rem] pl-20 pr-10 text-[12px] font-bold text-[#111827] outline-none focus:border-[#60A5FA] transition-all shadow-xl uppercase tracking-[0.1em] placeholder:text-[#9CA3AF]"
@@ -195,10 +195,10 @@ function SystemAdminDashboard() {
               <table className="w-full text-left border-collapse">
                 <thead>
                   <tr className="bg-[#F9FAFB] text-[11px] font-black uppercase tracking-[0.3em] text-[#4B5563]">
-                    <th className="px-14 py-10 border-b border-[#E5E7EB]">Institution Entity</th>
+                    <th className="px-14 py-10 border-b border-[#E5E7EB]">Institution Portal</th>
                     <th className="px-14 py-10 border-b border-[#E5E7EB]">Verification Status</th>
-                    <th className="px-14 py-10 border-b border-[#E5E7EB]">Digital Profile</th>
-                    <th className="px-14 py-10 border-b border-[#E5E7EB]">Registry Epoch</th>
+                    <th className="px-14 py-10 border-b border-[#E5E7EB]">Account Details</th>
+                    <th className="px-14 py-10 border-b border-[#E5E7EB]">Created At</th>
                     <th className="px-14 py-10 border-b border-[#E5E7EB] text-right">Actions</th>
                   </tr>
                 </thead>
@@ -212,7 +212,7 @@ function SystemAdminDashboard() {
                               <Users size={56} className="text-[#9CA3AF]" />
                             </div>
                             <p className="text-[14px] font-black uppercase tracking-[0.3em] text-[#9CA3AF] italic">
-                              Registry Isolated
+                              No accounts found
                             </p>
                           </div>
                         </td>

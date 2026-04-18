@@ -56,16 +56,16 @@ export function AuthProvider({ children }) {
     setUser(optimisticUser);
 
     try {
-      console.log(`[🛰️ SESSION_HYDRATION] Establishing identity node link...`);
+      console.log(`[🛰️ SESSION_HYDRATION] Establishing secure account connection...`);
       // Note: Backend processGoogleCallback MUST set cookies for this to work
       const res = await api.get('/api/auth/me');
       
       const fullUser = res.data;
       localStorage.setItem('user', JSON.stringify(fullUser));
       setUser(fullUser);
-      console.log(`[✅ SESSION_READY] Identity synchronized for: ${fullUser.email}`);
+      console.log(`[✅ SESSION_READY] Account synchronized for: ${fullUser.email}`);
     } catch (err) {
-      console.error('[🚨 SESSION_AUGMENT_FAILED] Identity sync failed. Falling back to optimistic profile.', err);
+      console.error('[🚨 SESSION_AUGMENT_FAILED] Account sync failed. Falling back to optimistic profile.', err);
     }
   }, []);
 

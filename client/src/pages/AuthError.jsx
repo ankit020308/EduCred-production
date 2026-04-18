@@ -12,7 +12,7 @@ export default function AuthError() {
 
   const handleRetry = () => {
     // Full page redirect to restart the OAuth flow
-    window.location.href = `${import.meta.env.VITE_API_URL || 'http://localhost:5001'}/api/auth/google`;
+    window.location.href = `${import.meta.env.VITE_API_URL || ''}/api/auth/google`;
   };
 
   return (

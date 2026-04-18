@@ -13,6 +13,15 @@ const api = axios.create({
     }
 });
 
+const refreshClient = axios.create({
+    baseURL: import.meta.env.VITE_API_URL || '',
+    timeout: 10000,
+    withCredentials: true,
+    headers: {
+        'Content-Type': 'application/json'
+    }
+});
+
 let refreshPromise = null;
 
 /**
@@ -32,13 +41,14 @@ api.interceptors.response.use(
     (response) => response,
     async (error) => {
         const originalRequest = error.config || {};
+        const requestUrl = originalRequest.url || '';
+        const isRefreshRequest = requestUrl.includes('/api/auth/refresh');
 
-        if (error.response?.status === 401 && !originalRequest._retry) {
+        if (error.response?.status === 401 && !originalRequest._retry && !isRefreshRequest) {
             originalRequest._retry = true;
 
             try {
-                // No token in body needed; refreshToken is in httpOnly cookie
-                refreshPromise ??= api.post(`${import.meta.env.VITE_API_URL || ''}/api/auth/refresh`);
+                refreshPromise ??= refreshClient.post('/api/auth/refresh');
 
                 await refreshPromise;
                 return api(originalRequest);

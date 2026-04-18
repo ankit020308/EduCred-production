@@ -8,7 +8,7 @@ import {
 import { protect, requireRole } from '../middleware/authMiddleware.js';
 import { authLimiter, otpLimiter } from '../middleware/rateLimiter.js';
 import Registry from '../services/registryService.js';
-import passport from 'passport';
+
 
 const router = express.Router();
 
@@ -79,16 +79,6 @@ const processGoogleCallback = (req, res) => {
   }
 };
 
-// Passport triggers
-router.get('/google', passport.authenticate('google', { scope: ['profile', 'email'], session: false }));
-
-router.get(
-  '/google/callback',
-  passport.authenticate('google', {
-    failureRedirect: `${process.env.CLIENT_URL || 'http://localhost:3000'}/auth/error`,
-    session: false
-  }),
-  processGoogleCallback
-);
+// Removed Passport OAuth routes; we will now handle authentication strictly through JWT credentials.
 
 export default router;

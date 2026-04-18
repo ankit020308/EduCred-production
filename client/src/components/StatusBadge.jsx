@@ -2,7 +2,7 @@ import { CheckCircle2, Clock, XCircle, ShieldCheck, ShieldAlert } from 'lucide-r
 
 const CONFIG = {
   CONFIRMED: {
-    label: 'Verified',
+    label: 'Secured',
     icon: ShieldCheck,
     color: 'text-blue-600',
     bg: 'bg-blue-50',
@@ -10,7 +10,7 @@ const CONFIG = {
     dot: 'bg-blue-600',
   },
   PENDING: {
-    label: 'Processing',
+    label: 'Pending Review',
     icon: Clock,
     color: 'text-amber-600',
     bg: 'bg-amber-50',
@@ -18,23 +18,23 @@ const CONFIG = {
     dot: 'bg-amber-500',
   },
   FAILED: {
-    label: 'Failed',
-    icon: XCircle,
+    label: 'Inactive Accounts',
+    icon: ShieldAlert,
     color: 'text-rose-600',
     bg: 'bg-rose-50',
     border: 'border-rose-100',
     dot: 'bg-rose-500',
   },
   APPROVED: {
-    label: 'Authorized',
+    label: 'Verified Portals',
     icon: CheckCircle2,
-    color: 'text-emerald-500',
+    color: 'text-emerald-600',
     bg: 'bg-emerald-50',
     border: 'border-emerald-100',
     dot: 'bg-emerald-500',
   },
   REJECTED: {
-    label: 'Denied',
+    label: 'On-Chain Denied',
     icon: XCircle,
     color: 'text-rose-600',
     bg: 'bg-rose-50',

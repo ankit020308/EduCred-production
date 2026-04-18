@@ -19,6 +19,7 @@ const Student = sequelize.define('Student', {
     userId: {
         type: DataTypes.UUID,
         allowNull: false,
+        unique: true,
         references: {
             model: 'User',
             key: 'id'
@@ -26,7 +27,7 @@ const Student = sequelize.define('Student', {
     }
 }, {
     indexes: [
-        { fields: ['userId'] }
+        { unique: true, fields: ['userId'] }
     ]
 });
 

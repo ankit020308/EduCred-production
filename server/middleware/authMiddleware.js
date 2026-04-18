@@ -1,8 +1,7 @@
 // server/middleware/authMiddleware.js
 import Registry from '../services/registryService.js';
 import jwt from 'jsonwebtoken';
-
-const jwtSecret = process.env.JWT_SECRET || "dev_jwt_secret";
+import { jwtSecret } from '../utils/runtimeConfig.js';
 
 /**
  * 🛡️ Security Protocol: JWT Authentication
@@ -20,16 +19,16 @@ export const protect = async (req, res, next) => {
       return res.status(401).json({ error: 'Identity proof required. No token provided.' });
     }
 
-    // Check if token is blacklisted (Must AWAIT)
-    const isBlacklisted = await Registry.findOne('blacklistedTokens', { token });
+    const decoded = jwt.verify(token, jwtSecret);
+
+    const [isBlacklisted, user] = await Promise.all([
+      Registry.findOne('blacklistedTokens', { token }),
+      Registry.findById('users', decoded.id),
+    ]);
+
     if (isBlacklisted) {
       return res.status(401).json({ error: 'Security token revoked. Please login again.' });
     }
-
-    const decoded = jwt.verify(token, jwtSecret);
-
-    // Hydrate user from SQL (Must AWAIT)
-    const user = await Registry.findById('users', decoded.id);
     if (!user) {
       return res.status(401).json({ error: 'Identity node no longer exists.' });
     }

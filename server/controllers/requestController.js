@@ -1,4 +1,5 @@
 // server/controllers/requestController.js
+import { UniqueConstraintError } from 'sequelize';
 import Registry from '../services/registryService.js';
 import { issueCertificateOnChain } from '../utils/blockchain.js';
 import { logAudit } from '../utils/logger.js';
@@ -75,11 +76,15 @@ export const approveRequest = async (req, res) => {
     
     if (!request || request.status !== 'pending') return res.status(400).json({ error: 'Invalid request' });
 
-    // Mark request approved
-    await Registry.update('requests', { id }, { status: 'approved' });
+    const university = await Registry.findOne('universities', { userId: req.user.id });
+    if (!university || String(university.id) !== String(request.universityId)) {
+      return res.status(403).json({ error: 'You are not authorized to approve this request.' });
+    }
+    if (university.status !== 'APPROVED' || !university.encryptedPrivateKey) {
+      return res.status(403).json({ error: 'Institution wallet is not fully configured.' });
+    }
 
     const student = await Registry.findById('students', request.studentId);
-    const university = await Registry.findById('universities', request.universityId);
     const studentUser = await Registry.findById('users', student.userId);
 
     // 1. Generate a deterministic transcript hash
@@ -91,31 +96,52 @@ export const approveRequest = async (req, res) => {
       transcriptData: request.transcriptData
     };
     const certificateHash = generateHash(payloadForHash);
+    const existingCertificate = await Registry.findOne('certificates', { certificateHash });
+    if (existingCertificate) {
+      return res.status(409).json({
+        error: 'Duplicate Credential Detected',
+        message: 'A certificate with this transcript payload already exists.',
+        existingCertificateId: existingCertificate.certificateId,
+      });
+    }
 
     // 2. Create certificate record aligned with the live schema
-    const newCert = await Registry.insert('certificates', {
-      studentName: student.name,
-      studentEmail: studentUser?.email || student.email || `${student.id}@educred.local`,
-      studentPhone: student.phone || '0000000000',
-      course: student.degree || 'Academic Transcript',
-      issuer: university.name,
-      fileUrl: `/api/requests/${request.id}`,
-      studentId: student.id,
-      universityId: university.id,
-      certificateHash,
-      certificateId: `REQ-${new Date().getFullYear()}-${request.id.toString().slice(-6).toUpperCase()}`,
-      certificateType: 'Consolidated Marks Sheet',
-      metadata: {
-        requestId: request.id,
-        regNo: student.regNo,
-        branch: student.branch,
-        transcriptData: request.transcriptData,
-      },
-      status: 'PENDING',
-      issuedBy: req.user.id,
-      workflowStatus: 'STAGE2',
-      workflowLog: [{ stage: 'Request approved and transcript hashed', actorId: req.user.id, actorName: req.user.name, timestamp: new Date() }]
-    });
+    let newCert;
+    try {
+      newCert = await Registry.insert('certificates', {
+        studentName: student.name,
+        studentEmail: studentUser?.email || student.email || `${student.id}@educred.local`,
+        studentPhone: student.phone || '0000000000',
+        course: student.degree || 'Academic Transcript',
+        issuer: university.name,
+        fileUrl: `/api/requests/${request.id}`,
+        studentId: student.id,
+        universityId: university.id,
+        certificateHash,
+        certificateId: `REQ-${new Date().getFullYear()}-${request.id.toString().slice(-6).toUpperCase()}`,
+        certificateType: 'Consolidated Marks Sheet',
+        metadata: {
+          requestId: request.id,
+          regNo: student.regNo,
+          branch: student.branch,
+          transcriptData: request.transcriptData,
+        },
+        status: 'PENDING',
+        issuedBy: req.user.id,
+        workflowStatus: 'STAGE2',
+        workflowLog: [{ stage: 'Request approved and transcript hashed', actorId: req.user.id, actorName: req.user.name, timestamp: new Date() }]
+      });
+    } catch (error) {
+      if (error instanceof UniqueConstraintError) {
+        const duplicate = await Registry.findOne('certificates', { certificateHash });
+        return res.status(409).json({
+          error: 'Duplicate Credential Detected',
+          message: 'A certificate with this transcript payload already exists.',
+          existingCertificateId: duplicate?.certificateId || null,
+        });
+      }
+      throw error;
+    }
 
     // Standardized log
     await logAudit(req, 'CERTIFICATE_APPROVE', 'SUCCESS', `Credential approval and anchor generation for ${student.name}.`, { 
@@ -125,7 +151,12 @@ export const approveRequest = async (req, res) => {
 
     // 3. Send to Blockchain
     try {
-      const receipt = await issueCertificateOnChain(newCert.id.toString(), certificateHash);
+      const receipt = await issueCertificateOnChain(
+        newCert.id.toString(),
+        certificateHash,
+        2,
+        university.encryptedPrivateKey
+      );
       
       await Registry.update('certificates', { id: newCert.id }, {
           blockchainTxHash: receipt.hash,
@@ -133,8 +164,10 @@ export const approveRequest = async (req, res) => {
           workflowStatus: 'ISSUED'
       });
 
+      await Registry.update('requests', { id }, { status: 'approved' });
+
       await Registry.insert('ledger', {
-        type: 'APPROVE',
+        type: 'ISSUE',
         studentName: student.name,
         universityName: university.name,
         certificateId: newCert.id,
@@ -152,8 +185,9 @@ export const approveRequest = async (req, res) => {
       res.json({ message: 'Request approved and certificate anchored', certificate: newCert });
     } catch (bcError) {
       console.error(bcError);
+      await Registry.update('certificates', { id: newCert.id }, { status: 'FAILED' });
       await Registry.insert('ledger', {
-        type: 'APPROVE',
+        type: 'ISSUE',
         studentName: student.name,
         universityName: university.name,
         certificateId: newCert.id,
@@ -176,21 +210,17 @@ export const rejectRequest = async (req, res) => {
     const request = await Registry.findById('requests', id);
     if (!request) return res.status(404).json({ error: 'Request not found' });
 
+    const university = await Registry.findOne('universities', { userId: req.user.id });
+    if (!university || String(university.id) !== String(request.universityId)) {
+      return res.status(403).json({ error: 'You are not authorized to reject this request.' });
+    }
+
     await Registry.update('requests', { id }, { status: 'rejected' });
     
     const student = await Registry.findById('students', request.studentId);
-    const university = await Registry.findById('universities', request.universityId);
 
     await logAudit(req, 'CERTIFICATE_REJECT', 'SUCCESS', `Credential request rejected for ${student.name}.`, { 
       requestId: request.id 
-    });
-
-    await Registry.insert('ledger', {
-      type: 'REJECT',
-      studentName: student.name,
-      universityName: university.name,
-      status: 'SUCCESS',
-      metadata: { requestId: request.id }
     });
 
     res.json({ message: 'Request rejected' });

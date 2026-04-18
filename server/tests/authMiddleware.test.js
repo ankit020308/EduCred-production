@@ -1,6 +1,10 @@
 // server/tests/authMiddleware.test.js
 import { jest } from '@jest/globals';
 
+process.env.JWT_SECRET = 'test-jwt-secret';
+process.env.REFRESH_SECRET = 'test-refresh-secret';
+process.env.SESSION_SECRET = 'test-session-secret';
+
 // 🎭 ESM Mocking Strategy: Must happen BEFORE imports
 const mockRegistry = {
     findOne: jest.fn(),
@@ -49,6 +53,7 @@ describe('🛡️ Auth Middleware Security Suite', () => {
         it('should block blacklisted tokens (401)', async () => {
             req.cookies.accessToken = 'blacklisted-token';
             Registry.findOne.mockResolvedValue(true);
+            jwt.verify.mockReturnValue({ id: 'user-123' });
 
             await protect(req, res, next);
             expect(res.status).toHaveBeenCalledWith(401);

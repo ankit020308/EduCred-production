@@ -5,6 +5,10 @@ import Student from './Student.js';
 import Certificate from './Certificate.js';
 import AuditLog from './AuditLog.js';
 import Ledger from './Ledger.js';
+import BlacklistedToken from './BlacklistedToken.js';
+import Request from './Request.js';
+import FraudAlert from './FraudAlert.js';
+import VerificationLog from './VerificationLog.js';
 
 // ─── Associations ─────────────────────────────────────────────────────────────
 
@@ -42,5 +46,9 @@ export {
     Student,
     Certificate,
     AuditLog,
-    Ledger
+    Ledger,
+    BlacklistedToken,
+    Request,
+    FraudAlert,
+    VerificationLog
 };

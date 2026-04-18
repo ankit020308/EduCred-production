@@ -164,10 +164,10 @@ export default function VerifyOTP() {
                <div className="h-px w-20 bg-slate-100 mx-auto" />
 
                <button
-                  onClick={() => navigate('/login')}
+                  onClick={() => navigate('/dashboard')}
                   className="h-16 px-12 bg-[#0B132B] text-white rounded-2xl text-[11px] font-black uppercase tracking-[0.2em] hover:bg-black transition-all shadow-xl shadow-slate-900/20 flex items-center justify-center gap-4 mx-auto w-full group"
                >
-                  Return to Gateway <ArrowRight size={18} className="group-hover:translate-x-1 transition-transform" />
+                  Enter Dashboard <ArrowRight size={18} className="group-hover:translate-x-1 transition-transform" />
                </button>
             </div>
           </motion.div>

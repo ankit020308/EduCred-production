@@ -25,7 +25,7 @@ const AuthError = lazy(() => import('./pages/AuthError'));
 // Dashboards
 const Admin = lazy(() => import('./pages/Admin')); // University Dashboard
 const SystemAdmin = lazy(() => import('./pages/SystemAdmin')); // Global Admin Approval Panel
-const AIWorkbench = lazy(() => import('./pages/AIWorkbench'));
+
 const Onboarding = lazy(() => import('./pages/Onboarding'));
 const VerifyOTP = lazy(() => import('./pages/VerifyOTP'));
 const Profile = lazy(() => import('./pages/Profile'));
@@ -156,7 +156,7 @@ const NavigationWrapper = () => {
               <Route path="/onboarding" element={<ProtectedRoute roles={['pending']}><Onboarding /></ProtectedRoute>} />
               <Route path="/dashboard" element={<DashboardRedirect />} />
               <Route path="/sys-admin" element={<ProtectedRoute roles={['admin', 'super_admin']}><ErrorBoundary><SystemAdmin /></ErrorBoundary></ProtectedRoute>} />
-              <Route path="/sys-admin/workbench" element={<ProtectedRoute roles={['super_admin']}><ErrorBoundary><AIWorkbench /></ErrorBoundary></ProtectedRoute>} />
+
               <Route path="/university-node" element={<ProtectedRoute roles={['university']}><ErrorBoundary><Admin /></ErrorBoundary></ProtectedRoute>} />
               <Route path="/student-portal" element={<ProtectedRoute roles={['student']}><ErrorBoundary><StudentDashboard /></ErrorBoundary></ProtectedRoute>} />
               <Route path="/profile" element={<ProtectedRoute roles={['student', 'university', 'admin', 'super_admin']}><ErrorBoundary><Profile /></ErrorBoundary></ProtectedRoute>} />

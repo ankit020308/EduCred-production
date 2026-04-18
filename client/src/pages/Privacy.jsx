@@ -40,23 +40,23 @@ export default function Privacy() {
             {[
               {
                 icon: Eye,
-                title: "Data Collection",
-                text: "We collect only essential information (Name, Email, Institution) required to issue and verify secure digital credentials."
+                title: "I. Data Processing & Collection",
+                text: "EduCred acquires only the necessary personal identifiers required for the reliable issuance and verification of academic credentials, limited to name, institutional email, and enrollment data."
               },
               {
                 icon: Server,
-                title: "Data Usage",
-                text: "Your information is used exclusively for credential management, institutional communication, and platform security."
+                title: "II. Information Utilization",
+                text: "Data processed by the platform is utilized exclusively for cross-institutional verification, system authentication, and ensuring the technical integrity of the credentialing lifecycle."
               },
               {
                 icon: Globe,
-                title: "Blockchain Integrity",
-                text: "Credential hashes are anchored to a secure ledger. No sensitive personal documents are publicly exposed on the blockchain."
+                title: "III. Cryptographic Persistence",
+                text: "Non-PII (Personally Identifiable Information) hashes are anchored to the blockchain ledger. Sensitive source documents are stored in secure, encrypted environments and never exposed on-chain."
               },
               {
                 icon: ShieldCheck,
-                title: "User Control",
-                text: "You maintain full ownership of your records. Your data is never sold or shared with unauthorized third parties."
+                title: "IV. Data Sovereignty",
+                text: "The platform operates on a principle of user ownership. EduCred does not engage in the sale of user data or unauthorized third-party sharing of institutional records."
               }
             ].map((section, idx) => (
               <div key={idx} className="space-y-4">
@@ -70,9 +70,9 @@ export default function Privacy() {
           </div>
 
           <div className="pt-16 border-t border-slate-50 space-y-8">
-            <h2 className="text-2xl font-black text-slate-900 tracking-tighter uppercase">GDPR & Privacy Rights</h2>
+            <h2 className="text-2xl font-black text-slate-900 tracking-tighter uppercase">Statutory Rights & Compliance</h2>
             <p className="text-slate-500 text-[11px] font-semibold uppercase tracking-widest leading-relaxed max-w-2xl">
-              Under our privacy policy, every user has the right to access, update, or request the deletion of their personal data at any time. We are committed to transparency in how your records are handled.
+              EduCred adheres to global data protection standards, ensuring users retain the right to rectify, access, or request erasure of stored data. We maintain full transparency regarding the handling of academic attestations.
             </p>
             <div className="flex items-center gap-4 text-[10px] font-black uppercase tracking-widest text-blue-600 cursor-pointer hover:gap-6 transition-all group">
               Manage Data Settings <RefreshCcw size={14} className="group-hover:rotate-180 transition-transform" />

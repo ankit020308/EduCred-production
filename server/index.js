@@ -1,9 +1,7 @@
-import './utils/envLoader.js'; // 🛡️ LOAD ENV FIRST
+import './utils/envLoader.js'; // LOAD ENV FIRST
 import express from 'express';
 import bcrypt from 'bcryptjs';
 import cors from 'cors';
-import { Server } from 'socket.io';
-import http from 'http';
 import helmet from 'helmet';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -24,15 +22,25 @@ import systemRoutes from './routes/systemRoutes.js';
 import adminRoutes from './routes/adminRoutes.js';
 import requestRoutes from './routes/requestRoutes.js';
 import ledgerRoutes from './routes/ledgerRoutes.js';
+import supportRoutes from './routes/supportRoutes.js';
 import Registry from './services/registryService.js';
-import aiRoutes from './routes/aiRoutes.js';
-import passport from 'passport';
-import { configurePassport } from './config/passport.js';
-import session from 'express-session';
+import fs from 'fs';
 
 import { getAllowedOrigins, isProduction, sessionSecret, validateServerEnv, requireEnv } from './utils/runtimeConfig.js';
 import { isPinataConfigured, testPinataConnection } from './utils/ipfsService.js';
 import { getBlockchainRuntimeInfo } from './utils/blockchain.js';
+
+// [SECURITY] BOOT-TIME PERMISSION GUARD
+const bootPath = path.resolve(process.cwd(), 'write_test.tmp');
+try {
+  fs.writeFileSync(bootPath, 'BOOT_TEST');
+  fs.unlinkSync(bootPath);
+} catch (err) {
+  console.error('\n\n[ERROR] [CRITICAL] Filesystem is READ-ONLY for Node. Check your terminal perms!');
+  console.error(`Attempted write at: ${bootPath}`);
+  console.error(`Error: ${err.message}\n\n`);
+  process.exit(1);
+}
 
 validateServerEnv();
 
@@ -40,73 +48,12 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const app = express();
-const httpServer = http.createServer(app);
 const allowedOrigins = getAllowedOrigins();
-const io = new Server(httpServer, {
-  cors: {
-    origin: allowedOrigins,
-    methods: ['GET', 'POST']
-  }
-});
-app.set('io', io); // make io accessible in controllers via req.app.get('io')
+// WebSockets (socket.io) disabled for architectural stability.
 
-io.on('connection', (socket) => {
-  if (!isProduction) console.log(`🔌 Socket connected: ${socket.id}`);
 
-  socket.on('join_institutional_room', (universityId) => {
-    socket.join(`university_${universityId}`);
-  });
+// Asynchronous background workers (BullMQ) disabled for architectural stability.
 
-  socket.on('leave_institutional_room', (universityId) => {
-    socket.leave(`university_${universityId}`);
-  });
-
-  socket.on('join_user_room', (userId) => {
-    socket.join(`user_${userId}`);
-  });
-
-  socket.on('leave_user_room', (userId) => {
-    socket.leave(`user_${userId}`);
-  });
-
-  socket.on('join_admin_room', () => {
-    socket.join('admin_room');
-  });
-
-  socket.on('leave_admin_room', () => {
-    socket.leave('admin_room');
-  });
-
-  socket.on('disconnect', () => {
-    if (!isProduction) console.log(`🔌 Socket disconnected: ${socket.id}`);
-  });
-});
-
-// ─── BullMQ Global Event Forwarding ───
-import { certificateQueue } from './queues/producers.js';
-certificateQueue.on('global:completed', async (jobId, resultString) => {
-    try {
-        const result = JSON.parse(resultString);
-        const job = await certificateQueue.getJob(jobId);
-        if (job && job.data && job.data.universityData) {
-            io.to(`university_${job.data.universityData.id}`).emit('certificateConfirmed', {
-                certificateId: job.data.studentData.certificateId,
-                status: 'CONFIRMED',
-                txHash: result.txHash
-            });
-            // Also notify the student user room directly
-            const studentUser = await Registry.findOne('users', { email: job.data.studentData.studentEmail });
-            if (studentUser) {
-                 io.to(`user_${studentUser.id}`).emit('certificateConfirmed', {
-                     certificateId: job.data.studentData.certificateId,
-                     status: 'CONFIRMED'
-                 });
-            }
-        }
-    } catch (err) {
-        console.error("Failed to construct socket telemetry from worker job:", err);
-    }
-});
 
 const PORT = process.env.PORT || 5001;
 
@@ -163,19 +110,8 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
 
-app.use(session({
-  secret: sessionSecret,
-  resave: false,
-  saveUninitialized: false,
-  cookie: {
-    httpOnly: true,
-    sameSite: isProduction ? 'none' : 'lax',
-    secure: isProduction,
-  },
-}));
-app.use(passport.initialize());
-app.use(passport.session());
-configurePassport();
+// JWT strictly used for authentication.
+
 
 if (!isProduction) {
   app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
@@ -184,7 +120,6 @@ if (!isProduction) {
 // ─── Routes ───────────────────────────────────────────
 app.use('/api', apiLimiter); 
 app.use('/api/auth', authLimiter, authRoutes); // Apply strict auth limits
-app.use('/api/auth/verify-otp', otpLimiter, authRoutes); // Shared route but stricter limit for OTP
 
 app.use('/auth', authRoutes); 
 app.use('/api/certificates', certificateRoutes);
@@ -195,8 +130,7 @@ app.use('/api/system', systemRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/requests', requestRoutes);
 app.use('/api/ledger', ledgerRoutes);
-app.use('/api/ai', aiRoutes);
-
+app.use('/api/support', supportRoutes);
 app.get('/', (req, res) => {
   res.status(200).json({
     message: 'EduCred Protocol Node: Online',
@@ -222,7 +156,7 @@ app.get('/api/health', async (req, res) => {
 
 // ─── GLOBAL ERROR HANDLER ─────────────────────────────
 app.use((err, req, res, next) => {
-  console.error(`[❌ PROTOCOL_ERROR] ${err.message}${!isProduction ? `\n${err.stack}` : ''}`);
+  console.error(`[ERROR] [PROTOCOL_ERROR] ${err.message}${!isProduction ? `\n${err.stack}` : ''}`);
 
   res.status(err.status || 500).json({
     success: false,
@@ -243,35 +177,46 @@ async function seedSystem() {
     const adminPassword = process.env.ADMIN_PASSWORD;
 
     if (!adminEmail || !adminPassword) {
-      console.warn('⚠️ [SEED]: Skipping administrative seeding - ADMIN_EMAIL or ADMIN_PASSWORD missing in .env');
+      console.warn('[WARNING] [SEED]: Skipping administrative seeding - ADMIN_EMAIL or ADMIN_PASSWORD missing in .env');
       return;
     }
 
     const adminExists = await Registry.findOne('users', { email: adminEmail });
     if (adminExists) {
-      console.log(`📡 ROOT AUTHORITY: Node verified (${adminEmail}). Bypassing seeding cycle.`);
+      console.log(`[NETWORK] ROOT AUTHORITY: Node verified (${adminEmail}). Bypassing seeding cycle.`);
       return;
     }
 
     const salt = await bcrypt.genSalt(10);
     const hash = await bcrypt.hash(adminPassword, salt);
-    const bcInfo = getBlockchainRuntimeInfo();
 
     await Registry.insert('users', {
       name: 'System Controller',
       email: adminEmail,
       passwordHash: hash,
       role: 'admin',
-      isEmailVerified: true,
-      walletAddress: bcInfo.contractAddress ? process.env.PRIVATE_KEY_ADDRESS || '0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266' : null 
+      isEmailVerified: true
     });
-    console.log(`✅ ROOT AUTHORITY: Global Admin established (${adminEmail})`);
+    console.log(`[SUCCESS] ROOT AUTHORITY: Global Admin established (${adminEmail})`);
   } catch (error) {
     console.error('❌ Error seeding system:', error);
   }
 }
 
-// ─── Server Startup Protocol ─────────────────────────
+// ─── Server Startup Protocol ─────────────────────────// ─── Catch-All and Global Error Handler ─────────────────
+app.use((req, res, next) => {
+    res.status(404).json({ error: 'Route not found.' });
+});
+
+app.use((err, req, res, next) => {
+    console.error('[ERROR] [GLOBAL ERROR]:', err.stack || err.message || err);
+    res.status(err.status || 500).json({
+        success: false,
+        error: err.message || 'Internal Server Error',
+        details: process.env.NODE_ENV === 'development' ? err.stack : undefined
+    });
+});
+
 let server;
 
 if (process.env.NODE_ENV !== 'test') {
@@ -285,30 +230,29 @@ if (process.env.NODE_ENV !== 'test') {
           await seedSystem();
   
           // Step 3: Launch Node
-          server = httpServer.listen(PORT, '0.0.0.0', async () => {
-            console.log(`\n🚀 [EDuCRED NODE] Startup Complete`);
-            console.log(`📡 Network: http://localhost:${PORT}`);
-            console.log(`🗄️  Storage: ${Registry.isSimulation ? 'MEMORY (SIM)' : 'AUTHORITATIVE (SQL)'}`);
-            console.log(`🔗 Ledger:  ${getBlockchainRuntimeInfo().mode === 'LIVE' ? 'SEP-LIVE' : 'MOCK-SIM'}`);
-            console.log(`📦 Assets:  ${isPinataConfigured() ? 'DECENTRALIZED (PINATA)' : 'LOCAL (UPLOADS)'}`);
-            console.log(`━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`);
+          server = app.listen(PORT, '0.0.0.0', async () => {
+            console.log(`\n[STARTUP] [EDUCRED NODE] Startup Complete`);
+            console.log(`[NETWORK] Network: http://localhost:${PORT}`);
+            console.log(`[STORAGE] Storage: AUTHORITATIVE (SQL)`);
+            console.log(`[LEDGER]  Ledger:  ${getBlockchainRuntimeInfo().mode === 'LIVE' ? 'SEP-LIVE' : 'OFFLINE'}`);
+            console.log(`[ASSETS]  Assets:  ${isPinataConfigured() ? 'DECENTRALIZED (PINATA)' : 'LOCAL (UPLOADS)'}`);
+            console.log(`-------------------------------------------------\n`);
   
             // Background Connectivity Check
             if (isPinataConfigured()) {
               try {
                 const isIpfsReady = await testPinataConnection();
                 if (isIpfsReady) {
-                  console.log(`✅ IPFS: Decentralized storage layer active.`);
+                  console.log(`[SUCCESS] IPFS: Decentralized storage layer active.`);
                 }
               } catch (ipfsError) {
-                console.warn(`[IPFS] ⚠️ Connectivity failed. Continuing without decentralized storage.`);
+                console.warn(`[IPFS] [WARNING] Connectivity failed. Continuing without decentralized storage.`);
               }
             }
           });
       } catch (err) {
-          console.error('🛑 CRITICAL: Node failed to initialize. Review logs.', err);
-          // Only exit on fatal internal errors, but allow Simulation Mode to proceed
-          if (!Registry.isSimulation) process.exit(1); 
+          console.error('[STOP] CRITICAL: Node failed to initialize. Review logs.', err);
+          process.exit(1);
       }
   })();
 }
@@ -317,7 +261,7 @@ const shutdown = (signal) => {
   console.log(`\n⚠️ [DEVOPS]: ${signal} received. Initiating graceful shutdown...`);
   if (server) {
     server.close(() => {
-      console.log('🛑 HTTP: Server closed.');
+      console.log('[STOP] HTTP: Server closed.');
       process.exit(0);
     });
   } else {

@@ -3,6 +3,7 @@ import react from '@vitejs/plugin-react'
 
 export default defineConfig({
   plugins: [react()],
+  envDir: '../',
   build: {
     outDir: 'dist',
     // Increase warning limit for large chunks (Three.js/nivo are heavy)

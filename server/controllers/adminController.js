@@ -1,6 +1,6 @@
 import Registry from '../services/registryService.js';
-import { ethers } from 'ethers';
 import { authorizeUniversityOnChain } from '../utils/blockchain.js';
+import { createEncryptedWalletRecord } from '../utils/keyVault.js';
 
 /**
  * 👑 Admin Controller
@@ -18,45 +18,38 @@ export const getPendingUniversities = async (req, res) => {
 
 export const approveUniversity = async (req, res) => {
   try {
-    const { universityId } = req.body;
+    const { universityId, overrideRisk } = req.body;
     const university = await Registry.findById('universities', universityId);
     if (!university) return res.status(404).json({ error: 'University not found.' });
     if (university.status === 'APPROVED') return res.status(400).json({ error: 'University node is already active.' });
 
     // 🏥 Security Check: Institutional Integrity
     const isInstitutional = university.email.endsWith('.edu') || university.email.endsWith('.ac.in');
-    if (university.isFlagged && !isInstitutional) {
+    
+    // Provide a "Pitch Override" for admins during demos
+    if (university.isFlagged && !isInstitutional && !overrideRisk) {
       return res.status(403).json({ 
         error: 'High Risk Node Detected', 
         message: 'This node is flagged due to a non-institutional email domain. Manual domain verification required.' 
       });
     }
     
-    // 🏦 Generate Dedicated Ethereum Wallet for the University
-    const wallet = ethers.Wallet.createRandom();
-    const publicWalletAddress = wallet.address;
-    const encryptedPrivateKey = wallet.privateKey; // Store raw for now, ideally encrypt via KMS
+    const { publicWalletAddress, encryptedPrivateKey } = createEncryptedWalletRecord();
+
+    await authorizeUniversityOnChain(publicWalletAddress);
 
     await Registry.update('universities', { id: universityId }, {
-        status: 'APPROVED',
-        approvedBy: req.user.id,
-        approvedAt: new Date(),
-        isVerified: true,
-        publicWalletAddress,
-        encryptedPrivateKey
+      status: 'APPROVED',
+      approvedBy: req.user.id,
+      approvedAt: new Date(),
+      isVerified: true,
+      publicWalletAddress,
+      encryptedPrivateKey
     });
 
-    // 🔗 Anchor university wallet on-chain
-    try {
-      await authorizeUniversityOnChain(publicWalletAddress);
-    } catch (contractErr) {
-      console.warn("⚠️ Contract authorization failed:", contractErr.message);
-    }
-
     // Update the associated User node status
-    await Registry.update('users', { id: university.userId }, { 
-      'universityStatus': 'APPROVED',
-      'isEmailVerified': true 
+    await Registry.update('users', { id: university.userId }, {
+      'isEmailVerified': true
     });
     
     const updatedUni = await Registry.findById('universities', universityId);

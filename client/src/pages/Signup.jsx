@@ -164,7 +164,7 @@ export default function Signup() {
                          onClick={() => setForm({...form, role: 'university'})}
                          className={`flex-1 py-3 text-[10px] font-black uppercase tracking-widest rounded-xl transition-all ${form.role === 'university' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
                        >
-                         Institution
+                         Portal
                        </button>
                     </div>
 
@@ -223,7 +223,7 @@ export default function Signup() {
                           <div className="bg-amber-50 border border-amber-100 rounded-xl p-4 flex gap-3">
                              <ShieldCheck className="text-amber-600 shrink-0" size={18} />
                              <p className="text-[10px] text-amber-700 font-bold leading-relaxed uppercase tracking-wider">
-                               Institution accounts are verified by our admin team before activation.
+                               Institution portals are verified by our admin team before activation.
                              </p>
                           </div>
                         </>

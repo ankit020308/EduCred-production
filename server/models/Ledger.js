@@ -41,7 +41,7 @@ const Ledger = sequelize.define('Ledger', {
         allowNull: false
     },
     metadata: {
-        type: DataTypes.JSONB,
+        type: DataTypes.JSON,
         defaultValue: {}
     }
 }, {

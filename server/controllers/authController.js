@@ -1,5 +1,4 @@
 import Registry from '../services/registryService.js';
-import { OAuth2Client } from 'google-auth-library';
 import jwt from 'jsonwebtoken';
 import crypto from 'crypto';
 import bcrypt from 'bcryptjs';
@@ -9,8 +8,51 @@ import { registrationSchema, loginSchema } from '../validators/joiSchemas.js';
 import { sendOTP } from '../utils/emailService.js';
 import { sendPhoneOTP } from '../utils/smsService.js';
 import { logAudit } from '../utils/logger.js';
-const jwtSecret = process.env.JWT_SECRET || "dev_jwt_secret";
-const refreshSecret = process.env.REFRESH_SECRET || "dev_refresh_secret";
+import { jwtSecret, refreshSecret } from '../utils/runtimeConfig.js';
+
+const JWT_EXPIRES = '1h';
+const REFRESH_EXPIRES = '7d';
+
+const buildCookieOptions = () => {
+  const isProd = process.env.NODE_ENV === 'production';
+
+  return {
+    httpOnly: true,
+    secure: isProd,
+    sameSite: isProd ? 'none' : 'lax',
+    maxAge: 7 * 24 * 60 * 60 * 1000,
+  };
+};
+
+const clearAuthCookies = (res) => {
+  const cookieOptions = buildCookieOptions();
+  res.clearCookie('accessToken', cookieOptions);
+  res.clearCookie('refreshToken', cookieOptions);
+};
+
+const extractRefreshToken = (req) => req.cookies?.refreshToken || req.body?.token || null;
+
+const blacklistTokenIfPresent = async (token) => {
+  if (!token) {
+    return;
+  }
+
+  const decoded = jwt.decode(token);
+  if (!decoded?.exp) {
+    return;
+  }
+
+  const existing = await Registry.findOne('blacklistedTokens', { token });
+  if (existing) {
+    return;
+  }
+
+  await Registry.insert('blacklistedTokens', {
+    token,
+    expiresAt: new Date(decoded.exp * 1000),
+  });
+};
+
 /**
  * 🚪 Logout
  * Revokes the session context by blacklisting the active token.
@@ -18,49 +60,34 @@ const refreshSecret = process.env.REFRESH_SECRET || "dev_refresh_secret";
 export const logout = async (req, res) => {
   try {
     const authHeader = req.headers.authorization;
-    if (authHeader?.startsWith('Bearer ')) {
-      const token = authHeader.split(' ')[1];
-      const decoded = jwt.decode(token);
+    const accessToken = req.cookies?.accessToken || (authHeader?.startsWith('Bearer ') ? authHeader.split(' ')[1] : null);
+    const refreshToken = req.cookies?.refreshToken || null;
 
-      // Blacklist the token until its original expiry
-      if (decoded && decoded.exp) {
-        await Registry.insert('blacklistedTokens', {
-          token,
-          expiresAt: new Date(decoded.exp * 1000)
-        });
-      }
-    }
+    await Promise.all([
+      blacklistTokenIfPresent(accessToken),
+      blacklistTokenIfPresent(refreshToken),
+    ]);
 
-    await logAudit(req, 'NODE_LOGOUT', 'SUCCESS', 'Identity node session terminated.', { userId: req.user?.id });
-    
-    res.clearCookie('accessToken');
-    res.clearCookie('refreshToken');
-    
-    res.status(200).json({ message: 'Identity node session terminated and token revoked.' });
+    await logAudit(req, 'AUTH_LOGOUT', 'SUCCESS', 'Account session terminated.', { userId: req.user?.id });
+
+    clearAuthCookies(res);
+
+    res.status(200).json({ message: 'Account session terminated and token revoked.' });
   } catch (err) {
     console.error('Logout error:', err);
     res.status(500).json({ error: 'Logout failed.' });
   }
 };
 
-const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
-
-const JWT_EXPIRES = '1h'; // Short-lived access token
-const REFRESH_EXPIRES = '7d'; // Long-lived refresh token
+// 🛡️ Google Auth Client (google-auth-library) disabled for stabilization.
 
 export const signToken = (id) => jwt.sign({ id }, jwtSecret, { expiresIn: JWT_EXPIRES });
 export const signRefreshToken = (id) => jwt.sign({ id }, refreshSecret, { expiresIn: REFRESH_EXPIRES });
 
 export const setCookies = (res, accessToken, refreshToken) => {
-  const isProd = process.env.NODE_ENV === 'production';
-  const cookieOptions = {
-    httpOnly: true,
-    secure: isProd,
-    sameSite: isProd ? 'none' : 'lax', // 'none' for cross-domain prod, 'lax' for local dev
-    maxAge: 7 * 24 * 60 * 60 * 1000 // 7 days (match refresh token)
-  };
+  const cookieOptions = buildCookieOptions();
 
-  res.cookie('accessToken', accessToken, { ...cookieOptions, maxAge: 60 * 60 * 1000 }); // 1h
+  res.cookie('accessToken', accessToken, { ...cookieOptions, maxAge: 60 * 60 * 1000 });
   res.cookie('refreshToken', refreshToken, cookieOptions);
 };
 const generateOTP = () => Math.floor(100000 + Math.random() * 900000).toString();
@@ -68,10 +95,8 @@ const hashOTP = (otp) => crypto.createHash('sha256').update(otp).digest('hex');
 
 export const register = async (req, res) => {
   try {
-
     const { error } = registrationSchema.validate(req.body);
     if (error) return res.status(400).json({ error: error.details[0].message });
-
 
     const { name, email: rawEmail, password, role, universityName } = req.body;
     const email = rawEmail.toLowerCase();
@@ -107,17 +132,12 @@ export const register = async (req, res) => {
       await Registry.insert('universities', {
         name: universityName,
         email,
-        userId: user.id, // Sequelize uses .id by default in my model
+        userId: user.id,
         documents: documents || [],
         description: description || '',
         isFlagged: !isInstitutional,
-        status: 'PENDING'
-      });
-
-      req.app.get('io')?.to('admin_room')?.emit('universityRegistered', {
-        name: universityName,
-        email,
-        timestamp: new Date()
+        status: 'PENDING',
+        isVerified: false,
       });
     } else {
       await Registry.insert('students', { name, userId: user.id });
@@ -127,30 +147,22 @@ export const register = async (req, res) => {
       await sendOTP(email, otp);
     } catch (error) {
       console.warn(`[⚠️ SMTP_FAILURE] Could not deliver OTP to ${email}:`, error.message);
-      
-      // If it's a university registration, we allow it to proceed to the "Waitlist" flow
-      // even if email fails, as they require manual admin approval anyway.
-      if (role !== 'university') {
-        await Registry.delete('universities', { userId: user.id });
-        await Registry.delete('students', { userId: user.id });
-        await Registry.delete('users', { id: user.id });
-        return res.status(502).json({ error: 'OTP email delivery failed. Check SMTP settings and try again.' });
-      }
-      
-      // For universities, we log the OTP so it can be manually verified if needed
-      console.log(`[🚀 WAITLIST_BYPASS] University ${universityName} registered. Manual activation required. OTP: ${otp}`);
+      await Registry.delete('universities', { userId: user.id });
+      await Registry.delete('students', { userId: user.id });
+      await Registry.delete('users', { id: user.id });
+      return res.status(502).json({ error: 'OTP email delivery failed. Check SMTP settings and try again.' });
     }
 
-    await logAudit(req, 'NODE_REGISTRATION', 'SUCCESS', 'New identity node provisioned.', { userId: user.id, role: user.role });
+    await logAudit(req, 'AUTH_REGISTRATION', 'SUCCESS', 'New user account provisioned.', { userId: user.id, role: user.role });
 
     res.status(201).json({
-      message: 'Initial identity node created. Verify your email to activate.',
+      message: 'Initial account created. Verify your email to activate.',
       email: user.email,
       requiresVerification: true
     });
   } catch (err) {
-    console.error('Register error:', err);
-    await logAudit(req, 'NODE_REGISTRATION', 'FAILURE', 'Identity node provisioning failed.', { email: req.body.email, error: err.message });
+    console.error('[AUTH] [ERROR] Registration failure:', err);
+    await logAudit(req, 'AUTH_REGISTRATION', 'FAILURE', 'Account provisioning failed.', { email: req.body.email, error: err.message });
     res.status(500).json({ error: 'Registration failed.', details: err.message });
   }
 };
@@ -194,8 +206,8 @@ export const login = async (req, res) => {
       university: university || null
     });
   } catch (err) {
-    console.error('Login error:', err);
-    await logAudit(req, 'NODE_LOGIN', 'FAILURE', 'Identity session failed.', { email: req.body.email });
+    console.error('[AUTH] [ERROR] Login failure:', err);
+    await logAudit(req, 'AUTH_LOGIN', 'FAILURE', 'Account session establishment failed.', { email: req.body.email });
     res.status(500).json({ error: 'Login failed.', details: err.message });
   }
 };
@@ -214,7 +226,7 @@ export const verifyOTP = async (req, res) => {
     const user = await Registry.findOne('users', { email });
 
     if (!user) {
-      return res.status(404).json({ error: 'Identity node not found.' });
+      return res.status(404).json({ error: 'Account not found.' });
     }
 
     // 1. Check if blocked due to excessive attempts
@@ -250,7 +262,7 @@ export const verifyOTP = async (req, res) => {
       otpAttempts: 0
     });
 
-    await logAudit(req, 'OTP_VERIFICATION', 'SUCCESS', 'Identity node activated via security key.', { userId: user.id });
+    await logAudit(req, 'OTP_VERIFICATION', 'SUCCESS', 'Account activated via valid security key.', { userId: user.id });
 
     const accessToken = signToken(user.id);
     const refreshToken = signRefreshToken(user.id);
@@ -258,7 +270,7 @@ export const verifyOTP = async (req, res) => {
     setCookies(res, accessToken, refreshToken);
 
     res.status(200).json({
-      message: 'Identity node activated successfully.',
+      message: 'Account activated successfully.',
       user: {
         id: user.id,
         name: user.name,
@@ -326,21 +338,39 @@ export const resendOTP = async (req, res) => {
  */
 export const refreshToken = async (req, res) => {
   try {
-    const { token } = req.body;
-    if (!token) return res.status(401).json({ error: 'Refresh proof required.' });
+    const token = extractRefreshToken(req);
+    if (!token) {
+      return res.status(401).json({ error: 'Refresh proof required.' });
+    }
+
+    const isBlacklisted = await Registry.findOne('blacklistedTokens', { token });
+    if (isBlacklisted) {
+      clearAuthCookies(res);
+      return res.status(401).json({ error: 'Refresh token revoked. Please login again.' });
+    }
 
     const decoded = jwt.verify(token, refreshSecret);
     const user = await Registry.findById('users', decoded.id);
 
-    if (!user) return res.status(401).json({ error: 'Identity node no longer exists.' });
+    if (!user) {
+      clearAuthCookies(res);
+      return res.status(401).json({ error: 'Account no longer exists.' });
+    }
+
+    if (!user.isEmailVerified) {
+      clearAuthCookies(res);
+      return res.status(401).json({ error: 'Account inactive. Verification required.' });
+    }
 
     const accessToken = signToken(user.id);
-    // Refresh tokens can also be rotated here if desired
-    setCookies(res, accessToken, token); 
+    const rotatedRefreshToken = signRefreshToken(user.id);
+
+    await blacklistTokenIfPresent(token);
+    setCookies(res, accessToken, rotatedRefreshToken);
 
     res.status(200).json({ success: true });
-
   } catch (err) {
+    clearAuthCookies(res);
     res.status(401).json({ error: 'Invalid or expired refresh token.' });
   }
 };
@@ -350,72 +380,7 @@ export const refreshToken = async (req, res) => {
  * Verifies Google ID tokens and provisions identity nodes.
  */
 export const googleLogin = async (req, res) => {
-  try {
-    const { idToken, role } = req.body;
-    if (!idToken) return res.status(400).json({ error: 'Google identity proof required.' });
-    if (!process.env.GOOGLE_CLIENT_ID) {
-      return res.status(500).json({ error: 'Google OAuth is not configured.' });
-    }
-
-    const ticket = await googleClient.verifyIdToken({
-      idToken,
-      audience: process.env.GOOGLE_CLIENT_ID,
-    });
-
-    const payload = ticket.getPayload();
-    if (!payload?.email) {
-      return res.status(400).json({ error: 'Google account email is unavailable.' });
-    }
-
-    const email = payload.email.toLowerCase();
-    const { name, picture, sub: googleId } = payload;
-
-    let user = await Registry.findOne('users', { email });
-
-    if (!user) {
-      // Auto-provision new node if it doesn't exist
-      user = await Registry.insert('users', {
-        name,
-        email,
-        passwordHash: crypto.randomBytes(16).toString('hex'), // Randomized password for social-only nodes
-        role: 'pending',
-        isEmailVerified: true, // Google emails are pre-verified
-        isGoogleUser: true,
-        avatar: picture,
-        googleId
-      });
-    } else {
-      // If user exists, link account securely
-      const update = {};
-      if (!user.googleId) update.googleId = googleId;
-      if (!user.isGoogleUser) update.isGoogleUser = true;
-      if (!user.isEmailVerified) update.isEmailVerified = true;
-      if (!user.avatar && picture) update.avatar = picture;
-      
-      if (Object.keys(update).length > 0) {
-        await Registry.update('users', { id: user.id }, update);
-      }
-    }
-
-    const accessToken = signToken(user.id);
-    const refreshToken = signRefreshToken(user.id);
-
-    res.status(200).json({
-      accessToken,
-      refreshToken,
-      isNewUser: user.role === 'pending',
-      user: {
-        id: user.id,
-        name: user.name,
-        email: user.email,
-        role: user.role
-      }
-    });
-
-  } catch (err) {
-    console.error('Google Login error:', err);
-    res.status(401).json({ error: 'Google identity verification failed.' });
-  }
+  res.status(501).json({ error: 'Google identity verification is temporarily disabled for system stabilization.' });
 };
 
 /**
@@ -454,7 +419,10 @@ export const verifyPhoneOTP = async (req, res) => {
     const { otp } = req.body;
     if (!otp) return res.status(400).json({ error: 'Security key required.' });
 
-    const user = Registry.findById('users', req.user.id);
+    const user = await Registry.findById('users', req.user.id);
+    if (!user || !user.otp) {
+      return res.status(404).json({ error: 'Mobile verification challenge not found.' });
+    }
 
     const expectedOtpHash = Buffer.from(hashOTP(otp), 'utf8');
     const actualOtpHash = Buffer.from(user.otp, 'utf8');
@@ -584,7 +552,7 @@ export const completeOnboarding = async (req, res) => {
     }
 
     await Registry.update('users', { id: user.id }, update);
-    await logAudit(req, 'PROTOCOL_ONBOARDING', 'SUCCESS', `Identity node configured as ${role}.`, { userId: user.id, role });
+    await logAudit(req, 'PROTOCOL_ONBOARDING', 'SUCCESS', `Account configured as ${role}.`, { userId: user.id, role });
 
     res.status(200).json({
       message: 'Identity protocol successfully established.',

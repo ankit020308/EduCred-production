@@ -24,13 +24,14 @@ const University = sequelize.define('University', {
     userId: {
         type: DataTypes.UUID,
         allowNull: false,
+        unique: true,
         references: {
             model: 'User',
             key: 'id'
         }
     },
     documents: {
-        type: DataTypes.JSONB,
+        type: DataTypes.JSON,
         defaultValue: []
     },
     description: {
@@ -64,7 +65,7 @@ const University = sequelize.define('University', {
     }
 }, {
     indexes: [
-        { fields: ['userId'] },
+        { unique: true, fields: ['userId'] },
         { fields: ['status'] },
         { fields: ['publicWalletAddress'] }
     ]

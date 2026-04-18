@@ -1,13 +1,38 @@
+import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { GraduationCap, Send, Clock, User, Hexagon } from 'lucide-react';
+import { fetchSystemStats } from '../services/api';
 
 export default function DashboardLayout({ children, currentTab, setTab, pendingCount }) {
+  const [status, setStatus] = useState({ mode: 'LIVE', label: 'LIVE (Mainnet)' });
+
+  useEffect(() => {
+    const updateStatus = async () => {
+      try {
+        const res = await fetchSystemStats();
+        const mode = res.data?.blockchainMode || 'OFFLINE';
+        setStatus({
+          mode,
+          label: mode === 'LIVE' ? 'LIVE (Mainnet)' : 'OFFLINE (Safe Mode)'
+        });
+      } catch {
+        setStatus({ mode: 'OFFLINE', label: 'OFFLINE (Safe Mode)' });
+      }
+    };
+
+    updateStatus();
+    const interval = setInterval(updateStatus, 300000); // 5 min poll
+    return () => clearInterval(interval);
+  }, []);
+
   const tabs = [
-    { key: 'wallet', label: 'Identity Wallet', icon: GraduationCap },
-    { key: 'submit', label: 'Submit Proof', icon: Send },
-    { key: 'status', label: 'Network Status', icon: Clock },
-    { key: 'profile', label: 'Node Profile', icon: User },
+    { key: 'wallet', label: 'My Credentials', icon: GraduationCap },
+    { key: 'submit', label: 'Verify Document', icon: Send },
+    { key: 'status', label: 'System Status', icon: Clock },
+    { key: 'profile', label: 'Account Settings', icon: User },
   ];
+
+  const isLive = status.mode === 'LIVE';
 
   return (
     <div className="flex min-h-screen bg-[#F8FAFC] text-slate-800 font-sans selection:bg-blue-500/30 overflow-hidden relative">
@@ -45,7 +70,7 @@ export default function DashboardLayout({ children, currentTab, setTab, pendingC
               >
                 <div className="relative flex items-center gap-4 z-10">
                   <Icon size={18} className={isActive ? "text-white" : "group-hover:text-blue-400 transition-colors"} />
-                  <span className="text-[10px] font-black uppercase tracking-widest">{tab.label === 'Identity Wallet' ? 'My Credentials' : tab.label === 'Node Profile' ? 'Account Settings' : tab.label === 'Submit Proof' ? 'Verify Document' : tab.label}</span>
+                  <span className="text-[10px] font-black uppercase tracking-widest">{tab.label}</span>
                 </div>
 
                 {tab.key === 'status' && pendingCount > 0 && (
@@ -62,12 +87,14 @@ export default function DashboardLayout({ children, currentTab, setTab, pendingC
         <div className="p-6 border-t border-white/5">
           <div className="flex items-center gap-4 px-4 py-4 rounded-xl bg-white/5 border border-white/5">
             <div className="relative flex items-center justify-center">
-              <div className="absolute w-3 h-3 bg-emerald-500/20 rounded-full animate-ping" />
-              <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full" />
+              <div className={`absolute w-3 h-3 ${isLive ? 'bg-emerald-500/20' : 'bg-rose-500/20'} rounded-full animate-ping`} />
+              <div className={`w-1.5 h-1.5 ${isLive ? 'bg-emerald-500' : 'bg-rose-500'} rounded-full`} />
             </div>
             <div className="flex flex-col text-left">
               <span className="text-[8px] font-black text-slate-500 uppercase tracking-widest mb-0.5">System Status</span>
-              <span className="text-[10px] font-black text-white uppercase tracking-widest">Active</span>
+              <span className={`text-[10px] font-black ${isLive ? 'text-emerald-500' : 'text-rose-500'} uppercase tracking-widest`}>
+                {status.label}
+              </span>
             </div>
           </div>
         </div>

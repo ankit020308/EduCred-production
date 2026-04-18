@@ -7,7 +7,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 // 🛡️ Explicitly point to the server/.env from the root
-const envPath = path.resolve(__dirname, 'server', '.env');
+const envPath = path.resolve(__dirname, '..', 'server', '.env');
 const envResult = dotenv.config({ path: envPath });
 
 async function runAuthDiagnostics() {

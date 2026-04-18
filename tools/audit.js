@@ -2,7 +2,7 @@ import { GoogleGenerativeAI } from '@google/generative-ai';
 import fs from 'fs';
 import path from 'path';
 import dotenv from 'dotenv';
-import { getPrompt } from './server/ai-agent/promptEngine.js';
+import { getPrompt } from '../server/ai-agent/promptEngine.js';
 
 dotenv.config(); // Loads .env from root
 

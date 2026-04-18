@@ -51,7 +51,7 @@ export default function Login() {
   const handleGoogleRedirect = () => {
     if (isGoogleRedirecting) return;
     setIsGoogleRedirecting(true);
-    const backendUrl = import.meta.env.VITE_API_URL || 'http://localhost:5001';
+    const backendUrl = import.meta.env.VITE_API_URL || '';
     window.location.href = `${backendUrl}/api/auth/google`;
   };
 

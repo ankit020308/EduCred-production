@@ -1,204 +1,137 @@
-// server/services/registryService.js
 import sequelize from '../config/database.js';
 import * as Models from '../models/index.js';
 import { Op } from 'sequelize';
-import crypto from 'crypto';
 
-/**
- * 🔀 Registry Adapter (Resilient Edition)
- * Maps logic to SQL by default, with an automatic in-memory Simulation Mode fallback.
- */
 const COLLECTION_MODEL_MAP = {
-    users: Models.User,
-    universities: Models.University,
-    students: Models.Student,
-    certificates: Models.Certificate,
-    ledger: Models.Ledger,
-    auditLogs: Models.AuditLog
+  users: Models.User,
+  universities: Models.University,
+  students: Models.Student,
+  certificates: Models.Certificate,
+  ledger: Models.Ledger,
+  auditLogs: Models.AuditLog,
+  blacklistedTokens: Models.BlacklistedToken,
+  requests: Models.Request,
+  fraudAlerts: Models.FraudAlert,
+  verificationLogs: Models.VerificationLog,
 };
 
 class RegistryService {
-    constructor() {
-        this.models = COLLECTION_MODEL_MAP;
-        this.isSimulation = false;
-        this.store = {
-            users: [],
-            universities: [],
-            students: [],
-            certificates: [],
-            ledger: [],
-            auditLogs: []
-        };
+  constructor() {
+    this.models = COLLECTION_MODEL_MAP;
+    this.isReady = false;
+    this.isSimulation = false;
+  }
+
+  _getModel(collection) {
+    const Model = this.models[collection];
+    if (!Model) {
+      throw new Error(`Unsupported registry collection: ${collection}`);
     }
 
-    /**
-     * 🛡️ Initialises the database connection and syncs models.
-     * Falls back to Simulation Mode if DB is unreachable.
-     */
-    async init() {
-        try {
-            console.log('[Registry] Initializing SQL storage protocol...');
-            
-            // Explicitly verify connection
-            await sequelize.authenticate();
-            
-            // 🛡️ SQLite Resilience: 'alter: true' can fail on a fresh SQLite DB if tables are missing.
-            // We perform a standard sync first to ensure the schema exists.
-            const forceSync = process.env.DB_FORCE_SYNC === 'true';
-            const isProduction = process.env.NODE_ENV === 'production';
-            
-            if (forceSync) {
-                console.warn('⚠️ [Registry] FORCE SYNC ENABLED. Wiping database...');
-                await sequelize.sync({ force: true });
-            } else {
-                try {
-                    // Try to sync/alter schema
-                    await sequelize.sync({ alter: true });
-                } catch (syncErr) {
-                    if (syncErr.message.includes('no such table') && !isProduction) {
-                        console.info('🛠️ [Registry] Fresh SQLite detected. Performing initial schema build...');
-                        await sequelize.sync(); // Basic sync to create tables
-                    } else {
-                        throw syncErr;
-                    }
-                }
-            }
-            
-            console.log('✅ [Registry] SQL storage layer active & synced.');
-            this.isSimulation = false;
-            return true;
-        } catch (error) {
-            console.error(`[Registry_CRITICAL] 🚨 Database connection failed: ${error.message}`);
-            if (error.original) {
-                console.error(`🔍 [Detail]: ${error.original.code} - ${error.original.address}:${error.original.port}`);
-            }
-            throw new Error('Database connection failed. EduCred requires an active database to run.');
-        }
+    return Model;
+  }
+
+  async _verifySchema() {
+    const queryInterface = sequelize.getQueryInterface();
+    const requiredTables = [
+      'User',
+      'University',
+      'Student',
+      'Certificate',
+      'Ledger',
+      'AuditLog',
+      'blacklistedTokens',
+      'Request',
+      'FraudAlert',
+      'VerificationLog',
+    ];
+
+    for (const tableName of requiredTables) {
+      await queryInterface.describeTable(tableName);
     }
 
-    /**
-     * 🔍 Find Documents
-     */
-    async find(collection, query = {}) {
-        if (this.isSimulation) {
-            return this.store[collection]?.filter(item => this._match(item, query)) || [];
-        }
+    const certificateIndexes = await queryInterface.showIndex('Certificate');
+    const uniqueFields = new Set(
+      certificateIndexes
+        .filter((index) => index.unique)
+        .flatMap((index) => index.fields.map((field) => field.attribute || field.name))
+    );
 
-        const Model = this.models[collection];
-        if (!Model) return [];
-        const where = this._parseQuery(query);
-        return await Model.findAll({ where });
+    for (const field of ['certificateId', 'certificateHash']) {
+      if (!uniqueFields.has(field)) {
+        throw new Error(`Database schema is missing the required unique index on Certificate.${field}.`);
+      }
     }
+  }
 
-    async findOne(collection, query = {}) {
-        if (this.isSimulation) {
-            return this.store[collection]?.find(item => this._match(item, query)) || null;
-        }
-
-        const Model = this.models[collection];
-        if (!Model) return null;
-        const where = this._parseQuery(query);
-        return await Model.findOne({ where });
+  async init() {
+    try {
+      console.log('[Registry] Initializing SQL storage protocol...');
+      await sequelize.authenticate();
+      await this._verifySchema();
+      this.isReady = true;
+      console.log('[Registry] [SUCCESS] SQL storage layer active.');
+      return true;
+    } catch (error) {
+      console.error(`[Registry] [ERROR] Database connection failed: ${error.message}`);
+      if (error.original) {
+        console.error(`[Registry] [INFO] Detail: ${error.original.code} - ${error.original.address}:${error.original.port}`);
+      }
+      throw new Error('Database connection failed or schema is unsafe. EduCred requires a migrated database to run.');
     }
+  }
 
-    async findById(collection, id) {
-        if (this.isSimulation) {
-            return this.store[collection]?.find(item => item.id === id) || null;
-        }
+  async find(collection, query = {}, options = {}) {
+    const Model = this._getModel(collection);
+    const where = this._parseQuery(query);
+    return Model.findAll({ where, ...options });
+  }
 
-        const Model = this.models[collection];
-        if (!Model) return null;
-        return await Model.findByPk(id);
+  async findOne(collection, query = {}, options = {}) {
+    const Model = this._getModel(collection);
+    const where = this._parseQuery(query);
+    return Model.findOne({ where, ...options });
+  }
+
+  async findById(collection, id, options = {}) {
+    const Model = this._getModel(collection);
+    return Model.findByPk(id, options);
+  }
+
+  async insert(collection, document, options = {}) {
+    const Model = this._getModel(collection);
+    const { _id, ...cleanDoc } = document;
+    const result = await Model.create(cleanDoc, options);
+    return result.get({ plain: true });
+  }
+
+  async update(collection, query, updateData, options = {}) {
+    const Model = this._getModel(collection);
+    const where = this._parseQuery(query);
+    await Model.update(updateData, { where, ...options });
+    return this.find(collection, query, options.transaction ? { transaction: options.transaction } : {});
+  }
+
+  async delete(collection, query, options = {}) {
+    const Model = this._getModel(collection);
+    const where = this._parseQuery(query);
+    await Model.destroy({ where, ...options });
+  }
+
+  async count(collection, query = {}, options = {}) {
+    const Model = this._getModel(collection);
+    const where = this._parseQuery(query);
+    return Model.count({ where, ...options });
+  }
+
+  _parseQuery(query) {
+    const parsed = { ...query };
+    if (query.$or) {
+      parsed[Op.or] = query.$or;
+      delete parsed.$or;
     }
-
-    /**
-     * 📝 Insert Document
-     */
-    async insert(collection, document) {
-        if (this.isSimulation) {
-            const newItem = { 
-                ...document, 
-                id: document.id || crypto.randomUUID(),
-                createdAt: new Date(),
-                updatedAt: new Date()
-            };
-            this.store[collection].push(newItem);
-            return newItem;
-        }
-
-        const Model = this.models[collection];
-        if (!Model) return document;
-        const { _id, ...cleanDoc } = document;
-        const result = await Model.create(cleanDoc);
-        return result.get({ plain: true }); // Use get({ plain: true }) for clean POJO
-    }
-
-    /**
-     * 🔄 Update Documents
-     */
-    async update(collection, query, updateData) {
-        if (this.isSimulation) {
-            const items = this.store[collection].filter(item => this._match(item, query));
-            items.forEach(item => {
-                Object.assign(item, updateData);
-                item.updatedAt = new Date();
-            });
-            return items;
-        }
-
-        const Model = this.models[collection];
-        if (!Model) return [];
-        const where = this._parseQuery(query);
-        await Model.update(updateData, { where });
-        return this.find(collection, where);
-    }
-
-    /**
-     * 🗑️ Delete Documents
-     */
-    async delete(collection, query) {
-        if (this.isSimulation) {
-            this.store[collection] = this.store[collection].filter(item => !this._match(item, query));
-            return;
-        }
-
-        const Model = this.models[collection];
-        if (!Model) return;
-        const where = this._parseQuery(query);
-        await Model.destroy({ where });
-    }
-
-    async count(collection, query = {}) {
-        if (this.isSimulation) {
-            return this.store[collection].filter(item => this._match(item, query)).length;
-        }
-
-        const Model = this.models[collection];
-        if (!Model) return 0;
-        const where = this._parseQuery(query);
-        return await Model.count({ where });
-    }
-
-    /**
-     * 🛠️ Query Parser & Matcher
-     */
-    _match(item, query) {
-        return Object.entries(query).every(([key, value]) => {
-            if (key === '$or') {
-                return value.some(condition => this._match(item, condition));
-            }
-            return item[key] === value;
-        });
-    }
-
-    _parseQuery(query) {
-        const parsed = { ...query };
-        if (query.$or) {
-            parsed[Op.or] = query.$or;
-            delete parsed.$or;
-        }
-        return parsed;
-    }
+    return parsed;
+  }
 }
 
 const Registry = new RegistryService();
