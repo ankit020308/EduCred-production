@@ -3,8 +3,9 @@ services:
     name: educred-backend
     env: node
     plan: free
-    buildCommand: cd server && npm install
+    buildCommand: cd server && npm install && mkdir -p uploads
     startCommand: cd server && node scripts/apply-hardening-migration.js && npm start
+    healthCheckPath: /api/health
     envVars:
       - key: NODE_ENV
         value: production

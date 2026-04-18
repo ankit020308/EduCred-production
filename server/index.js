@@ -143,12 +143,22 @@ app.get('/', (req, res) => {
 app.get('/api/health', async (req, res) => {
   const bcInfo = getBlockchainRuntimeInfo();
   
+  // Proactive Storage Audit
+  const isStoragePersistent = isPinataConfigured() || !!process.env.CLOUDINARY_URL;
+  const storageWarning = !isStoragePersistent && isProduction 
+    ? '⚠️ EPHEMERAL: Local uploads will be lost on restart. Configure Pinata or Cloudinary for persistence.' 
+    : null;
+
   res.status(200).json({
     status: 'Online',
     timestamp: new Date().toISOString(),
     registry: 'Operational (SQL-Hybrid)',
     blockchain: bcInfo.mode,
     ipfs: isPinataConfigured() ? 'Connected (Pinata)' : 'Fallback (Local)',
+    storage: {
+      persistence: isStoragePersistent ? 'Persistent' : 'Ephemeral (Disk)',
+      warning: storageWarning,
+    },
     uptime: `${(process.uptime() / 60).toFixed(2)}m`,
     env: isProduction ? 'production' : 'development'
   });
