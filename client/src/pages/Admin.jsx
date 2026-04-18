@@ -34,7 +34,9 @@ function AdminDashboard() {
   const [copiedId, setCopiedId] = useState(null);
 
   const [formData, setFormData] = useState({
-    studentName: '', studentEmail: '', studentPhone: '', course: '', file: null
+    studentName: '', studentEmail: '', studentPhone: '', course: '', 
+    certificateType: 'Degree Certificate', branch: '', graduationYear: new Date().getFullYear(),
+    studentEnrollmentNumber: '', cgpa: '', file: null
   });
   const [issuedResult, setIssuedResult] = useState(null);
   const fileInputRef = useRef(null);
@@ -46,6 +48,7 @@ function AdminDashboard() {
 
     // ⚡ Socket.io Lifecycle
     if (user?.universityId) {
+      // socket.connect() logic...
       socket.connect();
       joinInstitutionalRoom(user.universityId);
 
@@ -115,11 +118,20 @@ function AdminDashboard() {
       data.append('studentEmail', formData.studentEmail);
       data.append('studentPhone', formData.studentPhone);
       data.append('course', formData.course);
+      data.append('certificateType', formData.certificateType);
+      data.append('branch', formData.branch);
+      data.append('graduationYear', formData.graduationYear);
+      data.append('studentEnrollmentNumber', formData.studentEnrollmentNumber);
+      data.append('cgpa', formData.cgpa);
       data.append('file', formData.file);
 
       const res = await api.post('/api/certificates/issue', data);
       setIssuedResult(res.data);
-      setFormData({ studentName: '', studentEmail: '', studentPhone: '', course: '', file: null });
+      setFormData({ 
+        studentName: '', studentEmail: '', studentPhone: '', course: '', 
+        certificateType: 'Degree Certificate', branch: '', graduationYear: new Date().getFullYear(),
+        studentEnrollmentNumber: '', cgpa: '', file: null 
+      });
       fetchLocalCerts();
       fetchStats();
     } catch (err) {
@@ -415,13 +427,69 @@ function AdminDashboard() {
                         />
                       </div>
                     </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      <div className="space-y-3">
+                         <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Certificate Type</label>
+                         <select
+                          required value={formData.certificateType}
+                          onChange={(e) => setFormData({ ...formData, certificateType: e.target.value })}
+                          className="w-full h-14 bg-slate-50 border border-slate-200 rounded-2xl px-6 text-[11px] font-black text-slate-900 outline-none focus:bg-white focus:border-blue-500 transition-all shadow-sm uppercase tracking-widest"
+                        >
+                          <option>Degree Certificate</option>
+                          <option>Provisional Certificate</option>
+                          <option>Consolidated Marks Sheet</option>
+                          <option>Migration Certificate</option>
+                          <option>Transfer Certificate</option>
+                          <option>Character Certificate</option>
+                        </select>
+                      </div>
+                      <div className="space-y-3">
+                         <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Program / Course</label>
+                         <input
+                          required value={formData.course}
+                          onChange={(e) => setFormData({ ...formData, course: e.target.value })}
+                          className="w-full h-14 bg-slate-50 border border-slate-200 rounded-2xl px-6 text-[11px] font-black text-slate-900 outline-none focus:bg-white focus:border-blue-500 transition-all shadow-sm uppercase tracking-widest"
+                          placeholder="E.G. B.TECH COMPUTER SCIENCE"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                      <div className="space-y-3">
+                         <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Branch / Major</label>
+                         <input
+                          value={formData.branch}
+                          onChange={(e) => setFormData({ ...formData, branch: e.target.value })}
+                          className="w-full h-14 bg-slate-50 border border-slate-200 rounded-2xl px-6 text-[11px] font-black text-slate-900 outline-none focus:bg-white focus:border-blue-500 transition-all shadow-sm uppercase tracking-widest"
+                          placeholder="CS / IT / MECH"
+                        />
+                      </div>
+                      <div className="space-y-3">
+                         <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Graduation Year</label>
+                         <input
+                          type="number" required value={formData.graduationYear}
+                          onChange={(e) => setFormData({ ...formData, graduationYear: e.target.value })}
+                          className="w-full h-14 bg-slate-50 border border-slate-200 rounded-2xl px-6 text-[11px] font-black text-slate-900 outline-none focus:bg-white focus:border-blue-500 transition-all shadow-sm uppercase tracking-widest"
+                        />
+                      </div>
+                      <div className="space-y-3">
+                         <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Final CGPA</label>
+                         <input
+                          value={formData.cgpa}
+                          onChange={(e) => setFormData({ ...formData, cgpa: e.target.value })}
+                          className="w-full h-14 bg-slate-50 border border-slate-200 rounded-2xl px-6 text-[11px] font-black text-slate-900 outline-none focus:bg-white focus:border-blue-500 transition-all shadow-sm uppercase tracking-widest"
+                          placeholder="0.00"
+                        />
+                      </div>
+                    </div>
+
                     <div className="space-y-3">
-                       <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Program of Study</label>
+                       <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Student Enrollment / Roll Number</label>
                        <input
-                        required value={formData.course}
-                        onChange={(e) => setFormData({ ...formData, course: e.target.value })}
+                        required value={formData.studentEnrollmentNumber}
+                        onChange={(e) => setFormData({ ...formData, studentEnrollmentNumber: e.target.value })}
                         className="w-full h-14 bg-slate-50 border border-slate-200 rounded-2xl px-6 text-[11px] font-black text-slate-900 outline-none focus:bg-white focus:border-blue-500 transition-all shadow-sm uppercase tracking-widest"
-                        placeholder="E.G. BACHELOR OF COMPUTER SCIENCE"
+                        placeholder="E.G. 2024CS101"
                       />
                     </div>
                   </div>

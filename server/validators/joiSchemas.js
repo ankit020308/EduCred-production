@@ -33,7 +33,7 @@ export const certificateIssuanceSchema = Joi.object({
 });
 
 export const requestFulfillmentSchema = Joi.object({
-  studentId: Joi.string().required(),
+  studentId: Joi.string().optional(),
   universityId: Joi.string().required(),
   transcriptData: Joi.object({
     regNo: Joi.string().optional(),

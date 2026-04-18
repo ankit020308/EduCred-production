@@ -130,11 +130,43 @@ class RegistryService {
   }
 
   _parseQuery(query) {
-    const parsed = { ...query };
-    if (query.$or) {
-      parsed[Op.or] = query.$or;
-      delete parsed.$or;
-    }
+    if (!query || typeof query !== 'object') return query;
+    const parsed = {};
+
+    Object.keys(query).forEach(key => {
+      let value = query[key];
+
+      // Recursively parse nested objects or arrays
+      if (Array.isArray(value)) {
+        value = value.map(v => this._parseQuery(v));
+      } else if (value !== null && typeof value === 'object' && !(value instanceof Date)) {
+        value = this._parseQuery(value);
+      }
+
+      // Map Mongo-style operators to Sequelize equivalents
+      if (key === '$or') {
+        parsed[Op.or] = value;
+      } else if (key === '$and') {
+        parsed[Op.and] = value;
+      } else if (key === '$gt') {
+        parsed[Op.gt] = value;
+      } else if (key === '$gte') {
+        parsed[Op.gte] = value;
+      } else if (key === '$lt') {
+        parsed[Op.lt] = value;
+      } else if (key === '$lte') {
+        parsed[Op.lte] = value;
+      } else if (key === '$ne') {
+        parsed[Op.ne] = value;
+      } else if (key === '$in') {
+        parsed[Op.in] = value;
+      } else if (key === '$like') {
+        parsed[Op.like] = value;
+      } else {
+        parsed[key] = value;
+      }
+    });
+
     return parsed;
   }
 }

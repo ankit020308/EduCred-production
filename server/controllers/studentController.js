@@ -1,5 +1,6 @@
 // server/controllers/studentController.js
 import Registry from '../services/registryService.js';
+import { Op } from 'sequelize';
 
 /**
  * 🎓 Student Controller
@@ -8,11 +9,14 @@ import Registry from '../services/registryService.js';
 
 export const getStudentCertificates = async (req, res) => {
   try {
+    const student = await Registry.findOne('students', { userId: req.user.id });
+    
+    // We search by Student ID (linked record) OR by confirmed email for cross-institution mobility
     const certs = await Registry.find('certificates', { 
-      $or: [
-        { studentId: req.user.id },
+      [Op.or]: [
+        student ? { studentId: student.id } : null,
         { studentEmail: req.user.email } 
-      ]
+      ].filter(Boolean)
     });
     
     res.json(certs);

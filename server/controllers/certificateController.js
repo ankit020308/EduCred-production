@@ -10,6 +10,7 @@ import { issueCertificateOnChain, revokeHashOnChain, verifyHashDetailsOnChain } 
 import { generateStructuralHash } from '../utils/hashing.js';
 import { logAudit } from '../utils/logger.js';
 import { certificateIssuanceSchema } from '../validators/joiSchemas.js';
+import { isPinataConfigured, uploadFileToPinata, uploadJSONToPinata, getIPFSUrl } from '../utils/ipfsService.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -218,6 +219,44 @@ export const issueCertificate = async (req, res) => {
       ],
     });
 
+    let ipfsCid = null;
+    let metadataIpfsCid = null;
+    let fileUrl = null;
+
+    if (tempPath && fs.existsSync(tempPath)) {
+      const fileBuffer = fs.readFileSync(tempPath);
+      const filename = `Certificate_${cert.certificateId}.pdf`;
+
+      if (isPinataConfigured()) {
+        try {
+          // 1. Upload PDF to IPFS
+          const fileResult = await uploadFileToPinata(fileBuffer, filename, {
+            certificateId: cert.certificateId,
+            studentName: cert.studentName,
+            issuer: university.name,
+          });
+          ipfsCid = fileResult.cid;
+          fileUrl = fileResult.url;
+
+          // 2. Upload Metadata JSON to IPFS (Proactive Transparency)
+          const metadataResult = await uploadJSONToPinata({
+            ...cert,
+            institution: university.name,
+            anchoredHash: structuralHash,
+          }, `${cert.certificateId}_metadata.json`);
+          metadataIpfsCid = metadataResult.cid;
+
+          console.log(`[📦 IPFS] Successfully anchored certificate assets. CID: ${ipfsCid}`);
+        } catch (ipfsError) {
+          console.error('[⚠️ IPFS_FAILURE]: Falling back to local storage mapping.', ipfsError.message);
+          fileUrl = `/uploads/${path.basename(tempPath)}`;
+        }
+      } else {
+        console.warn('[⚠️ PROACTIVE_WARNING]: Pinata not configured. Storing local (ephemeral) link.');
+        fileUrl = `/uploads/${path.basename(tempPath)}`;
+      }
+    }
+
     const receipt = await issueCertificateOnChain(
       cert.id,
       structuralHash,
@@ -227,6 +266,9 @@ export const issueCertificate = async (req, res) => {
 
     await Registry.update('certificates', { id: cert.id }, {
       blockchainTxHash: receipt.hash,
+      ipfsCid,
+      metadataIpfsCid,
+      fileUrl,
       status: 'CONFIRMED',
       workflowStatus: 'ISSUED',
       workflowLog: [
@@ -370,6 +412,20 @@ export const confirmIssuance = async (req, res) => {
     lockedCertificate = lockResult.certificate;
     lockToken = lockResult.lockToken;
 
+    // Proactive: Ensure metadata is pinned to IPFS if not already done
+    let metadataIpfsCid = lockedCertificate.metadataIpfsCid;
+    if (!metadataIpfsCid && isPinataConfigured()) {
+      try {
+        const metadataResult = await uploadJSONToPinata({
+          ...lockedCertificate,
+          institution: university.name,
+        }, `${lockedCertificate.certificateId}_metadata.json`);
+        metadataIpfsCid = metadataResult.cid;
+      } catch (ipfsError) {
+        console.error('[⚠️ IPFS_CONFIRM_FAILURE]:', ipfsError.message);
+      }
+    }
+
     const receipt = await issueCertificateOnChain(
       lockedCertificate.id,
       lockedCertificate.certificateHash,
@@ -389,6 +445,7 @@ export const confirmIssuance = async (req, res) => {
 
     const [updatedCount] = await Certificate.update({
       blockchainTxHash: receipt.hash,
+      metadataIpfsCid,
       status: 'CONFIRMED',
       workflowStatus: 'ISSUED',
       workflowLog: nextWorkflowLog,

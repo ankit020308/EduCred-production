@@ -1,5 +1,7 @@
 import './utils/envLoader.js'; // LOAD ENV FIRST
 import express from 'express';
+import { createServer } from 'http';
+import { Server } from 'socket.io';
 import bcrypt from 'bcryptjs';
 import cors from 'cors';
 import helmet from 'helmet';
@@ -48,8 +50,37 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const app = express();
+const httpServer = createServer(app);
 const allowedOrigins = getAllowedOrigins();
-// WebSockets (socket.io) disabled for architectural stability.
+
+// ⚡ Socket.io Protocol Initialization
+const io = new Server(httpServer, {
+  cors: {
+    origin: allowedOrigins,
+    methods: ['GET', 'POST'],
+    credentials: true
+  }
+});
+
+// Configure Socket.io logic
+io.on('connection', (socket) => {
+  const userId = socket.handshake.query.userId;
+  if (userId) {
+    socket.join(`user:${userId}`);
+  }
+
+  socket.on('joinInstitutionalRoom', (universityId) => {
+    socket.join(`university:${universityId}`);
+    console.log(`[NETWORK] Node joined institutional room: ${universityId}`);
+  });
+
+  socket.on('disconnect', () => {
+    // Graceful disconnect
+  });
+});
+
+// Attach io to app for use in controllers
+app.set('io', io);
 
 
 // Asynchronous background workers (BullMQ) disabled for architectural stability.
@@ -164,14 +195,17 @@ app.get('/api/health', async (req, res) => {
   });
 });
 
-// ─── GLOBAL ERROR HANDLER ─────────────────────────────
+// ─── GLOBAL ERROR HANDLER (Consolidated) ─────────────────────────────
 app.use((err, req, res, next) => {
-  console.error(`[ERROR] [PROTOCOL_ERROR] ${err.message}${!isProduction ? `\n${err.stack}` : ''}`);
+  const status = err.status || 500;
+  const isProd = process.env.NODE_ENV === 'production';
+  
+  console.error(`[ERROR] [PROTOCOL_ERROR] ${err.message}${!isProd ? `\n${err.stack}` : ''}`);
 
-  res.status(err.status || 500).json({
+  res.status(status).json({
     success: false,
-    message: isProduction ? 'Internal Server Error' : err.message,
-    ...(isProduction ? {} : { stack: err.stack })
+    message: isProd ? 'Internal Server Error' : err.message,
+    ...(isProd ? {} : { stack: err.stack, details: err.details })
   });
 });
 
@@ -213,18 +247,9 @@ async function seedSystem() {
   }
 }
 
-// ─── Server Startup Protocol ─────────────────────────// ─── Catch-All and Global Error Handler ─────────────────
+// ─── Catch-All for undefined routes
 app.use((req, res, next) => {
     res.status(404).json({ error: 'Route not found.' });
-});
-
-app.use((err, req, res, next) => {
-    console.error('[ERROR] [GLOBAL ERROR]:', err.stack || err.message || err);
-    res.status(err.status || 500).json({
-        success: false,
-        error: err.message || 'Internal Server Error',
-        details: process.env.NODE_ENV === 'development' ? err.stack : undefined
-    });
 });
 
 let server;
@@ -240,12 +265,13 @@ if (process.env.NODE_ENV !== 'test') {
           await seedSystem();
   
           // Step 3: Launch Node
-          server = app.listen(PORT, '0.0.0.0', async () => {
+          httpServer.listen(PORT, '0.0.0.0', async () => {
             console.log(`\n[STARTUP] [EDUCRED NODE] Startup Complete`);
             console.log(`[NETWORK] Network: http://localhost:${PORT}`);
             console.log(`[STORAGE] Storage: AUTHORITATIVE (SQL)`);
             console.log(`[LEDGER]  Ledger:  ${getBlockchainRuntimeInfo().mode === 'LIVE' ? 'SEP-LIVE' : 'OFFLINE'}`);
             console.log(`[ASSETS]  Assets:  ${isPinataConfigured() ? 'DECENTRALIZED (PINATA)' : 'LOCAL (UPLOADS)'}`);
+            console.log(`[PUBSUB]  Real-time: Socket.io Layer Active`);
             console.log(`-------------------------------------------------\n`);
   
             // Background Connectivity Check

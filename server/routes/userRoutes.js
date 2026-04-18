@@ -87,8 +87,10 @@ router.post('/verify-email', protect, async (req, res) => {
 // ─── 🎯 STUDENT WALLET (FINAL VERSION) ────────────────
 router.get('/certificates', protect, requireRole('student'), async (req, res) => {
     try {
+        const student = await Registry.findOne('students', { userId: req.user.id });
+        
         const certificates = await Registry.find('certificates', {
-            studentId: req.user.id
+            studentId: student ? student.id : 'none'
         });
 
         res.json(certificates);

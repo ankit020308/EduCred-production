@@ -96,10 +96,14 @@ export function AuthProvider({ children }) {
   // 🔹 VERIFY OTP
   const verifyOTP = useCallback(async (email, otp) => {
     try {
-      const res = await api.post('/api/auth/verify-otp', { email, otp });
-      const { user: u } = res.data;
-      persistSession(u);
-      return u;
+      await api.post('/api/auth/verify-otp', { email, otp });
+      
+      // Force profile hydration to get universityId/status/etc
+      const res = await api.get('/api/auth/me');
+      const fullUser = res.data;
+      
+      persistSession(fullUser);
+      return fullUser;
     } catch (err) {
       throw err.response?.data?.error || 'Verification failed';
     }
@@ -110,17 +114,10 @@ export function AuthProvider({ children }) {
     await api.post('/api/auth/resend-otp', { email });
   }, []);
 
-  // 🔹 GOOGLE LOGIN (via @react-oauth/google)
-  const googleLogin = useCallback(async (idToken, role = 'student') => {
-    try {
-      const res = await api.post('/api/auth/google-login', { idToken, role });
-      const { user: u, isNewUser } = res.data;
-      persistSession(u);
-      return { user: u, isNewUser };
-    } catch (err) {
-      throw err.response?.data?.error || 'Google login failed';
-    }
-  }, [persistSession]);
+  // 🔹 GOOGLE LOGIN (DISABLED)
+  const googleLogin = useCallback(async () => {
+    throw new Error('Google authentication is currently disabled for architectural stability.');
+  }, []);
 
   // 🔹 COMPLETE ONBOARDING
   const completeOnboarding = useCallback(async (data) => {

@@ -94,6 +94,6 @@ export function getGoogleCallbackUrl() {
 export function getAllowedOrigins() {
   return requireEnv('CLIENT_URL')
     .split(',')
-    .map((origin) => origin.trim())
+    .map((origin) => origin.trim().replace(/\/$/, ''))
     .filter(Boolean);
 }

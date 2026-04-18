@@ -1,5 +1,7 @@
 // server/controllers/universityController.js
 import Registry from '../services/registryService.js';
+import { authorizeUniversityOnChain } from '../utils/blockchain.js';
+import { createEncryptedWalletRecord } from '../utils/keyVault.js';
 
 /**
  * 🎓 University Controller (Administrative Protocol)
@@ -42,16 +44,35 @@ export const approveUniversity = async (req, res) => {
       return res.status(404).json({ error: 'University not found.' });
     }
 
+    if (university.status === 'APPROVED') {
+      return res.status(400).json({ error: 'University node is already active.' });
+    }
+
+    // 🏥 Provision Cryptographic Identity
+    const { publicWalletAddress, encryptedPrivateKey } = createEncryptedWalletRecord();
+
+    // ⚓ Authorize on authoritative ledger
+    await authorizeUniversityOnChain(publicWalletAddress);
+
     await Registry.update('universities', { id }, {
         status: 'APPROVED',
         isVerified: true,
         approvedBy: req.user.id,
-        approvedAt: new Date()
+        approvedAt: new Date(),
+        publicWalletAddress,
+        encryptedPrivateKey
     });
 
-    res.json({ message: 'University approved successfully.', data: university });
+    // Update the associated User node status
+    await Registry.update('users', { id: university.userId }, {
+      isEmailVerified: true
+    });
+
+    const updated = await Registry.findById('universities', id);
+    res.json({ message: 'University approved and identity authorized.', data: updated });
   } catch (err) {
-    res.status(500).json({ error: 'Approval failed.', details: err.message });
+    console.error('[APPROVE_FAILURE]', err);
+    res.status(500).json({ error: 'Approval and authorization failed.', details: err.message });
   }
 };
 
