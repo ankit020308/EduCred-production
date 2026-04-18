@@ -3,7 +3,7 @@ import jwt from 'jsonwebtoken';
 import crypto from 'crypto';
 import bcrypt from 'bcryptjs';
 
-import { registrationSchema, loginSchema } from '../validators/joiSchemas.js';
+import { registrationSchema, loginSchema, onboardingSchema } from '../validators/joiSchemas.js';
 
 import { sendOTP } from '../utils/emailService.js';
 import { sendPhoneOTP } from '../utils/smsService.js';
@@ -528,31 +528,52 @@ export const createAdmin = async (req, res) => {
  */
 export const completeOnboarding = async (req, res) => {
   try {
-    const { role, universityName, description, documents } = req.body;
+    const { error } = onboardingSchema.validate(req.body);
+    if (error) {
+      console.warn(`[AUTH] [ONBOARDING_VALIDATION_FAILURE]: ${error.details[0].message}`);
+      return res.status(400).json({ error: error.details[0].message });
+    }
+
+    const { role, documents } = req.body;
+    
+    // Proactive Field Mapping: Support both 'universityName' and 'name' fallbacks
+    const resolvedUniversityName = req.body.universityName || req.body.name;
+    const resolvedDescription = req.body.description || '';
+    
     const user = req.user;
 
     if (user.role !== 'pending') {
       return res.status(400).json({ error: 'Identity protocol already established.' });
     }
 
-    if (!['student', 'university'].includes(role)) {
-      return res.status(400).json({ error: 'Invalid identity role selected.' });
-    }
-
     const update = { role };
     if (role === 'university') {
-      update.universityName = universityName;
+      // Safety check: ensure we have a name before hitting the DB constraint
+      if (!resolvedUniversityName) {
+        return res.status(400).json({ error: 'Institution Name is required to complete setup.' });
+      }
+
+      update.universityName = resolvedUniversityName;
 
       const isInstitutional = user.email.endsWith('.edu') || user.email.endsWith('.ac.in');
-      await Registry.insert('universities', {
-        name: universityName,
-        email: user.email,
-        userId: user.id,
-        documents: documents || [],
-        description: description || '',
-        isFlagged: !isInstitutional,
-        status: 'PENDING'
-      });
+      
+      try {
+        await Registry.insert('universities', {
+          name: resolvedUniversityName,
+          email: user.email,
+          userId: user.id,
+          documents: documents || [],
+          description: resolvedDescription,
+          isFlagged: !isInstitutional,
+          status: 'PENDING'
+        });
+      } catch (dbErr) {
+        console.error('[❌ DB_ERROR] Failed to provision university node:', dbErr.message);
+        return res.status(500).json({ 
+          error: 'Failed to create institution profile. Database constraint violation.',
+          details: dbErr.message 
+        });
+      }
     } else {
       await Registry.insert('students', { name: user.name, userId: user.id });
     }

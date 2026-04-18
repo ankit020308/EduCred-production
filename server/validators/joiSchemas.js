@@ -84,3 +84,15 @@ export const loginSchema = Joi.object({
   email: Joi.string().email().required(),
   password: Joi.string().required()
 });
+
+export const onboardingSchema = Joi.object({
+  role: Joi.string().valid('student', 'university').required(),
+  universityName: Joi.string().when('role', {
+    is: 'university',
+    then: Joi.required(),
+    otherwise: Joi.optional().allow('', null)
+  }),
+  description: Joi.string().optional().allow('', null),
+  name: Joi.string().optional().allow('', null), // Fallback support
+  documents: Joi.array().items(Joi.string()).optional()
+});
