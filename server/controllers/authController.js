@@ -96,7 +96,10 @@ const hashOTP = (otp) => crypto.createHash('sha256').update(otp).digest('hex');
 export const register = async (req, res) => {
   try {
     const { error } = registrationSchema.validate(req.body);
-    if (error) return res.status(400).json({ error: error.details[0].message });
+    if (error) {
+      console.warn(`[AUTH] [VALIDATION_FAILURE] Registration invalid: ${error.details[0].message}`);
+      return res.status(400).json({ error: error.details[0].message });
+    }
 
     const { name, email: rawEmail, password, role, universityName } = req.body;
     const email = rawEmail.toLowerCase();
@@ -170,7 +173,10 @@ export const register = async (req, res) => {
 export const login = async (req, res) => {
   try {
     const { error } = loginSchema.validate(req.body);
-    if (error) return res.status(400).json({ error: error.details[0].message });
+    if (error) {
+      console.warn(`[AUTH] [VALIDATION_FAILURE] Login invalid: ${error.details[0].message}`);
+      return res.status(400).json({ error: error.details[0].message });
+    }
 
     const { email: rawEmail, password } = req.body;
     const email = rawEmail.toLowerCase();

@@ -105,6 +105,10 @@ class RegistryService {
     return result.get({ plain: true });
   }
 
+  async create(...args) {
+    return this.insert(...args);
+  }
+
   async update(collection, query, updateData, options = {}) {
     const Model = this._getModel(collection);
     const where = this._parseQuery(query);
