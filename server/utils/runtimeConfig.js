@@ -108,8 +108,23 @@ export function getGoogleCallbackUrl() {
 }
 
 export function getAllowedOrigins() {
-  return requireEnv('CLIENT_URL')
-    .split(',')
-    .map((origin) => origin.trim().replace(/\/$/, ''))
+  const raw = requireEnv('CLIENT_URL');
+  const origins = raw.split(',')
+    .map((origin) => {
+      let trimmed = origin.trim().replace(/\/$/, '');
+      if (trimmed && !trimmed.startsWith('http')) {
+        trimmed = `https://${trimmed}`;
+      }
+      return trimmed;
+    })
     .filter(Boolean);
+
+  // Always include www variant if root is present (and vice versa)
+  const expanded = new Set(origins);
+  origins.forEach(o => {
+    if (o.includes('://educred.in')) expanded.add(o.replace('://educred.in', '://www.educred.in'));
+    if (o.includes('://www.educred.in')) expanded.add(o.replace('://www.educred.in', '://educred.in'));
+  });
+
+  return Array.from(expanded);
 }

@@ -13,6 +13,11 @@ const api = axios.create({
     }
 });
 
+// 🛰️ PROACTIVE NETWORK DIAGNOSTIC
+if (import.meta.env.PROD) {
+    console.log(`[NETWORK] EduCred Protocol target: ${import.meta.env.VITE_API_URL || 'RELATIVE_PATH (Verify Proxy)'}`);
+}
+
 const refreshClient = axios.create({
     baseURL: import.meta.env.VITE_API_URL || '',
     timeout: 10000,

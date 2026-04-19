@@ -86,6 +86,7 @@ const corsOptions = {
   credentials: true
 };
 app.use(cors(corsOptions));
+app.options('*', cors(corsOptions)); // Enable preflight for all routes
 
 const apiLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
@@ -207,6 +208,13 @@ if (process.env.NODE_ENV !== 'test') {
       // Step 1: Initialize Registry
       await Registry.init();
       console.log(`[REGISTRY] Storage layer initialized.`);
+
+      // 🛰️ PROACTIVE CORS AUDIT
+      const allowed = getAllowedOrigins();
+      console.log(`[SECURITY] Allowed Origins: ${allowed.join(', ')}`);
+      if (isProduction && allowed.some(o => o.includes('localhost'))) {
+        console.warn('[CAUTION] [SECURITY]: Production node is allowing localhost. Check CLIENT_URL in Render dashboard.');
+      }
 
       // Step 2: Seed System Authority
       await seedSystem();
