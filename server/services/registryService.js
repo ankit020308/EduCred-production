@@ -142,6 +142,14 @@ class RegistryService {
     return Model.count({ where, ...options });
   }
 
+  getSequelize() {
+    return sequelize;
+  }
+
+  async transaction(callback) {
+    return sequelize.transaction(callback);
+  }
+
   _parseQuery(query) {
     if (!query || typeof query !== 'object') return query;
     const parsed = {};

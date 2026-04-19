@@ -129,8 +129,12 @@ export const register = async (req, res) => {
 
     const existing = await Registry.findOne('users', { email });
     if (existing) {
-      console.warn(`[DIAGNOSTIC] Registration aborted: Email ${email} already registered.`);
-      return res.status(400).json({ error: 'An account with this email already exists.' });
+      if (existing.isEmailVerified) {
+        console.warn(`[DIAGNOSTIC] Registration aborted: Verified email ${email} already in use.`);
+        return res.status(400).json({ error: 'An account with this email already exists and is verified.' });
+      }
+      console.log(`[DIAGNOSTIC] Detected unverified legacy account for ${email}. Clearing for fresh protocol initiation.`);
+      // We don't delete yet; we do it inside the transaction for safety
     }
 
     const otp = generateOTP();
@@ -150,81 +154,86 @@ export const register = async (req, res) => {
     }
     */
 
-    const hashedPassword = await bcrypt.hash(password, 12);
+    const passwordHash = await bcrypt.hash(password, 12);
 
-    console.log(`[DIAGNOSTIC] Handshaking with SQL layer: Provisioning primary User node...`);
-    const user = await Registry.insert('users', {
-      name,
-      email,
-      passwordHash: hashedPassword,
-      role,
-      universityName: role === 'university' ? universityName : undefined,
-      otp: hashedOtp,
-      otpExpires: Date.now() + 10 * 60 * 1000, // 10 minutes
-      otpAttempts: 0,
-      lastOtpResend: new Date(),
-      isEmailVerified: false
-    });
-    console.log(`[DIAGNOSTIC] User node provisioned successfully. ID: ${user.id}`);
-
-    if (role === 'university') {
-      const { documents, description } = req.body;
-      const isInstitutional = email.endsWith('.edu') || email.endsWith('.ac.in');
-      
-      console.log(`[DIAGNOSTIC] Provisioning University node for ${universityName}...`);
-      await Registry.insert('universities', {
-        name: universityName,
-        email,
-        userId: user.id,
-        documents: documents || [],
-        description: description || '',
-        isFlagged: !isInstitutional,
-        status: 'PENDING',
-        isVerified: false,
-      });
-      console.log(`[DIAGNOSTIC] University node attached successfully.`);
-    } else {
-      await Registry.insert('students', { name, userId: user.id });
-      console.log(`[DIAGNOSTIC] Student node attached successfully.`);
-    }
-
-    try {
-      console.log(`[DIAGNOSTIC] Dispatching activation link to ${email}...`);
-      await sendOTP(email, otp);
-      console.log(`[DIAGNOSTIC] Activation link delivered.`);
-    } catch (error) {
-      console.warn(`[⚠️ SMTP_FAILURE] Could not deliver OTP to ${email}:`, error.message);
-      
-      // 🛡️ RESILIENCE GUARD: In non-production, we allow registration to proceed
-      // even if SMTP fails, as long as the OTP was logged to the console.
-      if (process.env.NODE_ENV !== 'production') {
-        console.log(`[DEV_AUTH] [BYPASS] SMTP delivery failed but registration allowed. OTP: ${otp}`);
-      } else {
-        // In production, we rollback to ensure data integrity and prevent "ghost" unverified accounts
-        await Registry.delete('universities', { userId: user.id });
-        await Registry.delete('students', { userId: user.id });
-        await Registry.delete('users', { id: user.id });
-        return res.status(502).json({ 
-          error: 'OTP delivery failed.', 
-          details: 'We could not reach your email provider. Check SMTP settings or try again later.' 
-        });
+    // 🔐 TRANSACTIONAL GATE: Ensure atomicity across User and Profile nodes
+    const { requiresVerification, user: createdUser } = await Registry.transaction(async (t) => {
+      // PROACTIVE CLEANUP: Remove unverified legacy account if it exists
+      const existingUnverified = await Registry.findOne('users', { email, isEmailVerified: false }, { transaction: t });
+      if (existingUnverified) {
+        await Registry.delete('universities', { userId: existingUnverified.id }, { transaction: t });
+        await Registry.delete('students', { userId: existingUnverified.id }, { transaction: t });
+        await Registry.delete('users', { id: existingUnverified.id }, { transaction: t });
       }
-    }
 
-    await logAudit(req, 'AUTH_REGISTRATION', 'SUCCESS', 'New user account provisioned.', { userId: user.id, role: user.role });
+      const user = await Registry.insert('users', {
+        name,
+        email,
+        passwordHash,
+        role,
+        universityName: role === 'university' ? universityName : null,
+        otp: hashedOtp,
+        otpExpires: new Date(Date.now() + 15 * 60 * 1000), // 15 min
+        isEmailVerified: false
+      }, { transaction: t });
+
+      if (role === 'university') {
+        const { documents, description } = req.body;
+        const isInstitutional = email.endsWith('.edu') || email.endsWith('.ac.in');
+        
+        console.log(`[DIAGNOSTIC] Provisioning University node for ${universityName}...`);
+        await Registry.insert('universities', {
+          name: universityName,
+          email,
+          userId: user.id,
+          documents: documents || [],
+          description: description || '',
+          isFlagged: !isInstitutional,
+          status: 'PENDING',
+          isVerified: false,
+        }, { transaction: t });
+      } else {
+        // Only provision student if gate is bypassed (handled by our earlier resilience fix)
+        await Registry.insert('students', { name, userId: user.id }, { transaction: t });
+      }
+
+      // 📧 DISPATCH OTP
+      try {
+        await sendOTP(email, otp);
+        console.log(`[AUTH] Protocol activation code dispatched to ${email}`);
+      } catch (error) {
+        console.warn(`[⚠️ SMTP_FAILURE] Could not deliver OTP to ${email}:`, error.message);
+        
+        if (process.env.NODE_ENV === 'production') {
+          // In production, SMTP failure aborts the transaction
+          throw new Error(`SMTP_DISPATCH_FAILED: ${error.message}`);
+        } else {
+          console.log(`[DEV_AUTH] [BYPASS] SMTP delivery failed but registration allowed. OTP: ${otp}`);
+        }
+      }
+
+      return { requiresVerification: true, user };
+    });
+
+    await logAudit(req, 'AUTH_REGISTRATION', 'SUCCESS', 'New user account provisioned.', { userId: createdUser.id, role: createdUser.role });
 
     res.status(201).json({
       message: 'Initial account created. Verify your email to activate.',
-      email: user.email,
-      requiresVerification: true
+      email: createdUser.email,
+      requiresVerification
     });
   } catch (err) {
-    // 🚨 DETAILED DIAGNOSTIC: Log Sequelize field-level errors
-    const errorMessage = err.errors ? err.errors.map(e => `${e.path}: ${e.message}`).join(', ') : err.message;
-    console.error(`[DIAGNOSTIC] [CRITICAL_FAILURE] Step failed. Details: ${errorMessage}`);
+    const isSmtpError = err.message.includes('SMTP_DISPATCH_FAILED');
+    const details = err.errors ? err.errors.map(e => `${e.path}: ${e.message}`).join(', ') : err.message;
     
-    await logAudit(req, 'AUTH_REGISTRATION', 'FAILURE', 'Account provisioning failed.', { email: req.body.email, error: errorMessage });
-    res.status(500).json({ error: 'Registration failed.', details: errorMessage });
+    console.error(`[DIAGNOSTIC] [CRITICAL_FAILURE] Step failed. Details: ${details}`);
+    
+    await logAudit(req, 'AUTH_REGISTRATION', 'FAILURE', 'Account provisioning failed.', { email: req.body.email, error: details });
+    
+    res.status(isSmtpError ? 502 : 500).json({ 
+      error: isSmtpError ? 'Email delivery failed.' : 'Registration failed.', 
+      details: isSmtpError ? 'The verification system could not reach your inbox. Check SMTP settings.' : details 
+    });
   }
 };
 
@@ -617,20 +626,18 @@ export const completeOnboarding = async (req, res) => {
       return res.status(400).json({ error: 'Identity protocol already established.' });
     }
 
-    const update = { role };
-    if (role === 'university') {
-      // Safety check: ensure we have a name before hitting the DB constraint
-      if (!resolvedUniversityName) {
-        console.warn(`[DIAGNOSTIC] Onboarding failed: Missing institution name.`);
-        return res.status(400).json({ error: 'Institution Name is required to complete setup.' });
-      }
+    const updatedUser = await Registry.transaction(async (t) => {
+      const update = { role };
+      if (role === 'university') {
+        if (!resolvedUniversityName) {
+          throw new Error('Onboarding failed: Missing institution name.');
+        }
 
-      console.log(`[DIAGNOSTIC] Finalizing University protocol for: ${resolvedUniversityName}`);
-      update.universityName = resolvedUniversityName;
+        console.log(`[DIAGNOSTIC] Finalizing University protocol for: ${resolvedUniversityName}`);
+        update.universityName = resolvedUniversityName;
 
-      const isInstitutional = user.email.endsWith('.edu') || user.email.endsWith('.ac.in');
-      
-      try {
+        const isInstitutional = user.email.endsWith('.edu') || user.email.endsWith('.ac.in');
+        
         await Registry.insert('universities', {
           name: resolvedUniversityName,
           email: user.email,
@@ -639,34 +646,26 @@ export const completeOnboarding = async (req, res) => {
           description: resolvedDescription,
           isFlagged: !isInstitutional,
           status: 'PENDING'
-        });
-        console.log(`[DIAGNOSTIC] University node successfully provisioned through SQL hybrid layer.`);
-      } catch (dbErr) {
-        const errorMessage = dbErr.errors ? dbErr.errors.map(e => `${e.path}: ${e.message}`).join(', ') : dbErr.message;
-        console.error('[❌ DB_ERROR] [ONBOARDING_FAILURE] Failed to provision university node:', errorMessage);
-        return res.status(500).json({ 
-          error: 'Failed to create institution profile. Database constraint violation.',
-          details: errorMessage 
-        });
+        }, { transaction: t });
+      } else {
+        console.log(`[DIAGNOSTIC] Finalizing Student protocol for user...`);
+        await Registry.insert('students', { name: user.name, userId: user.id }, { transaction: t });
       }
-    } else {
-      console.log(`[DIAGNOSTIC] Finalizing Student protocol for user...`);
-      await Registry.insert('students', { name: user.name, userId: user.id });
-      console.log(`[DIAGNOSTIC] Student node successfully provisioned.`);
-    }
 
-    await Registry.update('users', { id: user.id }, update);
+      await Registry.update('users', { id: user.id }, update, { transaction: t });
+      return await buildUserPayload(user.id, t);
+    });
+
     await logAudit(req, 'PROTOCOL_ONBOARDING', 'SUCCESS', `Account configured as ${role}.`, { userId: user.id, role });
     
     console.log(`[AUTH_POST_WRITE] Onboarding finalized for user ${user.id}`);
-    const payload = await buildUserPayload(user.id);
     res.status(200).json({
       message: 'Identity protocol successfully established.',
-      user: payload
+      user: updatedUser
     });
   } catch (err) {
-    const errorMessage = err.errors ? err.errors.map(e => `${e.path}: ${e.message}`).join(', ') : err.message;
-    console.error(`[DIAGNOSTIC] [CRITICAL_FAILURE] Onboarding failed. Details: ${errorMessage}`);
-    res.status(500).json({ error: 'Onboarding failed.', details: errorMessage });
+    const details = err.errors ? err.errors.map(e => `${e.path}: ${e.message}`).join(', ') : err.message;
+    console.error(`[DIAGNOSTIC] [CRITICAL_FAILURE] Onboarding failed. Details: ${details}`);
+    res.status(500).json({ error: 'Onboarding failed.', details });
   }
 };

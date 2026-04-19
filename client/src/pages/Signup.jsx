@@ -54,8 +54,24 @@ export default function Signup() {
         navigate('/dashboard');
       }
     } catch (err) {
+      console.error('[SIGNUP_EXCEPTION] Protocol registration failed:', err);
+      
       const data = err?.response?.data;
-      const msg = typeof err === 'string' ? err : (data?.details ? `${data.error}: ${data.details}` : (data?.error || data?.message || 'Registration failed.'));
+      const networkError = !err.response && err.message;
+      
+      let msg = 'Registration failed.';
+      if (networkError) {
+        msg = `Network Error: Could not connect to the EduCred server. Please check your internet or try again later. (${err.message})`;
+      } else if (data?.details) {
+        msg = `${data.error} Details: ${data.details}`;
+      } else if (data?.error) {
+        msg = data.error;
+      } else if (data?.message) {
+        msg = data.message;
+      } else if (err.message) {
+        msg = err.message;
+      }
+      
       setError(msg);
       setLoading(false);
     }
@@ -207,20 +223,26 @@ export default function Signup() {
                     <div className="space-y-4">
                       {form.role === 'university' ? (
                         <>
-                          <div className="relative group">
-                              <Building2 className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-blue-500 transition-colors" size={18} />
-                              <input 
-                                placeholder="Institution Name" required autoFocus
-                                value={form.universityName} onChange={e => setForm({...form, universityName: e.target.value})}
-                                className="w-full bg-slate-50 border border-slate-200 rounded-xl py-4 pl-12 pr-4 text-sm text-slate-900 focus:outline-none focus:border-blue-500 focus:bg-white transition-all font-medium"
-                              />
+                          <div className="space-y-4 mb-6">
+                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Institutional Identity</label>
+                            <div className="relative group">
+                                <Building2 className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-blue-500 transition-colors" size={18} />
+                                <input 
+                                  placeholder="Full Institution Name" required autoFocus
+                                  value={form.universityName} onChange={e => setForm({...form, universityName: e.target.value})}
+                                  className="w-full bg-slate-50 border border-slate-200 rounded-xl py-4 pl-12 pr-4 text-sm text-slate-900 focus:outline-none focus:border-blue-500 focus:bg-white transition-all font-semibold"
+                                />
+                            </div>
                           </div>
-                          <textarea
-                            placeholder="Briefly describe your institution..."
-                            value={form.description} onChange={e => setForm({...form, description: e.target.value})}
-                            rows="4"
-                            className="w-full bg-slate-50 border border-slate-200 rounded-xl py-4 px-4 text-sm text-slate-900 focus:outline-none focus:border-blue-500 focus:bg-white transition-all font-medium resize-none text-[13px]"
-                          />
+                          <div className="space-y-4 mb-6">
+                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Mission Statement / Description</label>
+                            <textarea
+                              placeholder="Briefly describe your institution's authority and academic scope..."
+                              value={form.description} onChange={e => setForm({...form, description: e.target.value})}
+                              rows="4"
+                              className="w-full bg-slate-50 border border-slate-200 rounded-xl py-4 px-4 text-sm text-slate-900 focus:outline-none focus:border-blue-500 focus:bg-white transition-all font-medium resize-none text-[13px]"
+                            />
+                          </div>
                           <div className="bg-amber-50 border border-amber-100 rounded-xl p-4 flex gap-3">
                              <ShieldCheck className="text-amber-600 shrink-0" size={18} />
                              <p className="text-[10px] text-amber-700 font-bold leading-relaxed uppercase tracking-wider">

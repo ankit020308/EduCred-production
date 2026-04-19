@@ -23,6 +23,7 @@ import adminRoutes from './routes/adminRoutes.js';
 import requestRoutes from './routes/requestRoutes.js';
 import ledgerRoutes from './routes/ledgerRoutes.js';
 import supportRoutes from './routes/supportRoutes.js';
+import healthRoutes from './routes/health.js';
 import Registry from './services/registryService.js';
 import { initSocket } from './utils/socketService.js';
 import fs from 'fs';
@@ -132,6 +133,7 @@ app.use('/api/admin', adminRoutes);
 app.use('/api/requests', requestRoutes);
 app.use('/api/ledger', ledgerRoutes);
 app.use('/api/support', supportRoutes);
+app.use('/api/health', healthRoutes);
 app.get('/', (req, res) => {
   res.status(200).json({
     message: 'EduCred Protocol Node: Online',
@@ -140,30 +142,7 @@ app.get('/', (req, res) => {
   });
 });
 
-// ─── Health Check ─────────────────────────────────────
-app.get('/api/health', async (req, res) => {
-  const bcInfo = getBlockchainRuntimeInfo();
-
-  // Proactive Storage Audit
-  const isStoragePersistent = isPinataConfigured() || !!process.env.CLOUDINARY_URL;
-  const storageWarning = !isStoragePersistent && isProduction
-    ? '⚠️ EPHEMERAL: Local uploads will be lost on restart. Configure Pinata or Cloudinary for persistence.'
-    : null;
-
-  res.status(200).json({
-    status: 'Online',
-    timestamp: new Date().toISOString(),
-    registry: 'Operational (SQL-Hybrid)',
-    blockchain: bcInfo.mode,
-    ipfs: isPinataConfigured() ? 'Connected (Pinata)' : 'Fallback (Local)',
-    storage: {
-      persistence: isStoragePersistent ? 'Persistent' : 'Ephemeral (Disk)',
-      warning: storageWarning,
-    },
-    uptime: `${(process.uptime() / 60).toFixed(2)}m`,
-    env: isProduction ? 'production' : 'development'
-  });
-});
+// ─── Health check legacy handler removed - replaced by healthRoutes ───
 
 // ─── GLOBAL ERROR HANDLER ─────────────────────────────
 app.use((err, req, res, next) => {

@@ -38,6 +38,9 @@ export const protect = async (req, res, next) => {
     }
 
     req.user = user;
+    // Forward enriched JWT claims so controllers can use them without extra DB lookups
+    if (decoded.institutionId) req.user.institutionId = decoded.institutionId;
+    if (decoded.walletAddress) req.user.walletAddress = decoded.walletAddress;
     next();
   } catch (err) {
     if (err.name === 'TokenExpiredError') {

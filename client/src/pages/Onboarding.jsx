@@ -43,8 +43,20 @@ export default function Onboarding() {
       });
       navigate('/dashboard');
     } catch (err) {
-      console.error('Onboarding Failure:', err);
-      setError(err || 'Failed to establish protocol.');
+      console.error('[ONBOARDING_EXCEPTION] Protocol expansion failed:', err);
+      const data = err?.response?.data;
+      const networkError = !err.response && err.message;
+
+      let msg = 'Onboarding failed.';
+      if (networkError) {
+        msg = `Network Error: Could not connect to the EduCred server. Please check your internet or try again later. (${err.message})`;
+      } else if (data?.details) {
+        msg = `${data.error} Details: ${data.details}`;
+      } else if (data?.error) {
+        msg = data.error;
+      }
+
+      setError(msg);
     } finally {
       setLoading(false);
     }
