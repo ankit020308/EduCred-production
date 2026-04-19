@@ -290,7 +290,7 @@ function AdminDashboard() {
                     </tr>
                   ) : (
                     filtered.map((cert) => (
-                      <tr key={cert._id} className="group hover:bg-slate-50 transition-all">
+                      <tr key={cert.id} className="group hover:bg-slate-50 transition-all">
                         <td className="px-10 py-6">
                           <div className="flex items-center gap-4">
                             <div className="w-12 h-12 bg-slate-100 rounded-xl flex items-center justify-center text-slate-400 font-black border border-slate-200 group-hover:bg-blue-600 group-hover:text-white transition-all text-sm uppercase">
@@ -310,13 +310,13 @@ function AdminDashboard() {
                         </td>
                         <td className="px-10 py-6">
                           <button
-                            onClick={() => copyToClipboard(cert.certificateId || cert._id, cert._id)}
+                            onClick={() => copyToClipboard(cert.certificateId || cert.id, cert.id)}
                             className="flex items-center gap-4 bg-slate-50 px-5 py-2.5 rounded-xl border border-slate-100 group/copy hover:bg-white hover:border-blue-200 transition-all shadow-sm"
                           >
                             <span className="text-[10px] font-black text-slate-400 group-hover/copy:text-blue-600 transition-colors truncate w-32 uppercase tracking-tight">
-                              {cert.certificateId || cert._id}
+                              {cert.certificateId || cert.id}
                             </span>
-                            {copiedId === cert._id
+                            {copiedId === cert.id
                                ? <Check size={14} className="text-emerald-500" />
                                : <Copy size={14} className="text-slate-300 group-hover/copy:text-blue-600 transition-colors" />
                             }

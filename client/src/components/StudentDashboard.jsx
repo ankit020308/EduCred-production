@@ -190,12 +190,12 @@ export default function StudentDashboard() {
             <div className="space-y-6">
               {certificates.map((cert) => (
                 <motion.div
-                  key={cert._id}
+                  key={cert.id}
                   layout
                   initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
                   className="bg-white rounded-[2.5rem] overflow-hidden border border-slate-100 hover:border-blue-200 hover:shadow-2xl hover:shadow-slate-900/10 transition-all duration-500 group cursor-pointer"
-                  onClick={() => setSelectedCert(selectedCert?._id === cert._id ? null : cert)}
+                  onClick={() => setSelectedCert(selectedCert?.id === cert.id ? null : cert)}
                 >
                   <div className="p-10 flex flex-col md:flex-row md:items-center justify-between gap-8">
                     <div className="flex items-center gap-8">
@@ -227,7 +227,7 @@ export default function StudentDashboard() {
 
                   {/* Expanded details */}
                   <AnimatePresence>
-                      {selectedCert?._id === cert._id && (
+                      {selectedCert?.id === cert.id && (
                         <motion.div
                           initial={{ height: 0, opacity: 0 }}
                           animate={{ height: 'auto', opacity: 1 }}
@@ -239,12 +239,12 @@ export default function StudentDashboard() {
                               <div className="space-y-4">
                                 <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Certificate ID</p>
                                 <div className="flex items-center gap-4 bg-white px-6 py-4 rounded-2xl border border-slate-100 shadow-sm">
-                                  <p className="text-blue-600 font-bold text-xs truncate flex-1">{cert.certificateId || cert._id}</p>
+                                  <p className="text-blue-600 font-bold text-xs truncate flex-1">{cert.certificateId || cert.id}</p>
                                   <button 
-                                    onClick={(e) => { e.stopPropagation(); copyToClipboard(cert.certificateId || cert._id, cert._id + 'id'); }}
+                                    onClick={(e) => { e.stopPropagation(); copyToClipboard(cert.certificateId || cert.id, cert.id + 'id'); }}
                                     className="p-2 text-slate-300 hover:text-blue-600 transition-colors"
                                   >
-                                    {copiedId === cert._id + 'id' ? <Check size={16} className="text-emerald-500" /> : <Copy size={16} />}
+                                    {copiedId === cert.id + 'id' ? <Check size={16} className="text-emerald-500" /> : <Copy size={16} />}
                                   </button>
                                 </div>
                               </div>
@@ -253,10 +253,10 @@ export default function StudentDashboard() {
                                 <div className="flex items-center gap-4 bg-white px-6 py-4 rounded-2xl border border-slate-100 shadow-sm">
                                   <p className="text-slate-500 font-medium text-xs truncate flex-1">{cert.certificateHash?.slice(0, 24)}...</p>
                                   <button
-                                    onClick={(e) => { e.stopPropagation(); copyToClipboard(cert.certificateHash, cert._id + 'hash'); }}
+                                    onClick={(e) => { e.stopPropagation(); copyToClipboard(cert.certificateHash, cert.id + 'hash'); }}
                                     className="p-2 text-slate-300 hover:text-blue-600 transition-colors"
                                   >
-                                    {copiedId === cert._id + 'hash' ? <Check size={16} className="text-emerald-500" /> : <Copy size={16} />}
+                                    {copiedId === cert.id + 'hash' ? <Check size={16} className="text-emerald-500" /> : <Copy size={16} />}
                                   </button>
                                 </div>
                               </div>
@@ -264,7 +264,7 @@ export default function StudentDashboard() {
                             <div className="flex flex-wrap gap-4 pt-4 border-t border-slate-100">
                               {cert.fileUrl && (
                                 <button
-                                  onClick={(e) => { e.stopPropagation(); window.open(`/api/certificates/${cert._id}/file`, '_blank'); }}
+                                  onClick={(e) => { e.stopPropagation(); window.open(`/api/certificates/${cert.id}/file`, '_blank'); }}
                                   className="inline-flex items-center gap-3 px-10 py-4 bg-slate-900 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-black transition-all shadow-xl shadow-slate-900/10"
                                 >
                                   <Download size={16} /> Download Certificate

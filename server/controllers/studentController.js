@@ -27,12 +27,13 @@ export const getStudentCertificates = async (req, res) => {
 
 export const getStudentCertificateById = async (req, res) => {
   try {
+    const student = await Registry.findOne('students', { userId: req.user.id });
     const cert = await Registry.findOne('certificates', {
       id: req.params.id,
       $or: [
-        { studentId: req.user.id },
+        student ? { studentId: student.id } : null,
         { studentEmail: req.user.email }
-      ]
+      ].filter(Boolean)
     });
     
     if (!cert) return res.status(404).json({ error: 'Certificate not found' });

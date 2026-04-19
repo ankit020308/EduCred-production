@@ -110,8 +110,8 @@ export const approveRequest = async (req, res) => {
     try {
       newCert = await Registry.insert('certificates', {
         studentName: student.name,
-        studentEmail: studentUser?.email || student.email || `${student.id}@educred.local`,
-        studentPhone: student.phone || '0000000000',
+        studentEmail: studentUser?.email || 'unknown@educred.local',
+        studentPhone: studentUser?.phoneNumber || '0000000000',
         course: student.degree || 'Academic Transcript',
         issuer: university.name,
         fileUrl: `/api/requests/${request.id}`,

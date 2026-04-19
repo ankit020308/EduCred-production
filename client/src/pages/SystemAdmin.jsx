@@ -219,7 +219,7 @@ function SystemAdminDashboard() {
                       </tr>
                     ) : filtered.map((uni) => (
                       <motion.tr
-                        key={uni._id}
+                        key={uni.id}
                         initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
                         className="group hover:bg-[#F9FAFB] transition-all"
                       >
@@ -279,16 +279,16 @@ function SystemAdminDashboard() {
                           {uni.status === 'PENDING' ? (
                             <div className="flex items-center justify-end gap-3">
                               <button
-                                onClick={() => requestAction(uni._id, 'approve', uni.name)}
-                                disabled={processingId === uni._id}
+                                onClick={() => requestAction(uni.id, 'approve', uni.name)}
+                                disabled={processingId === uni.id}
                                 className="h-12 px-8 bg-blue-600 text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-black transition-all shadow-lg shadow-blue-500/10 flex items-center gap-2"
                               >
-                                {processingId === uni._id ? <Loader2 size={12} className="animate-spin" /> : <Check size={16} />}
+                                {processingId === uni.id ? <Loader2 size={12} className="animate-spin" /> : <Check size={16} />}
                                 Approve
                               </button>
                               <button
-                                onClick={() => requestAction(uni._id, 'reject', uni.name)}
-                                disabled={processingId === uni._id}
+                                onClick={() => requestAction(uni.id, 'reject', uni.name)}
+                                disabled={processingId === uni.id}
                                 className="h-12 px-8 rounded-xl border border-rose-100 bg-rose-50 text-rose-500 text-[10px] font-black uppercase tracking-widest hover:bg-rose-500 hover:text-white transition-all shadow-sm flex items-center gap-2"
                               >
                                 <X size={16} /> Reject

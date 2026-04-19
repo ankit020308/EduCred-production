@@ -43,12 +43,24 @@ const University = sequelize.define('University', {
         defaultValue: false
     },
     status: {
-        type: DataTypes.ENUM('PENDING', 'APPROVED', 'REJECTED'),
+        type: DataTypes.ENUM('PENDING', 'APPROVED', 'REJECTED', 'SUSPENDED'),
         defaultValue: 'PENDING'
     },
     isVerified: {
         type: DataTypes.BOOLEAN,
         defaultValue: false
+    },
+    approvedBy: {
+        type: DataTypes.UUID,
+        allowNull: true
+    },
+    approvedAt: {
+        type: DataTypes.DATE,
+        allowNull: true
+    },
+    suspendedReason: {
+        type: DataTypes.TEXT,
+        allowNull: true
     },
     city: {
         type: DataTypes.STRING,

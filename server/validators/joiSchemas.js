@@ -69,7 +69,7 @@ export const registrationSchema = Joi.object({
   name: Joi.string().required().min(2).max(50),
   email: Joi.string().email().required(),
   password: passwordSchema,
-  role: Joi.string().valid('university', 'student', 'admin').default('student'),
+  role: Joi.string().valid('university', 'student').default('student'),
   universityName: Joi.string().when('role', {
     is: 'university',
     then: Joi.required(),

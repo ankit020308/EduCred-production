@@ -23,6 +23,8 @@ router.post('/send-phone-otp', protect, otpLimiter, sendPhoneVerification);
 router.post('/refresh', refreshToken);
 router.post('/logout', protect, logout);
 router.get('/me', protect, getMe);
+router.post('/complete-onboarding', protect, completeOnboarding);
+router.post('/admins', protect, requireRole('super_admin'), createAdmin);
 
 // ─── Profile Logic ───────────────────────────────────────────────────────────
 router.get('/profile', protect, async (req, res) => {

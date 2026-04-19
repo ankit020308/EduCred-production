@@ -24,6 +24,34 @@ const Student = sequelize.define('Student', {
             model: 'User',
             key: 'id'
         }
+    },
+    regNo: {
+        type: DataTypes.STRING,
+        allowNull: true
+    },
+    degree: {
+        type: DataTypes.STRING,
+        allowNull: true
+    },
+    branch: {
+        type: DataTypes.STRING,
+        allowNull: true
+    },
+    digilockerAccessToken: {
+        type: DataTypes.STRING,
+        allowNull: true
+    },
+    digilockerRefreshToken: {
+        type: DataTypes.STRING,
+        allowNull: true
+    },
+    digilockerConnected: {
+        type: DataTypes.BOOLEAN,
+        defaultValue: false
+    },
+    digilockerUsername: {
+        type: DataTypes.STRING,
+        allowNull: true
     }
 }, {
     indexes: [

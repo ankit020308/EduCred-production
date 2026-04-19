@@ -12,14 +12,14 @@ if (!databaseUrl) {
 
 console.info(`[DB] Connecting to PostgreSQL at: ${databaseUrl.split('@')[1] || 'localhost'}`);
 
+const isManagedHost = databaseUrl.includes('render.com') || databaseUrl.includes('supabase.co');
+const dialectOptions = (process.env.NODE_ENV === 'production' || isManagedHost) 
+    ? { ssl: { require: true, rejectUnauthorized: false } } 
+    : {};
+
 const sequelize = new Sequelize(databaseUrl, {
     dialect: 'postgres',
-    dialectOptions: {
-        ssl: {
-            require: true,
-            rejectUnauthorized: false // Required for Render free tier/managed Postgres
-        }
-    },
+    dialectOptions,
     logging: false, 
     define: {
         timestamps: true,

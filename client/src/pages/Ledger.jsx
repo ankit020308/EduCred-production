@@ -112,7 +112,7 @@ export default function Ledger() {
                   const Icon = conf.icon;
                   return (
                     <motion.div 
-                      key={ev._id} 
+                      key={ev.id} 
                       {...viewTransition}
                       transition={{ ...viewTransition.transition, delay: i * 0.05 }}
                       className="relative md:pl-28"

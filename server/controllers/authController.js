@@ -13,6 +13,23 @@ import { jwtSecret, refreshSecret } from '../utils/runtimeConfig.js';
 const JWT_EXPIRES = '1h';
 const REFRESH_EXPIRES = '7d';
 
+const buildUserPayload = async (userId) => {
+  const user = await Registry.findById('users', userId);
+  if (!user) return null;
+  const university = user.role === 'university' ? await Registry.findOne('universities', { userId: user.id }) : null;
+  
+  return {
+    id: user.id,
+    name: user.name,
+    email: user.email,
+    role: user.role,
+    universityName: user.universityName || (university ? university.name : null),
+    universityId: university ? university.id : null,
+    universityStatus: university ? university.status : null,
+    isVerified: university ? university.isVerified : user.isEmailVerified
+  };
+};
+
 const buildCookieOptions = () => {
   const isProd = process.env.NODE_ENV === 'production';
 
@@ -189,6 +206,7 @@ export const register = async (req, res) => {
 };
 
 export const login = async (req, res) => {
+  console.log(`[AUTH_ENTRY] /login invoked for ${req.body?.email}`);
   try {
     const { error } = loginSchema.validate(req.body);
     if (error) {
@@ -220,15 +238,8 @@ export const login = async (req, res) => {
 
     await logAudit(req, 'NODE_LOGIN', 'SUCCESS', 'Identity session established.', { userId: user.id });
 
-    res.json({
-      user: {
-        id: user.id,
-        name: user.name,
-        email: user.email,
-        role: user.role,
-      },
-      university: university || null
-    });
+    const payload = await buildUserPayload(user.id);
+    res.json({ user: payload });
   } catch (err) {
     console.error('[AUTH] [ERROR] Login failure:', err);
     await logAudit(req, 'AUTH_LOGIN', 'FAILURE', 'Account session establishment failed.', { email: req.body.email });
@@ -241,6 +252,7 @@ export const login = async (req, res) => {
  * Validates the cryptographic hash and activates the user account.
  */
 export const verifyOTP = async (req, res) => {
+  console.log(`[AUTH_ENTRY] /verify-otp invoked for ${req.body?.email}`);
   try {
     // Basic validation for OTP
     const { email: rawEmail, otp } = req.body;
@@ -292,16 +304,12 @@ export const verifyOTP = async (req, res) => {
     const refreshToken = signRefreshToken(user.id);
 
     setCookies(res, accessToken, refreshToken);
-
+    
+    console.log(`[AUTH_POST_WRITE] OTP Verification completed for user ${user.id}`);
+    const payload = await buildUserPayload(user.id);
     res.status(200).json({
       message: 'Account activated successfully.',
-      user: {
-        id: user.id,
-        name: user.name,
-        email: user.email,
-        role: user.role,
-        createdAt: user.createdAt
-      }
+      user: payload
     });
 
   } catch (err) {
@@ -474,19 +482,9 @@ export const verifyPhoneOTP = async (req, res) => {
 };
 
 export const getMe = async (req, res) => {
-  const u = req.user;
-  const university = u.role === 'university' ? await Registry.findOne('universities', { userId: u.id }) : null;
-
-  res.json({
-    id: u.id,
-    name: u.name,
-    email: u.email,
-    role: u.role,
-    universityName: u.universityName,
-    universityId: university ? university.id : null,
-    universityStatus: university ? university.status : null,
-    isVerified: university ? university.isVerified : false
-  });
+  console.log(`[AUTH_ENTRY] /me invoked for user ${req.user?.id}`);
+  const payload = await buildUserPayload(req.user.id);
+  res.json(payload);
 };
 
 /**
@@ -494,6 +492,7 @@ export const getMe = async (req, res) => {
  * Restricted to existing administrators via RBAC middleware.
  */
 export const createAdmin = async (req, res) => {
+  console.log(`[AUTH_ENTRY] /admins invoked to provision ${req.body?.role} by ${req.user?.email}`);
   try {
     // SECURITY CHECK: Only SUPER_ADMIN can create other admins
     if (!req.user || req.user.role !== 'super_admin') {
@@ -525,14 +524,11 @@ export const createAdmin = async (req, res) => {
       isEmailVerified: true // Admins are provisioned by existing admins — no OTP required
     });
 
+    console.log(`[AUTH_POST_WRITE] Admin node successfully provisioned for ${email}`);
+    const payload = await buildUserPayload(admin.id);
     res.status(201).json({
       message: 'Administrative node provisioned successfully.',
-      admin: {
-        id: admin.id,
-        name: admin.name,
-        email: admin.email,
-        role: admin.role
-      }
+      admin: payload
     });
   } catch (err) {
     console.error('Admin creation error:', err);
@@ -610,15 +606,12 @@ export const completeOnboarding = async (req, res) => {
 
     await Registry.update('users', { id: user.id }, update);
     await logAudit(req, 'PROTOCOL_ONBOARDING', 'SUCCESS', `Account configured as ${role}.`, { userId: user.id, role });
-
+    
+    console.log(`[AUTH_POST_WRITE] Onboarding finalized for user ${user.id}`);
+    const payload = await buildUserPayload(user.id);
     res.status(200).json({
       message: 'Identity protocol successfully established.',
-      user: {
-        id: user.id,
-        name: user.name,
-        email: user.email,
-        role: user.role
-      }
+      user: payload
     });
   } catch (err) {
     const errorMessage = err.errors ? err.errors.map(e => `${e.path}: ${e.message}`).join(', ') : err.message;
