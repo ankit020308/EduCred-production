@@ -4,10 +4,12 @@ import axios from 'axios';
  * Centralized Axios instance for the EduCred platform.
  * Automatically switches between local development proxy and the live production API URL.
  */
+const PRODUCTION_BACKEND_URL = 'https://educred-backend.onrender.com';
+
 const api = axios.create({
-    baseURL: import.meta.env.VITE_API_URL || '', // Empty fallback uses the Vite proxy in development
-    timeout: 10000, // 10s timeout for production resilience
-    withCredentials: true, // MANDATORY: Required for cookie-based session transport
+    baseURL: import.meta.env.VITE_API_URL || (window.location.hostname === 'educred.in' ? PRODUCTION_BACKEND_URL : ''), 
+    timeout: 15000, // 15s to be safe for slow SMTP/Blockchain ops
+    withCredentials: true,
     headers: {
         'Content-Type': 'application/json'
     }
@@ -15,12 +17,12 @@ const api = axios.create({
 
 // 🛰️ PROACTIVE NETWORK DIAGNOSTIC
 if (import.meta.env.PROD) {
-    console.log(`[NETWORK] EduCred Protocol target: ${import.meta.env.VITE_API_URL || 'RELATIVE_PATH (Verify Proxy)'}`);
+    console.log(`[NETWORK] EduCred Protocol target: ${api.defaults.baseURL || 'RELATIVE_PATH (Verify Proxy)'}`);
 }
 
 const refreshClient = axios.create({
-    baseURL: import.meta.env.VITE_API_URL || '',
-    timeout: 10000,
+    baseURL: import.meta.env.VITE_API_URL || (window.location.hostname === 'educred.in' ? PRODUCTION_BACKEND_URL : ''),
+    timeout: 15000,
     withCredentials: true,
     headers: {
         'Content-Type': 'application/json'
