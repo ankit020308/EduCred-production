@@ -1,205 +1,409 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { motion, AnimatePresence } from 'framer-motion';
-import { 
-  ArrowRight, 
-  ShieldCheck, 
-  CheckCircle2, 
-  Building2, 
-  Shield, 
-  Lock,
-  Globe,
-  Award,
-  Users
-} from 'lucide-react';
+import { ArrowRight, ShieldCheck, Zap, Globe } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
-import ProtocolBootSequence from '../components/ProtocolBootSequence';
 
-const transition = { duration: 0.8, ease: [0.22, 1, 0.36, 1] };
+const STATS = [
+  { value: '250K+', label: 'Credentials Issued' },
+  { value: '1,200+', label: 'Partner Institutions' },
+  { value: '99.9%', label: 'Network Uptime' },
+  { value: '50+', label: 'Countries Served' },
+];
+
+const FEATURES = [
+  {
+    icon: Zap,
+    title: 'Instant Issuance',
+    desc: 'Upload and anchor a certificate in under 60 seconds. No manual workflows.',
+  },
+  {
+    icon: ShieldCheck,
+    title: 'Blockchain Verified',
+    desc: 'Every credential is cryptographically signed on Ethereum. Immutable by design.',
+  },
+  {
+    icon: Globe,
+    title: 'Global Portability',
+    desc: 'Share credentials anywhere with a permanent, verifiable link. No intermediaries.',
+  },
+];
+
+const STEPS = [
+  {
+    num: '01',
+    title: 'Upload Certificate',
+    desc: 'Institution uploads a PDF and fills basic metadata.',
+  },
+  {
+    num: '02',
+    title: 'Blockchain Anchor',
+    desc: 'EduCred hashes the document and anchors it on-chain.',
+  },
+  {
+    num: '03',
+    title: 'Verify Anywhere',
+    desc: 'Employers and students verify in one click — instantly.',
+  },
+];
+
+const TESTIMONIALS = [
+  {
+    quote:
+      'EduCred transformed how we issue credentials. Students share verified certificates globally in seconds.',
+    name: 'Dr. Priya Sharma',
+    role: 'Director of Academics, SRMIST',
+    initials: 'PS',
+  },
+  {
+    quote:
+      'I shared my certificate link with three companies abroad. All verified without contacting my university.',
+    name: 'Rahul Mehta',
+    role: 'Engineering Graduate, MIT Pune',
+    initials: 'RM',
+  },
+];
+
+const FOOTER_COLS = [
+  {
+    heading: 'Product',
+    links: [
+      { label: 'Verify a Credential', to: '/verify' },
+      { label: 'Public Ledger', to: '/ledger' },
+    ],
+  },
+  {
+    heading: 'Platform',
+    links: [
+      { label: 'Sign Up', to: '/signup' },
+      { label: 'Log In', to: '/login' },
+      { label: 'Dashboard', to: '/dashboard' },
+    ],
+  },
+  {
+    heading: 'Legal',
+    links: [
+      { label: 'Privacy Policy', to: '/privacy' },
+      { label: 'Terms of Service', to: '/terms' },
+    ],
+  },
+  {
+    heading: 'Contact',
+    links: [{ label: 'Get in Touch', to: '/contact' }],
+  },
+];
 
 export default function Landing() {
   const { user } = useAuth();
   const navigate = useNavigate();
-  const [isBooting, setIsBooting] = useState(true);
+  const [mounted, setMounted] = useState(false);
 
-  const stats = [
-    { label: "Verified Credentials", value: "250K+", icon: Award },
-    { label: "Partner Institutions", value: "1.2K", icon: Building2 },
-    { label: "Network Uptime", value: "99.9%", icon: Globe },
-  ];
+  useEffect(() => {
+    // Trigger entrance animations after first paint
+    const id = requestAnimationFrame(() => setMounted(true));
+    return () => cancelAnimationFrame(id);
+  }, []);
+
+  // Returns merged className string + inline style for staggered CSS entrance transitions
+  const anim = mounted ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-6';
+  const fadeUp = (delay = 0, extra = '') =>
+    ({ className: `transition-all duration-700 ease-out ${anim} ${extra}`, style: { transitionDelay: `${delay}ms` } });
 
   return (
-    <div className="relative min-h-screen bg-[#F9FAFB] text-[#111827] font-sans selection:bg-blue-500/30 overflow-x-hidden">
-      <ProtocolBootSequence onComplete={() => setIsBooting(false)} />
-      
-      <AnimatePresence>
-        {!isBooting && (
-          <motion.div 
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ duration: 1 }}
-            className="relative z-10"
+    <>
+      {/* ── STICKY NAV ── */}
+      <header className="sticky top-0 z-50 bg-white/80 backdrop-blur border-b border-slate-200">
+        <nav
+          aria-label="Primary navigation"
+          className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between"
+        >
+          <Link
+            to="/"
+            className="text-xl font-black tracking-tight text-slate-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-500"
           >
-            {/* CLEAN BACKGROUND */}
-            <div className="fixed inset-0 bg-[#F9FAFB]" />
-            <div className="fixed inset-0 hero-gradient pointer-events-none" />
+            Edu<span className="text-blue-600">Cred</span>
+          </Link>
 
-            {/* 🚀 HERO SECTION */}
-            <section className="relative pt-32 pb-20 lg:pt-48 lg:pb-32 px-6">
-              <div className="container max-w-7xl mx-auto">
-                <div className="flex flex-col lg:flex-row items-center gap-16 lg:gap-24">
-                  
-                  {/* LEFT: CONTENT */}
-                  <div className="flex-1 text-center lg:text-left">
-                    <motion.div
-                      initial={{ opacity: 0, y: 20 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ delay: 0.2, ...transition }}
+          <ul className="hidden md:flex items-center gap-8 text-sm font-medium text-slate-600">
+            <li>
+              <a
+                href="#features"
+                className="hover:text-slate-900 transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-500"
+              >
+                Features
+              </a>
+            </li>
+            <li>
+              <a
+                href="#how-it-works"
+                className="hover:text-slate-900 transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-500"
+              >
+                How It Works
+              </a>
+            </li>
+            <li>
+              <a
+                href="#testimonials"
+                className="hover:text-slate-900 transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-500"
+              >
+                Testimonials
+              </a>
+            </li>
+          </ul>
+
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => navigate('/verify')}
+              className="btn-secondary hidden sm:inline-flex focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-500"
+            >
+              Verify a certificate
+            </button>
+            <button
+              onClick={() => navigate(user ? '/dashboard' : '/signup')}
+              className="btn-primary focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-500"
+            >
+              {user ? 'Dashboard' : 'Get started free'}
+            </button>
+          </div>
+        </nav>
+      </header>
+
+      <main>
+        {/* ── HERO ── */}
+        <section
+          aria-labelledby="hero-heading"
+          className="bg-gradient-to-b from-slate-50 to-white pt-24 pb-20 px-6"
+        >
+          <div className="max-w-4xl mx-auto text-center">
+            <div {...fadeUp(0)}>
+              <span className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-50 border border-blue-100 text-blue-600 text-xs font-semibold uppercase tracking-widest mb-8">
+                <ShieldCheck size={13} /> Blockchain-Powered Academic Credentials
+              </span>
+            </div>
+
+            <h1
+              id="hero-heading"
+              {...fadeUp(100, 'text-5xl md:text-7xl font-black tracking-tight text-slate-900 leading-[1.08] mb-6')}
+            >
+              Academic credentials{' '}
+              <span className="text-blue-600">trusted everywhere.</span>
+            </h1>
+
+            <p {...fadeUp(200, 'text-lg md:text-xl text-slate-500 leading-relaxed max-w-2xl mx-auto mb-10')}>
+              EduCred anchors every certificate on Ethereum — making credentials
+              instantly verifiable by anyone, anywhere, forever.
+            </p>
+
+            <div {...fadeUp(300, 'flex flex-col sm:flex-row items-center justify-center gap-4')}>
+              <button
+                onClick={() => navigate(user ? '/dashboard' : '/signup')}
+                className="btn-primary w-full sm:w-auto inline-flex items-center gap-2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-500"
+              >
+                Get started free <ArrowRight size={16} />
+              </button>
+              <button
+                onClick={() => navigate('/verify')}
+                className="btn-secondary w-full sm:w-auto focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-500"
+              >
+                Verify a certificate
+              </button>
+            </div>
+          </div>
+        </section>
+
+        {/* ── SOCIAL PROOF STATS BAR ── */}
+        <section aria-label="Platform statistics" className="border-y border-slate-200 bg-white py-10 px-6">
+          <dl className="max-w-5xl mx-auto grid grid-cols-2 md:grid-cols-4 gap-8 text-center">
+            {STATS.map(({ value, label }) => (
+              <div key={label}>
+                <dt className="text-3xl font-black text-slate-900">{value}</dt>
+                <dd className="mt-1 text-xs font-semibold uppercase tracking-widest text-slate-500">
+                  {label}
+                </dd>
+              </div>
+            ))}
+          </dl>
+        </section>
+
+        {/* ── FEATURES ── */}
+        <section
+          id="features"
+          aria-labelledby="features-heading"
+          className="py-24 px-6 bg-slate-50"
+        >
+          <div className="max-w-7xl mx-auto">
+            <h2
+              id="features-heading"
+              className="text-3xl md:text-4xl font-black text-slate-900 text-center mb-4"
+            >
+              Everything you need to issue and verify
+            </h2>
+            <p className="text-center text-slate-500 mb-14 max-w-xl mx-auto">
+              A complete platform for institutions and students — built on open
+              standards and cryptographic trust.
+            </p>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              {FEATURES.map(({ icon: Icon, title, desc }) => (
+                <article
+                  key={title}
+                  className="bg-white rounded-2xl p-8 border border-slate-200 hover:-translate-y-1 hover:shadow-md transition-all duration-200 ease-out"
+                >
+                  <figure className="w-11 h-11 rounded-xl bg-blue-50 flex items-center justify-center text-blue-600 mb-5">
+                    <Icon size={22} aria-hidden="true" />
+                  </figure>
+                  <h3 className="font-bold text-slate-900 text-lg mb-2">{title}</h3>
+                  <p className="text-slate-500 text-sm leading-relaxed">{desc}</p>
+                </article>
+              ))}
+            </div>
+          </div>
+        </section>
+
+        {/* ── HOW IT WORKS ── */}
+        <section
+          id="how-it-works"
+          aria-labelledby="how-heading"
+          className="py-24 px-6 bg-white"
+        >
+          <div className="max-w-5xl mx-auto">
+            <h2
+              id="how-heading"
+              className="text-3xl md:text-4xl font-black text-slate-900 text-center mb-4"
+            >
+              From upload to verified in seconds
+            </h2>
+            <p className="text-center text-slate-500 mb-16 max-w-xl mx-auto">
+              Three steps. Zero friction. Permanent proof.
+            </p>
+
+            <ol className="relative flex flex-col md:flex-row items-start md:items-stretch gap-10 md:gap-0">
+              {/* Connector line — hidden on mobile */}
+              <li aria-hidden="true" className="hidden md:block absolute top-8 left-[calc(16.6%+1rem)] right-[calc(16.6%+1rem)] h-px bg-slate-200 z-0" />
+
+              {STEPS.map(({ num, title, desc }, i) => (
+                <li
+                  key={num}
+                  className="relative z-10 flex-1 flex flex-col items-center text-center px-4"
+                >
+                  <div className="w-16 h-16 rounded-full bg-blue-600 text-white font-black text-xl flex items-center justify-center mb-5 shadow-md">
+                    {num}
+                  </div>
+                  <h3 className="font-bold text-slate-900 text-base mb-2">{title}</h3>
+                  <p className="text-slate-500 text-sm leading-relaxed">{desc}</p>
+                </li>
+              ))}
+            </ol>
+          </div>
+        </section>
+
+        {/* ── TESTIMONIALS ── */}
+        <section
+          id="testimonials"
+          aria-labelledby="testimonials-heading"
+          className="py-24 px-6 bg-slate-50"
+        >
+          <div className="max-w-5xl mx-auto">
+            <h2
+              id="testimonials-heading"
+              className="text-3xl md:text-4xl font-black text-slate-900 text-center mb-14"
+            >
+              Trusted by institutions and students
+            </h2>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {TESTIMONIALS.map(({ quote, name, role, initials }) => (
+                <article
+                  key={name}
+                  className="bg-white rounded-2xl p-8 border border-slate-200 flex flex-col gap-6 hover:-translate-y-1 hover:shadow-md transition-all duration-200 ease-out"
+                >
+                  <blockquote className="text-slate-700 text-sm leading-relaxed italic">
+                    &ldquo;{quote}&rdquo;
+                  </blockquote>
+                  <figure className="flex items-center gap-4 mt-auto">
+                    <div
+                      aria-hidden="true"
+                      className="w-10 h-10 rounded-full bg-blue-600 text-white font-bold text-sm flex items-center justify-center shrink-0"
                     >
-                      <span className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-blue-500/5 border border-blue-500/10 text-[#60A5FA] text-[10px] font-black uppercase tracking-[0.2em] mb-8">
-                        <ShieldCheck size={14} /> Global Credential Verification
-                      </span>
-                      <h1 className="text-5xl lg:text-7xl font-black text-[#111827] tracking-tight leading-[1.1] mb-8">
-                        Tamper-proof credentials for the <span className="text-[#60A5FA]">enterprise world.</span>
-                      </h1>
-                      <p className="text-lg lg:text-xl text-[#4B5563] font-medium leading-relaxed mb-10 max-w-2xl mx-auto lg:mx-0">
-                        EduCred provides a secure layer for verifying academic achievements instantly. No complexity, just pure cryptographic trust.
-                      </p>
-                      
-                      <div className="flex flex-col sm:flex-row items-center gap-4 justify-center lg:justify-start">
-                        <button 
-                          onClick={() => navigate(user ? '/dashboard' : '/signup')}
-                          className="btn-primary w-full sm:w-auto"
-                        >
-                          {user ? "Go to Dashboard" : "Get Started Now"} <ArrowRight size={18} />
-                        </button>
-                        <button 
-                          onClick={() => navigate('/verify')}
-                          className="btn-secondary w-full sm:w-auto"
-                        >
-                          Verify a Credential
-                        </button>
-                      </div>
+                      {initials}
+                    </div>
+                    <figcaption>
+                      <p className="font-semibold text-slate-900 text-sm">{name}</p>
+                      <p className="text-slate-500 text-xs">{role}</p>
+                    </figcaption>
+                  </figure>
+                </article>
+              ))}
+            </div>
+          </div>
+        </section>
 
-                      <div className="mt-16 grid grid-cols-1 sm:grid-cols-3 gap-8">
-                        {stats.map((stat, i) => (
-                           <div key={i} className="flex flex-col items-center lg:items-start">
-                              <span className="text-2xl font-black text-[#111827]">{stat.value}</span>
-                              <span className="text-[10px] font-bold uppercase tracking-widest text-[#4B5563] mt-1">{stat.label}</span>
-                           </div>
-                        ))}
-                      </div>
-                    </motion.div>
-                  </div>
+        {/* ── FINAL CTA BAND ── */}
+        <section
+          aria-labelledby="cta-heading"
+          className="bg-slate-900 py-24 px-6 text-center"
+        >
+          <div className="max-w-2xl mx-auto">
+            <h2
+              id="cta-heading"
+              className="text-3xl md:text-5xl font-black text-white mb-5 leading-tight"
+            >
+              Start issuing trusted credentials today.
+            </h2>
+            <p className="text-slate-400 mb-10 text-lg">
+              Join 1,200+ institutions already using EduCred to issue
+              blockchain-anchored academic records.
+            </p>
+            <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
+              <button
+                onClick={() => navigate(user ? '/dashboard' : '/signup')}
+                className="btn-primary w-full sm:w-auto inline-flex items-center gap-2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-500"
+              >
+                Get started free <ArrowRight size={16} />
+              </button>
+              <button
+                onClick={() => navigate('/verify')}
+                className="btn-secondary w-full sm:w-auto focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-500"
+              >
+                Verify a certificate
+              </button>
+            </div>
+          </div>
+        </section>
+      </main>
 
-                  {/* RIGHT: MOCKUP ASSET */}
-                  <motion.div 
-                    initial={{ opacity: 0, scale: 0.9, x: 20 }}
-                    animate={{ opacity: 1, scale: 1, x: 0 }}
-                    transition={{ delay: 0.4, ...transition }}
-                    className="flex-1 relative"
-                  >
-                    <div className="relative z-10 group">
-                      <div className="absolute -inset-1 bg-gradient-to-r from-blue-600 to-cyan-500 rounded-[2.5rem] blur opacity-20 group-hover:opacity-30 transition duration-1000"></div>
-                      <div className="relative saas-card rounded-[2rem] border-[#D1D5DB] overflow-hidden shadow-2xl">
-                         <img 
-                            src="/mockup_certificate.svg" 
-                            alt="EduCred Verified Certificate Mockup"
-                            className="w-full h-auto object-contain p-8"
-                         />
-                      </div>
-                      
-                      {/* FLOATING TRUST ELEMENTS */}
-                      <motion.div 
-                        animate={{ y: [0, -10, 0] }}
-                        transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
-                        className="absolute -top-6 -right-6 saas-card px-6 py-4 rounded-2xl flex items-center gap-3 shadow-xl border-[#D1D5DB]"
+      {/* ── FOOTER ── */}
+      <footer className="bg-slate-950 text-slate-400 py-16 px-6" aria-label="Site footer">
+        <div className="max-w-7xl mx-auto">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-10 mb-14">
+            {FOOTER_COLS.map(({ heading, links }) => (
+              <div key={heading}>
+                <h3 className="text-white font-semibold text-sm mb-4">{heading}</h3>
+                <ul className="space-y-3">
+                  {links.map(({ label, to }) => (
+                    <li key={label}>
+                      <Link
+                        to={to}
+                        className="text-sm hover:text-white transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-500"
                       >
-                         <div className="w-8 h-8 rounded-full bg-emerald-500/10 flex items-center justify-center text-emerald-600">
-                           <CheckCircle2 size={18} />
-                         </div>
-                         <div className="flex flex-col">
-                            <span className="text-[10px] font-black uppercase text-[#4B5563]">Trust Score</span>
-                            <span className="text-sm font-bold text-emerald-600">100% Valid</span>
-                         </div>
-                      </motion.div>
-                    </div>
-                  </motion.div>
-
-                </div>
+                        {label}
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
               </div>
-            </section>
+            ))}
+          </div>
 
-            <section className="py-16 border-y border-[#E5E7EB] bg-[#F1F5F9]">
-              <div className="container max-w-7xl mx-auto px-6">
-                <div className="flex flex-wrap justify-center gap-12 lg:gap-24 opacity-60 grayscale hover:grayscale-0 transition-all duration-700">
-                  <div className="flex items-center gap-3 text-[#2C2F33] font-bold tracking-tighter text-base uppercase">
-                    <Shield size={20} className="text-[#60A5FA]" /> Global Standards
-                  </div>
-                  <div className="flex items-center gap-3 text-[#2C2F33] font-bold tracking-tighter text-base uppercase">
-                    <Lock size={20} className="text-[#60A5FA]" /> AES-256 Secured
-                  </div>
-                  <div className="flex items-center gap-3 text-[#2C2F33] font-bold tracking-tighter text-base uppercase">
-                    <Globe size={20} className="text-[#60A5FA]" /> ISO Certified
-                  </div>
-                  <div className="flex items-center gap-3 text-[#2C2F33] font-bold tracking-tighter text-base uppercase">
-                    <Users size={20} className="text-[#60A5FA]" /> 1M+ Users
-                  </div>
-                </div>
-              </div>
-            </section>
-
-            <section className="py-40 px-6 relative overflow-hidden bg-[#F9FAFB]">
-              <div className="container max-w-7xl mx-auto">
-                <div className="bg-white rounded-[3rem] p-12 lg:p-32 shadow-2xl border border-[#E5E7EB] relative overflow-hidden">
-                  <div className="absolute top-0 right-0 w-[800px] h-[800px] bg-blue-500/5 blur-[150px] rounded-full -translate-y-1/2 translate-x-1/2 pointer-events-none" />
-                  
-                  <div className="flex flex-col lg:flex-row items-center gap-24 relative z-10">
-                    <div className="flex-1 space-y-10">
-                      <h2 className="text-5xl lg:text-7xl font-black text-[#2C2F33] tracking-tighter leading-none uppercase">
-                        Secure your <br/><span className="italic opacity-30">Identity.</span>
-                      </h2>
-                      <p className="text-xl text-[#4B5563] font-medium leading-relaxed max-w-2xl">
-                        Join a global network of institutions providing portable, verifiable, and tamper-proof academic records.
-                      </p>
-                      <ul className="space-y-8">
-                        {[
-                          { title: "Instant Verification", text: "Recruiters can verify credentials in one click." },
-                          { title: "Global Standard", text: "Blockchain-anchored IDs accepted worldwide." },
-                          { title: "Tamper-Proof", text: "Unbreakable security for every record." }
-                        ].map((item, i) => (
-                          <li key={i} className="flex items-start gap-6 group">
-                            <div className="w-10 h-10 rounded-2xl bg-blue-500/5 border border-blue-500/10 flex items-center justify-center text-[#60A5FA] shrink-0 mt-1 group-hover:bg-[#2C2F33] group-hover:text-white transition-all duration-500">
-                              <CheckCircle2 size={20} />
-                            </div>
-                            <div className="space-y-1">
-                                <h4 className="text-[#2C2F33] font-black text-sm uppercase tracking-widest">{item.title}</h4>
-                                <p className="text-[#4B5563] text-[11px] font-black uppercase tracking-widest opacity-80">{item.text}</p>
-                            </div>
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-
-                    <div className="w-full lg:w-[500px] bg-[#F9FAFB] border border-[#E5E7EB] p-16 shadow-2xl rounded-[3rem] relative group transition-all duration-700">
-                      <h3 className="text-3xl font-black text-[#2C2F33] mb-4 text-center lg:text-left uppercase tracking-tighter">Get Started.</h3>
-                      <p className="text-[#4B5563] text-sm mb-12 font-black uppercase tracking-widest text-center lg:text-left opacity-60">Create your enterprise EduCred profile today.</p>
-                      
-                      <div className="space-y-6">
-                        <button onClick={() => navigate('/signup')} className="btn-primary w-full shadow-slate-900/10 py-6 text-sm !bg-[#2C2F33]">Create Free Account</button>
-                        <p className="text-center text-[10px] uppercase font-black text-[#4B5563] tracking-[0.2em] mt-8 italic">
-                          Trusted by 1,200+ global institutions.
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </section>
-
-          </motion.div>
-        )}
-      </AnimatePresence>
-    </div>
+          <div className="border-t border-slate-800 pt-8 flex flex-col md:flex-row items-center justify-between gap-4">
+            <p className="text-sm font-black tracking-tight text-white">
+              Edu<span className="text-blue-500">Cred</span>
+            </p>
+            <p className="text-xs text-slate-600">
+              &copy; {new Date().getFullYear()} EduCred. All rights reserved.
+            </p>
+          </div>
+        </div>
+      </footer>
+    </>
   );
 }

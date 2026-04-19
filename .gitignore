@@ -32,3 +32,5 @@ blockchain/typechain/
 blockchain/ganache.log
 blockchain/ganache_db/
 blockchain/.env
+server/npm-cache/
+

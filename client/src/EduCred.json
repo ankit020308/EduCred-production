@@ -1,6 +1,6 @@
 {
   "contractName": "EduCred",
-  "contractAddress": "0xD96cD4ab57386045A34DbfF9256939A715D4dC8d",
+  "contractAddress": "0x94F1C4203489f65BAB80F72165eD4cEAd99BE19f",
   "ownerAddress": "0x648934B6e1a69746f632AB23D1b4A7E4CE807AB7",
   "issuerAddress": "0x648934B6e1a69746f632AB23D1b4A7E4CE807AB7",
   "abi": [
@@ -429,5 +429,5 @@
   ],
   "rpcUrl": "https://eth-sepolia.g.alchemy.com/v2/Fs4rtmDBRZao96DqoFk5l",
   "chainId": 11155111,
-  "deployedAt": "2026-04-15T14:56:12.901Z"
+  "deployedAt": "2026-04-19T13:12:37.474Z"
 }

@@ -12,6 +12,10 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import fs from 'fs';
 import os from 'os';
+import dotenv from 'dotenv';
+
+// Load environment from root
+dotenv.config();
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -145,10 +149,17 @@ async function main() {
   }
 
   // ── 1. Local blockchain node ────────────────────────────────────────────────
-  log.step('Initializing Local Blockchain...');
+  log.step('Initializing Blockchain Layer...');
+  
+  const rpcUrl = process.env.RPC_URL || '';
+  const isExternalRpc = rpcUrl && !rpcUrl.includes('localhost') && !rpcUrl.includes('127.0.0.1');
   const blockchainRunning = await isPortOpen('127.0.0.1', BLOCKCHAIN_PORT);
 
-  if (!blockchainRunning) {
+  if (isExternalRpc) {
+    log.info(`External RPC detected: ${rpcUrl.split('/v2/')[0] || 'Remote Node'}`);
+    log.info('Skipping local blockchain node startup.');
+  } else if (!blockchainRunning) {
+    log.info('Starting Local Hardhat Node...');
     const hardhatBin = path.join(BC_DIR, 'node_modules', '.bin', 'hardhat');
     const nodeProcess = spawnProcess(
       NODE,
@@ -159,21 +170,29 @@ async function main() {
     procs.push(nodeProcess);
     await waitForPort('127.0.0.1', BLOCKCHAIN_PORT, 'Blockchain');
   } else {
-    log.info(`Blockchain already running on port ${BLOCKCHAIN_PORT}`);
+    log.info(`Local blockchain already running on port ${BLOCKCHAIN_PORT}`);
   }
 
   // ── 2. Deploy contract ──────────────────────────────────────────────────────
   log.step('Deploying Smart Contracts...');
-  try {
-    execSync(`${NODE} ./scripts/deploy.js`, {
-      cwd: BC_DIR,
-      env: { ...process.env, PATH: `${path.dirname(NODE)}:${process.env.PATH}` },
-      stdio: 'inherit',
-    });
-    log.success('Contracts deployed successfully.');
-  } catch (err) {
-    log.error(`Contract deployment failed: ${err.message}`);
-    log.warn('Continuing in SIMULATION mode...');
+  const contractAddress = process.env.CONTRACT_ADDRESS;
+  const forceDeploy = process.argv.includes('--force-deploy');
+
+  if (isExternalRpc && contractAddress && !forceDeploy) {
+    log.info(`Active contract detected in .env: ${contractAddress}`);
+    log.info('Skipping deployment phase for external network.');
+  } else {
+    try {
+      execSync(`${NODE} ./scripts/deploy.js`, {
+        cwd: BC_DIR,
+        env: { ...process.env, PATH: `${path.dirname(NODE)}:${process.env.PATH}` },
+        stdio: 'inherit',
+      });
+      log.success('Contracts deployed successfully.');
+    } catch (err) {
+      log.error(`Contract deployment failed: ${err.message}`);
+      log.warn('Continuing in SIMULATION mode...');
+    }
   }
 
   // ── 3. Backend server ───────────────────────────────────────────────────────

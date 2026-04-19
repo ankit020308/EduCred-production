@@ -214,8 +214,8 @@ export default function Signup() {
                                 className="w-full bg-slate-50 border border-slate-200 rounded-xl py-4 pl-12 pr-4 text-sm text-slate-900 focus:outline-none focus:border-blue-500 focus:bg-white transition-all font-medium"
                               />
                           </div>
-                          <textarea 
-                            placeholder="Briefly describe your institution..." required
+                          <textarea
+                            placeholder="Briefly describe your institution..."
                             value={form.description} onChange={e => setForm({...form, description: e.target.value})}
                             rows="4"
                             className="w-full bg-slate-50 border border-slate-200 rounded-xl py-4 px-4 text-sm text-slate-900 focus:outline-none focus:border-blue-500 focus:bg-white transition-all font-medium resize-none text-[13px]"

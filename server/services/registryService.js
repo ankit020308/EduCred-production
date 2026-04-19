@@ -67,17 +67,30 @@ class RegistryService {
   async init() {
     try {
       console.log('[Registry] Initializing SQL storage protocol...');
+      console.log(`[Registry] [DIAGNOSTIC] Checking connectivity to: ${sequelize.options.host || 'remote node'}`);
+      
       await sequelize.authenticate();
+      console.log('[Registry] [SUCCESS] Connection established. Verifying schema...');
+      
       await this._verifySchema();
       this.isReady = true;
-      console.log('[Registry] [SUCCESS] SQL storage layer active.');
+      console.log('[Registry] [SUCCESS] SQL storage layer active and verified.');
       return true;
     } catch (error) {
-      console.error(`[Registry] [ERROR] Database connection failed: ${error.message}`);
+      console.error(`\n[Registry] [FAIL] [INIT_ERROR] Database connection failed.`);
+      console.error(`[Registry] [REASON] ${error.message}`);
+      
       if (error.original) {
-        console.error(`[Registry] [INFO] Detail: ${error.original.code} - ${error.original.address}:${error.original.port}`);
+        console.error(`[Registry] [OS_DETAIL] ${error.original.code} - ${error.original.address}:${error.original.port}`);
       }
-      throw new Error('Database connection failed or schema is unsafe. EduCred requires a migrated database to run.');
+      
+      if (error.message.includes('ECONNREFUSED')) {
+        console.error('[Registry] [HELP] The database seems unreachable. Verify your DATABASE_URL in .env and ensure your local IP is whitelisted if using a managed host like Render.');
+      } else if (error.message.includes('no pg_hba.conf entry')) {
+        console.error('[Registry] [HELP] Connection rejected by database server. This usually means SSL is required but not active, or the credentials are wrong.');
+      }
+
+      throw new Error(`Database connection failed: ${error.message}. EduCred requires an active database node to function.`);
     }
   }
 

@@ -21,6 +21,7 @@ export const getStudentCertificates = async (req, res) => {
     
     res.json(certs);
   } catch (error) {
+    console.error('[STUDENT] getStudentCertificates error:', error);
     res.status(500).json({ error: error.message });
   }
 };
@@ -40,6 +41,7 @@ export const getStudentCertificateById = async (req, res) => {
     
     res.json(cert);
   } catch (error) {
+    console.error('[STUDENT] controller error:', error);
     res.status(500).json({ error: error.message });
   }
 };
@@ -49,6 +51,7 @@ export const getStudentStats = async (req, res) => {
     const total = await Registry.count('certificates', { studentEmail: req.user.email });
     res.json({ total });
   } catch (error) {
+    console.error('[STUDENT] controller error:', error);
     res.status(500).json({ error: error.message });
   }
 };
@@ -70,6 +73,7 @@ export const connectDigilocker = async (req, res) => {
     const updatedStudent = await Registry.findOne('students', { userId: req.user.id });
     res.json({ message: 'DigiLocker connected successfully', student: updatedStudent });
   } catch (error) {
+    console.error('[STUDENT] controller error:', error);
     res.status(500).json({ error: error.message });
   }
 };
@@ -88,6 +92,7 @@ export const disconnectDigilocker = async (req, res) => {
     
     res.json({ message: 'DigiLocker disconnected successfully' });
   } catch (error) {
+    console.error('[STUDENT] controller error:', error);
     res.status(500).json({ error: error.message });
   }
 };

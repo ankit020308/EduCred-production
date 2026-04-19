@@ -1,7 +1,5 @@
 import './utils/envLoader.js'; // LOAD ENV FIRST
 import express from 'express';
-import { createServer } from 'http';
-import { Server } from 'socket.io';
 import bcrypt from 'bcryptjs';
 import cors from 'cors';
 import helmet from 'helmet';
@@ -20,12 +18,13 @@ import authRoutes from './routes/authRoutes.js';
 import universityRoutes from './routes/universityRoutes.js';
 import userRoutes from './routes/userRoutes.js';
 import studentRoutes from './routes/studentRoutes.js';
-import systemRoutes from './routes/systemRoutes.js'; 
+import systemRoutes from './routes/systemRoutes.js';
 import adminRoutes from './routes/adminRoutes.js';
 import requestRoutes from './routes/requestRoutes.js';
 import ledgerRoutes from './routes/ledgerRoutes.js';
 import supportRoutes from './routes/supportRoutes.js';
 import Registry from './services/registryService.js';
+import { initSocket } from './utils/socketService.js';
 import fs from 'fs';
 
 import { getAllowedOrigins, isProduction, sessionSecret, validateServerEnv, requireEnv } from './utils/runtimeConfig.js';
@@ -50,37 +49,8 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const app = express();
-const httpServer = createServer(app);
 const allowedOrigins = getAllowedOrigins();
-
-// ⚡ Socket.io Protocol Initialization
-const io = new Server(httpServer, {
-  cors: {
-    origin: allowedOrigins,
-    methods: ['GET', 'POST'],
-    credentials: true
-  }
-});
-
-// Configure Socket.io logic
-io.on('connection', (socket) => {
-  const userId = socket.handshake.query.userId;
-  if (userId) {
-    socket.join(`user:${userId}`);
-  }
-
-  socket.on('joinInstitutionalRoom', (universityId) => {
-    socket.join(`university:${universityId}`);
-    console.log(`[NETWORK] Node joined institutional room: ${universityId}`);
-  });
-
-  socket.on('disconnect', () => {
-    // Graceful disconnect
-  });
-});
-
-// Attach io to app for use in controllers
-app.set('io', io);
+// WebSockets (socket.io) disabled for architectural stability.
 
 
 // Asynchronous background workers (BullMQ) disabled for architectural stability.
@@ -105,8 +75,8 @@ app.use(helmet({
     },
   },
 }));
-app.use(compression()); 
-app.use(morgan('dev')); 
+app.use(compression());
+app.use(morgan('dev'));
 
 // ─── STRICT CORS PROTOCOL ────────────────────────────
 const corsOptions = {
@@ -117,9 +87,9 @@ const corsOptions = {
 app.use(cors(corsOptions));
 
 const apiLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, 
-  max: isProduction ? 100 : 1000, 
-  skip: (req) => !isProduction && (req.ip === '::1' || req.ip === '127.0.0.1'), 
+  windowMs: 15 * 60 * 1000,
+  max: isProduction ? 100 : 1000,
+  skip: (req) => !isProduction && (req.ip === '::1' || req.ip === '127.0.0.1'),
   message: { success: false, message: 'Too many requests from this IP.' },
   standardHeaders: true,
   legacyHeaders: false,
@@ -127,7 +97,7 @@ const apiLimiter = rateLimit({
 
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 20, 
+  max: 20,
   message: { success: false, message: 'Too many authentication attempts. Please try again in 15 minutes.' },
 });
 
@@ -149,15 +119,15 @@ if (!isProduction) {
 }
 
 // ─── Routes ───────────────────────────────────────────
-app.use('/api', apiLimiter); 
+app.use('/api', apiLimiter);
 app.use('/api/auth', authLimiter, authRoutes); // Apply strict auth limits
 
-app.use('/auth', authRoutes); 
+app.use('/auth', authRoutes);
 app.use('/api/certificates', certificateRoutes);
 app.use('/api/universities', universityRoutes);
 app.use('/api/user', userRoutes);
 app.use('/api/student', studentRoutes);
-app.use('/api/system', systemRoutes); 
+app.use('/api/system', systemRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/requests', requestRoutes);
 app.use('/api/ledger', ledgerRoutes);
@@ -173,11 +143,11 @@ app.get('/', (req, res) => {
 // ─── Health Check ─────────────────────────────────────
 app.get('/api/health', async (req, res) => {
   const bcInfo = getBlockchainRuntimeInfo();
-  
+
   // Proactive Storage Audit
   const isStoragePersistent = isPinataConfigured() || !!process.env.CLOUDINARY_URL;
-  const storageWarning = !isStoragePersistent && isProduction 
-    ? '⚠️ EPHEMERAL: Local uploads will be lost on restart. Configure Pinata or Cloudinary for persistence.' 
+  const storageWarning = !isStoragePersistent && isProduction
+    ? '⚠️ EPHEMERAL: Local uploads will be lost on restart. Configure Pinata or Cloudinary for persistence.'
     : null;
 
   res.status(200).json({
@@ -195,17 +165,14 @@ app.get('/api/health', async (req, res) => {
   });
 });
 
-// ─── GLOBAL ERROR HANDLER (Consolidated) ─────────────────────────────
+// ─── GLOBAL ERROR HANDLER ─────────────────────────────
 app.use((err, req, res, next) => {
-  const status = err.status || 500;
-  const isProd = process.env.NODE_ENV === 'production';
-  
-  console.error(`[ERROR] [PROTOCOL_ERROR] ${err.message}${!isProd ? `\n${err.stack}` : ''}`);
+  console.error(`[ERROR] [PROTOCOL_ERROR] ${err.message}${!isProduction ? `\n${err.stack}` : ''}`);
 
-  res.status(status).json({
+  res.status(err.status || 500).json({
     success: false,
-    message: isProd ? 'Internal Server Error' : err.message,
-    ...(isProd ? {} : { stack: err.stack, details: err.details })
+    message: isProduction ? 'Internal Server Error' : err.message,
+    ...(isProduction ? {} : { stack: err.stack })
   });
 });
 
@@ -238,58 +205,59 @@ async function seedSystem() {
       name: 'System Controller',
       email: adminEmail,
       passwordHash: hash,
-      role: 'admin',
+      role: 'super_admin',
+      isSuperAdmin: true,
       isEmailVerified: true
     });
     console.log(`[SUCCESS] ROOT AUTHORITY: Global Admin established (${adminEmail})`);
   } catch (error) {
-    console.error('❌ Error seeding system:', error);
+    console.error(' Error seeding system:', error);
   }
 }
 
-// ─── Catch-All for undefined routes
+// ─── Catch-All 404 ───────────────────────────────────────
 app.use((req, res, next) => {
-    res.status(404).json({ error: 'Route not found.' });
+  res.status(404).json({ error: 'Route not found.' });
 });
 
 let server;
 
 if (process.env.NODE_ENV !== 'test') {
   (async () => {
-      try {
-          // Step 1: Initialize Registry
-          await Registry.init();
-          console.log(`[REGISTRY] Storage layer initialized.`);
-          
-          // Step 2: Seed System Authority
-          await seedSystem();
-  
-          // Step 3: Launch Node
-          httpServer.listen(PORT, '0.0.0.0', async () => {
-            console.log(`\n[STARTUP] [EDUCRED NODE] Startup Complete`);
-            console.log(`[NETWORK] Network: http://localhost:${PORT}`);
-            console.log(`[STORAGE] Storage: AUTHORITATIVE (SQL)`);
-            console.log(`[LEDGER]  Ledger:  ${getBlockchainRuntimeInfo().mode === 'LIVE' ? 'SEP-LIVE' : 'OFFLINE'}`);
-            console.log(`[ASSETS]  Assets:  ${isPinataConfigured() ? 'DECENTRALIZED (PINATA)' : 'LOCAL (UPLOADS)'}`);
-            console.log(`[PUBSUB]  Real-time: Socket.io Layer Active`);
-            console.log(`-------------------------------------------------\n`);
-  
-            // Background Connectivity Check
-            if (isPinataConfigured()) {
-              try {
-                const isIpfsReady = await testPinataConnection();
-                if (isIpfsReady) {
-                  console.log(`[SUCCESS] IPFS: Decentralized storage layer active.`);
-                }
-              } catch (ipfsError) {
-                console.warn(`[IPFS] [WARNING] Connectivity failed. Continuing without decentralized storage.`);
-              }
+    try {
+      // Step 1: Initialize Registry
+      await Registry.init();
+      console.log(`[REGISTRY] Storage layer initialized.`);
+
+      // Step 2: Seed System Authority
+      await seedSystem();
+
+      // Step 3: Launch Node
+      server = app.listen(PORT, '0.0.0.0', async () => {
+        initSocket(server);
+        console.log(`\n[STARTUP] [EDUCRED NODE] Startup Complete`);
+        console.log(`[NETWORK] Network: http://localhost:${PORT}`);
+        console.log(`[STORAGE] Storage: AUTHORITATIVE (SQL)`);
+        console.log(`[LEDGER]  Ledger:  ${getBlockchainRuntimeInfo().mode === 'LIVE' ? 'SEP-LIVE' : 'OFFLINE'}`);
+        console.log(`[ASSETS]  Assets:  ${isPinataConfigured() ? 'DECENTRALIZED (PINATA)' : 'LOCAL (UPLOADS)'}`);
+        console.log(`-------------------------------------------------\n`);
+
+        // Background Connectivity Check
+        if (isPinataConfigured()) {
+          try {
+            const isIpfsReady = await testPinataConnection();
+            if (isIpfsReady) {
+              console.log(`[SUCCESS] IPFS: Decentralized storage layer active.`);
             }
-          });
-      } catch (err) {
-          console.error('[STOP] CRITICAL: Node failed to initialize. Review logs.', err);
-          process.exit(1);
-      }
+          } catch (ipfsError) {
+            console.warn(`[IPFS] [WARNING] Connectivity failed. Continuing without decentralized storage.`);
+          }
+        }
+      });
+    } catch (err) {
+      console.error('[STOP] CRITICAL: Node failed to initialize. Review logs.', err);
+      process.exit(1);
+    }
   })();
 }
 

@@ -96,14 +96,16 @@ export function AuthProvider({ children }) {
   // 🔹 VERIFY OTP
   const verifyOTP = useCallback(async (email, otp) => {
     try {
-      await api.post('/api/auth/verify-otp', { email, otp });
-      
-      // Force profile hydration to get universityId/status/etc
-      const res = await api.get('/api/auth/me');
-      const fullUser = res.data;
-      
-      persistSession(fullUser);
-      return fullUser;
+      const res = await api.post('/api/auth/verify-otp', { email, otp });
+      const userFromResponse = res.data?.user;
+      if (userFromResponse) {
+        persistSession(userFromResponse);
+        return userFromResponse;
+      }
+      // Fallback: hydrate from session cookie
+      const meRes = await api.get('/api/auth/me');
+      persistSession(meRes.data);
+      return meRes.data;
     } catch (err) {
       throw err.response?.data?.error || 'Verification failed';
     }

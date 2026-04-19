@@ -7,7 +7,8 @@ import sequelize from '../config/database.js';
 import Registry from '../services/registryService.js';
 import { Certificate } from '../models/index.js';
 import { issueCertificateOnChain, revokeHashOnChain, verifyHashDetailsOnChain } from '../utils/blockchain.js';
-import { generateStructuralHash } from '../utils/hashing.js';
+import { generateStructuralHash, generateBinaryHash } from '../utils/hashing.js';
+import { emitToInstitution } from '../utils/socketService.js';
 import { logAudit } from '../utils/logger.js';
 import { certificateIssuanceSchema } from '../validators/joiSchemas.js';
 import { isPinataConfigured, uploadFileToPinata, uploadJSONToPinata, getIPFSUrl } from '../utils/ipfsService.js';
@@ -167,11 +168,16 @@ export const issueCertificate = async (req, res) => {
     } = value;
 
     const programName = value.programName || value.course || 'General Degree';
-    const structuralHash = generateStructuralHash({
-      studentName,
-      course: programName,
-      issuerId: university.id,
-    });
+
+    // Read file buffer early so hash is computed from raw binary, not metadata
+    let fileBuffer = null;
+    if (tempPath && fs.existsSync(tempPath)) {
+      fileBuffer = fs.readFileSync(tempPath);
+    }
+
+    const certificateHash = fileBuffer
+      ? generateBinaryHash(fileBuffer)
+      : generateStructuralHash({ studentName, course: programName, issuerId: university.id });
 
     let studentId = null;
     try {
@@ -193,7 +199,7 @@ export const issueCertificate = async (req, res) => {
       studentId,
       course: programName,
       issuer: university.name,
-      certificateHash: structuralHash,
+      certificateHash,
       status: 'PROCESSING',
       workflowStatus: 'STAGE2',
       issuedBy: req.user.id,
@@ -223,8 +229,7 @@ export const issueCertificate = async (req, res) => {
     let metadataIpfsCid = null;
     let fileUrl = null;
 
-    if (tempPath && fs.existsSync(tempPath)) {
-      const fileBuffer = fs.readFileSync(tempPath);
+    if (fileBuffer) {
       const filename = `Certificate_${cert.certificateId}.pdf`;
 
       if (isPinataConfigured()) {
@@ -242,70 +247,92 @@ export const issueCertificate = async (req, res) => {
           const metadataResult = await uploadJSONToPinata({
             ...cert,
             institution: university.name,
-            anchoredHash: structuralHash,
+            anchoredHash: certificateHash,
           }, `${cert.certificateId}_metadata.json`);
           metadataIpfsCid = metadataResult.cid;
 
           console.log(`[📦 IPFS] Successfully anchored certificate assets. CID: ${ipfsCid}`);
         } catch (ipfsError) {
-          console.error('[⚠️ IPFS_FAILURE]: Falling back to local storage mapping.', ipfsError.message);
-          fileUrl = `/uploads/${path.basename(tempPath)}`;
+          console.error('[⚠️ IPFS_FAILURE]: Falling back to local storage.', ipfsError.message);
+          // Move file to permanent uploads dir so the finally block doesn't delete the only copy
+          const permanentDir = path.join(__dirname, '../../uploads');
+          if (!fs.existsSync(permanentDir)) fs.mkdirSync(permanentDir, { recursive: true });
+          const permanentFilename = path.basename(tempPath);
+          fs.renameSync(tempPath, path.join(permanentDir, permanentFilename));
+          tempPath = null; // file has been moved; prevent finally from unlinking it
+          fileUrl = `/uploads/${permanentFilename}`;
         }
       } else {
-        console.warn('[⚠️ PROACTIVE_WARNING]: Pinata not configured. Storing local (ephemeral) link.');
-        fileUrl = `/uploads/${path.basename(tempPath)}`;
+        // Pinata not configured — move temp file to permanent local dir before finally deletes it
+        console.warn('[⚠️ PROACTIVE_WARNING]: Pinata not configured — persisting to local storage.');
+        const permanentDir = path.join(__dirname, '../../uploads');
+        if (!fs.existsSync(permanentDir)) fs.mkdirSync(permanentDir, { recursive: true });
+        const permanentFilename = path.basename(tempPath);
+        fs.renameSync(tempPath, path.join(permanentDir, permanentFilename));
+        tempPath = null;
+        fileUrl = `/uploads/${permanentFilename}`;
       }
     }
 
-    const receipt = await issueCertificateOnChain(
-      cert.id,
-      structuralHash,
-      CERTIFICATE_TYPE_CODES[cert.certificateType] ?? 0,
-      university.encryptedPrivateKey
-    );
+    // Persist file metadata before blockchain so a network failure doesn't lose the file reference
+    await Registry.update('certificates', { id: cert.id }, { ipfsCid, metadataIpfsCid, fileUrl });
 
-    await Registry.update('certificates', { id: cert.id }, {
-      blockchainTxHash: receipt.hash,
-      ipfsCid,
-      metadataIpfsCid,
-      fileUrl,
-      status: 'CONFIRMED',
-      workflowStatus: 'ISSUED',
-      workflowLog: [
-        ...(cert.workflowLog || []),
-        {
-          stage: 'Anchored to Blockchain',
-          actorId: req.user.id,
-          actorName: university.name,
-          timestamp: new Date(),
-        },
-      ],
-    });
+    // Blockchain call is isolated — failure defers anchoring to confirmIssuance, never blocks issuance
+    let receipt = null;
+    emitToInstitution(university.id, 'anchoring:pending', { certificateId: cert.certificateId, id: cert.id });
+    try {
+      receipt = await issueCertificateOnChain(
+        cert.id,
+        certificateHash,
+        CERTIFICATE_TYPE_CODES[cert.certificateType] ?? 0,
+        university.encryptedPrivateKey
+      );
+      emitToInstitution(university.id, 'anchoring:success', { certificateId: cert.certificateId, id: cert.id, txHash: receipt.hash });
+    } catch (bcErr) {
+      console.error('[⚠️ BLOCKCHAIN_DEFERRED] Anchor skipped — cert queued for confirmIssuance.', bcErr.message);
+      emitToInstitution(university.id, 'anchoring:failed', { certificateId: cert.certificateId, id: cert.id, error: bcErr.message });
+    }
 
-    await Registry.insert('ledger', {
-      type: 'ISSUE',
-      studentName: cert.studentName,
-      universityName: university.name,
-      certificateId: cert.id,
-      txHash: receipt.hash,
-      status: 'SUCCESS',
-      metadata: { certificateType: cert.certificateType, source: 'issueCertificate' },
-    });
+    if (receipt) {
+      await Registry.update('certificates', { id: cert.id }, {
+        blockchainTxHash: receipt.hash,
+        status: 'CONFIRMED',
+        workflowStatus: 'ISSUED',
+        workflowLog: [
+          ...(cert.workflowLog || []),
+          {
+            stage: 'Anchored to Blockchain',
+            actorId: req.user.id,
+            actorName: university.name,
+            timestamp: new Date(),
+          },
+        ],
+      });
+
+      await Registry.insert('ledger', {
+        type: 'ISSUE',
+        studentName: cert.studentName,
+        universityName: university.name,
+        certificateId: cert.id,
+        txHash: receipt.hash,
+        status: 'SUCCESS',
+        metadata: { certificateType: cert.certificateType, source: 'issueCertificate' },
+      });
+    }
 
     res.status(201).json({
       success: true,
-      message: 'Certificate issued successfully.',
+      message: receipt
+        ? 'Certificate issued and anchored on blockchain.'
+        : 'Certificate created. Use "Confirm Issuance" to anchor to blockchain.',
       certificateId: cert.certificateId,
-      status: 'CONFIRMED',
-      txHash: receipt.hash,
+      status: receipt ? 'CONFIRMED' : 'PROCESSING',
+      txHash: receipt?.hash || null,
     });
   } catch (err) {
     if (cert?.id) {
       try {
-        await Registry.update('certificates', { id: cert.id }, {
-          blockchainTxHash: null,
-          status: 'FAILED',
-        });
+        await Registry.update('certificates', { id: cert.id }, { status: 'FAILED' });
         await Registry.insert('ledger', {
           type: 'ISSUE',
           studentName: cert.studentName,
@@ -327,7 +354,7 @@ export const issueCertificate = async (req, res) => {
       });
     }
 
-    console.error('🚀 Issuance Pipeline CRASH:', err);
+    console.error('[ISSUANCE_CRASH]:', err);
     res.status(500).json({ error: 'Certificate issuance failed.', details: err.message });
   } finally {
     if (tempPath && fs.existsSync(tempPath)) {
@@ -587,27 +614,10 @@ export const verifyCertificate = async (req, res) => {
         return res.status(400).json({ error: 'Invalid file: size is 0 bytes.' });
       }
 
-      const pdfParse = (await import('pdf-parse')).default;
       const fileBuffer = fs.readFileSync(tempPath);
-      const pdfData = await pdfParse(fileBuffer);
-      const pdfText = pdfData.text;
-
-      const hashMatch = pdfText.match(/Structural Hash:\s*([a-fA-F0-9]{64})/);
-      if (!hashMatch) {
-        return res.status(400).json({
-          valid: false,
-          message: 'Could not extract valid structural hash from the uploaded PDF.',
-        });
-      }
-
-      hashToVerify = hashMatch[1];
-
-      const idMatch = pdfText.match(/ID:\s*(EDUCRED-[^\s]+)/);
-      if (idMatch) {
-        extractedId = idMatch[1];
-      }
-
+      hashToVerify = generateBinaryHash(fileBuffer);
       metadata = await Registry.findOne('certificates', { certificateHash: hashToVerify });
+      if (metadata) extractedId = metadata.certificateId;
     } else if (certificateId) {
       const isUUID = /^[0-9a-fA-F-]{36}$/.test(certificateId);
       const cert = isUUID
@@ -625,17 +635,23 @@ export const verifyCertificate = async (req, res) => {
     }
 
     let onChainDetails;
+    let chainUnavailable = false;
     try {
       onChainDetails = await verifyHashDetailsOnChain(hashToVerify);
     } catch (ledgerErr) {
-      console.error('❌ [BLOCKCHAIN_UNREACHABLE]: Verification halted.', ledgerErr.message);
-      return res.status(503).json({
-        error: 'Verification Service Offline',
-        message: 'Authoritative ledger is currently unreachable. Integrity cannot be verified.',
-      });
+      console.error('❌ [BLOCKCHAIN_UNREACHABLE]:', ledgerErr.message);
+      if (verificationMethod === 'upload') {
+        // Trustless file verification cannot proceed without chain
+        return res.status(503).json({
+          error: 'Verification Service Offline',
+          message: 'Trustless file verification requires the blockchain ledger, which is currently unreachable.',
+        });
+      }
+      // ID-based: fall back to DB-only with warning
+      chainUnavailable = true;
     }
 
-    const isOnLedger = onChainDetails?.exists === true;
+    const isOnLedger = chainUnavailable ? !!metadata : onChainDetails?.exists === true;
     const requestIp = req.ip || req.connection?.remoteAddress || '0.0.0.0';
 
     await recordVerificationAttempt({
@@ -674,17 +690,47 @@ export const verifyCertificate = async (req, res) => {
       });
     }
 
+    // Wallet comparison: on-chain issuer must match institution's registered wallet
+    let walletMismatch = false;
+    if (!chainUnavailable && onChainDetails?.issuer && metadata?.universityId) {
+      try {
+        const institution = await Registry.findById('universities', metadata.universityId);
+        if (institution?.publicWalletAddress &&
+            onChainDetails.issuer.toLowerCase() !== institution.publicWalletAddress.toLowerCase()) {
+          walletMismatch = true;
+        }
+      } catch (walletErr) {
+        console.error('[WALLET_COMPARE_ERROR]:', walletErr.message);
+      }
+    }
+
+    if (walletMismatch) {
+      await recordFraudAlert({
+        alertType: 'WALLET_MISMATCH',
+        severity: 'CRITICAL',
+        description: 'On-chain issuer wallet does not match registered institution wallet.',
+        context: { onChainIssuer: onChainDetails.issuer, certificateId: metadata?.certificateId },
+      });
+      return res.status(403).json({
+        valid: false,
+        message: 'Issuer wallet mismatch: on-chain signer does not match registered institution.',
+      });
+    }
+
     await logAudit(req, 'CERTIFICATE_VERIFICATION', 'SUCCESS', 'Identity verified against ledger.', {
       hash: hashToVerify,
     });
 
     res.json({
       valid: true,
-      onChainConsensus: true,
-      verificationSource: 'blockchain',
-      message: 'Certificate verified against the authoritative blockchain ledger.',
+      onChainConsensus: !chainUnavailable,
+      verificationSource: chainUnavailable ? 'database' : 'blockchain',
+      message: chainUnavailable
+        ? 'Certificate found in registry. Blockchain ledger is temporarily unavailable — on-chain confirmation pending.'
+        : 'Certificate verified against the authoritative blockchain ledger.',
       hash: hashToVerify,
-      ledgerProof: {
+      ...(chainUnavailable ? { warning: 'Blockchain ledger unreachable. Result is DB-only and not cryptographically authoritative.' } : {}),
+      ledgerProof: chainUnavailable ? null : {
         transactionHash: metadata?.blockchainTxHash || null,
         status: 'PERMANENTLY_MINTED',
         issuer: onChainDetails?.issuer,
@@ -706,6 +752,75 @@ export const verifyCertificate = async (req, res) => {
   }
 };
 
+export const verifyByFileHash = async (req, res) => {
+  let tempPath = req.file?.path;
+  try {
+    if (!req.file || req.file.size === 0) {
+      return res.status(400).json({ error: 'A non-empty certificate file is required.' });
+    }
+
+    const fileBuffer = fs.readFileSync(tempPath);
+    const hashToVerify = generateBinaryHash(fileBuffer);
+
+    let onChainDetails;
+    try {
+      onChainDetails = await verifyHashDetailsOnChain(hashToVerify);
+    } catch (ledgerErr) {
+      console.error('❌ [TRUSTLESS_CHAIN_UNREACHABLE]:', ledgerErr.message);
+      return res.status(503).json({
+        error: 'Verification Service Offline',
+        message: 'Trustless file verification requires the blockchain ledger, which is currently unreachable.',
+      });
+    }
+
+    if (!onChainDetails?.exists) {
+      await recordFraudAlert({
+        alertType: 'HASH_MISMATCH',
+        severity: 'HIGH',
+        description: 'Trustless file verification: hash not found on chain.',
+        context: { submittedHash: hashToVerify },
+      });
+      return res.status(404).json({
+        valid: false,
+        message: 'No on-chain anchor found for this file. It has not been issued through EduCred.',
+        submittedHash: hashToVerify,
+      });
+    }
+
+    if (onChainDetails.revoked) {
+      return res.status(403).json({
+        valid: false,
+        isRevoked: true,
+        message: '⚠️ REVOKED: This certificate has been revoked on-chain.',
+        submittedHash: hashToVerify,
+      });
+    }
+
+    const metadata = await Registry.findOne('certificates', { certificateHash: hashToVerify });
+
+    res.json({
+      valid: true,
+      onChainConsensus: true,
+      verificationSource: 'blockchain',
+      message: 'File hash verified against the authoritative blockchain ledger.',
+      hash: hashToVerify,
+      ledgerProof: {
+        status: 'PERMANENTLY_MINTED',
+        issuer: onChainDetails.issuer,
+        anchoredAt: onChainDetails.timestamp
+          ? new Date(onChainDetails.timestamp * 1000).toISOString()
+          : null,
+      },
+      metadata: metadata ? buildPublicCertificatePayload(metadata) : null,
+    });
+  } catch (err) {
+    console.error('[TRUSTLESS_VERIFY_ERROR]:', err);
+    res.status(500).json({ error: 'Trustless verification failed.' });
+  } finally {
+    if (tempPath && fs.existsSync(tempPath)) fs.unlinkSync(tempPath);
+  }
+};
+
 export const verifyByEnrollment = async (req, res) => {
   try {
     const { enrollmentNumber, universityName } = req.body;
@@ -713,10 +828,11 @@ export const verifyByEnrollment = async (req, res) => {
       return res.status(400).json({ error: 'Enrollment number and university name are required.' });
     }
 
-    const certs = await Registry.find('certificates', {
-      issuer: universityName,
-      'metadata.studentEnrollmentNumber': enrollmentNumber,
-    });
+    // Sequelize can't query JSONB with dot-notation keys — load by issuer, filter in JS
+    const allCerts = await Registry.find('certificates', { issuer: universityName });
+    const certs = allCerts.filter(
+      (c) => c.metadata?.studentEnrollmentNumber === enrollmentNumber
+    );
 
     res.json({ data: certs });
   } catch (error) {
@@ -785,6 +901,11 @@ export const downloadCertificateFile = async (req, res) => {
     if (!cert.fileUrl) {
       return res.status(404).json({ error: 'Certificate file is unavailable.' });
     }
+
+    const filename = `Certificate_${cert.certificateId}.pdf`;
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    res.setHeader('X-Certificate-ID', cert.certificateId);
+    if (cert.certificateHash) res.setHeader('X-Certificate-Hash', cert.certificateHash);
 
     if (cert.fileUrl.startsWith('http://') || cert.fileUrl.startsWith('https://')) {
       return res.redirect(cert.fileUrl);

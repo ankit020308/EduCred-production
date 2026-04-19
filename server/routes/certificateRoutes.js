@@ -1,8 +1,9 @@
 import express from 'express';
-import { 
-    issueCertificate, 
-    verifyCertificate, 
-    getCertificates, 
+import {
+    issueCertificate,
+    verifyCertificate,
+    verifyByFileHash,
+    getCertificates,
     getStats,
     batchIssue,
     revokeCertificate,
@@ -38,6 +39,7 @@ router.post('/verify', authLimiter, upload.single('file'), verifyCertificate);
 router.post('/verify/upload', authLimiter, upload.single('file'), verifyCertificate);
 router.post('/verify/id', authLimiter, verifyCertificate);
 router.post('/verify/enrollment', authLimiter, verifyByEnrollment);
+router.post('/verify/file', authLimiter, upload.single('certificate'), verifyByFileHash);
 
 /**
  * 🎓 Public Certificate Lookup (for student sharing link)

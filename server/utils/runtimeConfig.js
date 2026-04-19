@@ -8,6 +8,22 @@ const __dirname = path.dirname(__filename);
 // 🛡️ Always load from the root .env for unified configuration
 dotenv.config({ path: path.join(__dirname, '../../.env') });
 
+// Resolve aliased env vars before validation — set canonical name from alias if present
+const ENV_ALIASES = {
+  DATABASE_URL: ['DB_URI', 'DB_URL'],
+  RPC_URL: ['SEPOLIA_RPC_URL'],
+};
+for (const [canonical, aliases] of Object.entries(ENV_ALIASES)) {
+  if (!process.env[canonical]) {
+    for (const alias of aliases) {
+      if (process.env[alias]) {
+        process.env[canonical] = process.env[alias];
+        break;
+      }
+    }
+  }
+}
+
 const REQUIRED_SERVER_ENV = [
   'DATABASE_URL',
   'CLIENT_URL',

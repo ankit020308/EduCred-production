@@ -98,7 +98,7 @@ export const logout = async (req, res) => {
 
 // 🛡️ Google Auth Client (google-auth-library) disabled for stabilization.
 
-export const signToken = (id) => jwt.sign({ id }, jwtSecret, { expiresIn: JWT_EXPIRES });
+export const signToken = (id, extraPayload = {}) => jwt.sign({ id, ...extraPayload }, jwtSecret, { expiresIn: JWT_EXPIRES });
 export const signRefreshToken = (id) => jwt.sign({ id }, refreshSecret, { expiresIn: REFRESH_EXPIRES });
 
 export const setCookies = (res, accessToken, refreshToken) => {
@@ -138,7 +138,14 @@ export const register = async (req, res) => {
       console.log(`\n🔑 [DEV_AUTH]: Activation Code for ${email} is: ${otp}\n`);
     }
     const hashedOtp = hashOTP(otp);
-    const hashedPassword = await bcrypt.hash(password, 10);
+    if (role === 'student') {
+      const allowedCert = await Registry.findOne('certificates', { studentEmail: email });
+      if (!allowedCert) {
+        return res.status(403).json({ error: 'No certificate has been issued to this email address. Contact your institution to register.' });
+      }
+    }
+
+    const hashedPassword = await bcrypt.hash(password, 12);
 
     console.log(`[DIAGNOSTIC] Handshaking with SQL layer: Provisioning primary User node...`);
     const user = await Registry.insert('users', {
@@ -231,7 +238,25 @@ export const login = async (req, res) => {
 
     const university = user.role === 'university' ? await Registry.findOne('universities', { userId: user.id }) : null;
 
-    const accessToken = signToken(user.id);
+    if (university && university.status === 'PENDING') {
+      return res.status(403).json({
+        error: 'Institution account is pending admin approval. You will be notified once approved.',
+        status: 'PENDING',
+      });
+    }
+
+    if (university && university.status === 'REJECTED') {
+      return res.status(403).json({
+        error: 'Institution account has been rejected. Contact support for assistance.',
+        status: 'REJECTED',
+      });
+    }
+
+    const extraPayload = university
+      ? { institutionId: university.id, walletAddress: university.publicWalletAddress || null }
+      : {};
+
+    const accessToken = signToken(user.id, extraPayload);
     const refreshToken = signRefreshToken(user.id);
 
     setCookies(res, accessToken, refreshToken);
@@ -300,7 +325,12 @@ export const verifyOTP = async (req, res) => {
 
     await logAudit(req, 'OTP_VERIFICATION', 'SUCCESS', 'Account activated via valid security key.', { userId: user.id });
 
-    const accessToken = signToken(user.id);
+    const otpUniversity = user.role === 'university' ? await Registry.findOne('universities', { userId: user.id }) : null;
+    const otpExtraPayload = otpUniversity
+      ? { institutionId: otpUniversity.id, walletAddress: otpUniversity.publicWalletAddress || null }
+      : {};
+
+    const accessToken = signToken(user.id, otpExtraPayload);
     const refreshToken = signRefreshToken(user.id);
 
     setCookies(res, accessToken, refreshToken);
@@ -394,7 +424,12 @@ export const refreshToken = async (req, res) => {
       return res.status(401).json({ error: 'Account inactive. Verification required.' });
     }
 
-    const accessToken = signToken(user.id);
+    const refreshUniversity = user.role === 'university' ? await Registry.findOne('universities', { userId: user.id }) : null;
+    const refreshExtraPayload = refreshUniversity
+      ? { institutionId: refreshUniversity.id, walletAddress: refreshUniversity.publicWalletAddress || null }
+      : {};
+
+    const accessToken = signToken(user.id, refreshExtraPayload);
     const rotatedRefreshToken = signRefreshToken(user.id);
 
     await blacklistTokenIfPresent(token);
@@ -515,7 +550,7 @@ export const createAdmin = async (req, res) => {
       return res.status(400).json({ error: 'Account already exists.' });
     }
 
-    const hashedPassword = await bcrypt.hash(password, 10);
+    const hashedPassword = await bcrypt.hash(password, 12);
     const admin = await Registry.insert('users', {
       name,
       email,
