@@ -54,7 +54,8 @@ export default function Signup() {
         navigate('/dashboard');
       }
     } catch (err) {
-      const msg = typeof err === 'string' ? err : err?.response?.data?.error || err?.response?.data?.message || 'Registration failed.';
+      const data = err?.response?.data;
+      const msg = typeof err === 'string' ? err : (data?.details ? `${data.error}: ${data.details}` : (data?.error || data?.message || 'Registration failed.'));
       setError(msg);
       setLoading(false);
     }

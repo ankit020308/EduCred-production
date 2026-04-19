@@ -24,7 +24,16 @@ function getTransporter() {
     );
   }
 
-  _transporter = nodemailer.createTransport({ host, port, secure, auth: { user, pass } });
+  _transporter = nodemailer.createTransport({ 
+    host, 
+    port, 
+    secure, 
+    auth: { user, pass },
+    // 🛡️ RESILIENCE: Prevent long hangs on flaky SMTP connections
+    connectionTimeout: 10000, // 10s
+    greetingTimeout: 10000, 
+    socketTimeout: 20000 
+  });
   return _transporter;
 }
 

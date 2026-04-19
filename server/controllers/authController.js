@@ -138,12 +138,17 @@ export const register = async (req, res) => {
       console.log(`\n🔑 [DEV_AUTH]: Activation Code for ${email} is: ${otp}\n`);
     }
     const hashedOtp = hashOTP(otp);
+    // 🎓 STUDENT ENROLLMENT GATE: Relaxed for better onboarding.
+    // We now allow students to register even if a certificate hasn't been issued yet.
+    // They will simply see an empty dashboard until their institution uploads credentials.
+    /*
     if (role === 'student') {
       const allowedCert = await Registry.findOne('certificates', { studentEmail: email });
       if (!allowedCert) {
         return res.status(403).json({ error: 'No certificate has been issued to this email address. Contact your institution to register.' });
       }
     }
+    */
 
     const hashedPassword = await bcrypt.hash(password, 12);
 
@@ -189,10 +194,21 @@ export const register = async (req, res) => {
       console.log(`[DIAGNOSTIC] Activation link delivered.`);
     } catch (error) {
       console.warn(`[⚠️ SMTP_FAILURE] Could not deliver OTP to ${email}:`, error.message);
-      await Registry.delete('universities', { userId: user.id });
-      await Registry.delete('students', { userId: user.id });
-      await Registry.delete('users', { id: user.id });
-      return res.status(502).json({ error: 'OTP email delivery failed. Check SMTP settings and try again.' });
+      
+      // 🛡️ RESILIENCE GUARD: In non-production, we allow registration to proceed
+      // even if SMTP fails, as long as the OTP was logged to the console.
+      if (process.env.NODE_ENV !== 'production') {
+        console.log(`[DEV_AUTH] [BYPASS] SMTP delivery failed but registration allowed. OTP: ${otp}`);
+      } else {
+        // In production, we rollback to ensure data integrity and prevent "ghost" unverified accounts
+        await Registry.delete('universities', { userId: user.id });
+        await Registry.delete('students', { userId: user.id });
+        await Registry.delete('users', { id: user.id });
+        return res.status(502).json({ 
+          error: 'OTP delivery failed.', 
+          details: 'We could not reach your email provider. Check SMTP settings or try again later.' 
+        });
+      }
     }
 
     await logAudit(req, 'AUTH_REGISTRATION', 'SUCCESS', 'New user account provisioned.', { userId: user.id, role: user.role });
