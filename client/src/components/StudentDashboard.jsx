@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   GraduationCap, ShieldCheck, Calendar, BookOpen, Hash,
   Loader2, Download, ExternalLink, Award, Fingerprint,
-  LogOut, User, Copy, Check, Shield, Hexagon, LayoutDashboard
+  LogOut, User, Copy, Check, Shield, Hexagon, LayoutDashboard, Clock
 } from 'lucide-react';
 import api from '../services/api';
 import { useAuth } from '../context/AuthContext';
