@@ -119,12 +119,10 @@ export function getAllowedOrigins() {
     })
     .filter(Boolean);
 
-  // Always include www variant if root is present (and vice versa)
-  const expanded = new Set(origins);
-  origins.forEach(o => {
-    if (o.includes('://educred.in')) expanded.add(o.replace('://educred.in', '://www.educred.in'));
-    if (o.includes('://www.educred.in')) expanded.add(o.replace('://www.educred.in', '://educred.in'));
-  });
+  // 🚀 PRODUCTION FAIL-SAFE: Always allow the primary domain and its variants
+  expanded.add('https://educred.in');
+  expanded.add('https://www.educred.in');
+  expanded.add('http://localhost:3000'); // Local dev safety
 
   return Array.from(expanded);
 }
