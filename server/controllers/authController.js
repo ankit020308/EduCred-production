@@ -30,8 +30,10 @@ const buildUserPayload = async (userId) => {
   };
 };
 
+import { isProduction } from '../utils/runtimeConfig.js';
+
 const buildCookieOptions = () => {
-  const isProd = process.env.NODE_ENV === 'production';
+  const isProd = isProduction;
 
   return {
     httpOnly: true,
