@@ -10,6 +10,8 @@ import { authLimiter, otpLimiter } from '../middleware/rateLimiter.js';
 import Registry from '../services/registryService.js';
 
 
+import { isProduction } from '../utils/runtimeConfig.js';
+
 const router = express.Router();
 
 // ─── Standard Auth Routes ────────────────────────────────────────────────────
@@ -53,7 +55,7 @@ router.get('/profile', protect, async (req, res) => {
 
 // ─── Passport OAuth Callback Handshake ───────────────────────────────────────
 const processGoogleCallback = (req, res) => {
-  const FRONTEND_URL = process.env.CLIENT_URL || 'http://localhost:3000';
+  const FRONTEND_URL = process.env.CLIENT_URL || (isProduction ? 'https://educred.in' : 'http://localhost:3000');
   
   try {
     const user = req.user;

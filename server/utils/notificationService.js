@@ -1,4 +1,5 @@
 import { sendCertificateEmail } from './emailService.js';
+import { isProduction } from './runtimeConfig.js';
 import dotenv from 'dotenv';
 
 dotenv.config();
@@ -46,7 +47,8 @@ export const sendCertificateNotification = async (studentName, course, universit
                 }
 
                 const isWhatsApp = studentPhone.startsWith('whatsapp:');
-                const message = `🎓 EduCred Protocol: Hello ${studentName}! Your certificate for "${course}" from ${universityName} has been anchored to the blockchain. Verify here: ${process.env.CLIENT_URL || 'http://localhost:3000'}/verify?id=${certId}`;
+                const frontendUrl = process.env.CLIENT_URL || (isProduction ? 'https://educred.in' : 'http://localhost:3000');
+                const message = `🎓 EduCred Protocol: Hello ${studentName}! Your certificate for "${course}" from ${universityName} has been anchored to the blockchain. Verify here: ${frontendUrl}/verify?id=${certId}`;
 
                 await twilioClient.messages.create({
                     body: message,

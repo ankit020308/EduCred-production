@@ -1,4 +1,5 @@
 import QRCode from 'qrcode';
+import { isProduction } from './runtimeConfig.js';
 import dotenv from 'dotenv';
 
 dotenv.config();
@@ -15,7 +16,7 @@ dotenv.config();
  */
 export const generateVerificationQR = async (certificateId) => {
     try {
-        const clientUrlEnv = process.env.CLIENT_URL || 'http://localhost:3000';
+        const clientUrlEnv = process.env.CLIENT_URL || (isProduction ? 'https://educred.in' : 'http://localhost:3000');
         const primaryClientUrl = clientUrlEnv.split(',')[0].trim();
         const verifyUrl = `${primaryClientUrl}/verify?id=${certificateId}`;
 

@@ -104,7 +104,9 @@ export function getGoogleCallbackUrl() {
     return `${clientUrl}/api/auth/google/callback`;
   }
 
-  return 'http://localhost:5001/api/auth/google/callback';
+  return isProduction 
+    ? 'https://educred-backend.onrender.com/api/auth/google/callback'
+    : 'http://localhost:5001/api/auth/google/callback';
 }
 
 export function getAllowedOrigins() {
@@ -118,11 +120,15 @@ export function getAllowedOrigins() {
       return trimmed;
     })
     .filter(Boolean);
-
+  const expanded = new Set(origins);
   // 🚀 PRODUCTION FAIL-SAFE: Always allow the primary domain and its variants
   expanded.add('https://educred.in');
   expanded.add('https://www.educred.in');
-  expanded.add('http://localhost:3000'); // Local dev safety
+  
+  if (!isProduction) {
+    expanded.add('http://localhost:3000');
+    expanded.add('http://localhost:5173');
+  }
 
   return Array.from(expanded);
 }

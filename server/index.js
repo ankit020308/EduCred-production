@@ -72,7 +72,12 @@ app.use(helmet({
       styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com", "https://accounts.google.com"],
       imgSrc: ["'self'", "data:", "https://res.cloudinary.com", "blob:"],
       fontSrc: ["'self'", "https://fonts.gstatic.com"],
-      connectSrc: ["'self'", ...allowedOrigins, "http://localhost:5001", "http://127.0.0.1:8545", "https://accounts.google.com"],
+      connectSrc: [
+        "'self'", 
+        ...allowedOrigins, 
+        ...(isProduction ? [] : ["http://localhost:5001", "http://127.0.0.1:8545"]),
+        "https://accounts.google.com"
+      ],
     },
   },
 }));

@@ -7,7 +7,7 @@ import axios from 'axios';
 const PRODUCTION_BACKEND_URL = 'https://educred-backend.onrender.com';
 
 const api = axios.create({
-    baseURL: import.meta.env.VITE_API_URL || (window.location.hostname === 'educred.in' ? PRODUCTION_BACKEND_URL : ''), 
+    baseURL: import.meta.env.VITE_API_URL || (['educred.in', 'www.educred.in'].includes(window.location.hostname) ? PRODUCTION_BACKEND_URL : ''), 
     timeout: 15000, // 15s to be safe for slow SMTP/Blockchain ops
     withCredentials: true,
     headers: {
@@ -21,7 +21,7 @@ if (import.meta.env.PROD) {
 }
 
 const refreshClient = axios.create({
-    baseURL: import.meta.env.VITE_API_URL || (window.location.hostname === 'educred.in' ? PRODUCTION_BACKEND_URL : ''),
+    baseURL: import.meta.env.VITE_API_URL || (['educred.in', 'www.educred.in'].includes(window.location.hostname) ? PRODUCTION_BACKEND_URL : ''),
     timeout: 15000,
     withCredentials: true,
     headers: {
