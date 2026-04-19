@@ -8,7 +8,7 @@ import { isProduction } from './runtimeConfig.js';
  */
 let _transporter = null;
 
-function getTransporter() {
+export function getTransporter() {
   if (_transporter) return _transporter;
 
   const host     = process.env.EMAIL_HOST;
