@@ -174,34 +174,6 @@ export const issueCertificate = async (req, res) => {
 
     const baseWorkflowEntry = { stage: 'Academic Record Verified', actorId: req.user.id, actorName: req.user.name, timestamp: new Date() };
 
-    // ── Helper: anchor one cert to the blockchain non-blocking ──────────────
-    const anchorAsync = (cert, certHash) => {
-      const { id: certId, certificateId: certCertificateId, certificateType: certType } = cert;
-      emitToInstitution(university.id, 'anchoring:pending', { certificateId: certCertificateId, id: certId });
-      issueCertificateOnChain(certId, certHash, CERTIFICATE_TYPE_CODES[certType] ?? 0, university.encryptedPrivateKey)
-        .then(async (receipt) => {
-          emitToInstitution(university.id, 'anchoring:success', { certificateId: certCertificateId, id: certId, txHash: receipt.hash });
-          await Registry.update('certificates', { id: certId }, {
-            blockchainTxHash: receipt.hash,
-            status: 'CONFIRMED',
-            workflowStatus: 'ISSUED',
-          });
-          await Registry.insert('ledger', {
-            type: 'ISSUE',
-            studentName,
-            universityName: university.name,
-            certificateId: certId,
-            txHash: receipt.hash,
-            status: 'SUCCESS',
-            metadata: { certificateType: certType, source: 'issueCertificate' },
-          });
-        })
-        .catch((bcErr) => {
-          console.error(`[CHAIN] Anchoring failed for ${certCertificateId}:`, bcErr.message);
-          emitToInstitution(university.id, 'anchoring:failed', { certificateId: certCertificateId, id: certId, error: bcErr.message });
-        });
-    };
-
     const issuedCerts = [];
 
     if (semesters && semesters.length > 0) {
@@ -221,7 +193,7 @@ export const issueCertificate = async (req, res) => {
           course: program,
           issuer: university.name,
           certificateHash: certHash,
-          status: 'PROCESSING',
+          status: 'PENDING_REVIEW',
           workflowStatus: 'STAGE2',
           issuedBy: req.user.id,
           universityId: university.id,
@@ -229,9 +201,8 @@ export const issueCertificate = async (req, res) => {
           metadata: { studentEnrollmentNumber: rollNumber, branch, graduationYear, semester, sgpa, subjects, finalCGPA },
           workflowLog: [baseWorkflowEntry],
         });
-        console.log(`[DB] Semester ${semester} cert saved: ${cert.certificateId}`);
+        console.log(`[DB] Semester ${semester} cert saved (PENDING_REVIEW): ${cert.certificateId}`);
 
-        anchorAsync(cert, certHash);
         issuedCerts.push({ certificateId: cert.certificateId, semester, hash: certHash });
       }
     } else {
@@ -247,7 +218,7 @@ export const issueCertificate = async (req, res) => {
         course: program,
         issuer: university.name,
         certificateHash: certHash,
-        status: 'PROCESSING',
+        status: 'PENDING_REVIEW',
         workflowStatus: 'STAGE2',
         issuedBy: req.user.id,
         universityId: university.id,
@@ -255,9 +226,8 @@ export const issueCertificate = async (req, res) => {
         metadata: { studentEnrollmentNumber: rollNumber, branch, graduationYear, finalCGPA },
         workflowLog: [baseWorkflowEntry],
       });
-      console.log(`[DB] Final cert saved: ${cert.certificateId}`);
+      console.log(`[DB] Final cert saved (PENDING_REVIEW): ${cert.certificateId}`);
 
-      anchorAsync(cert, certHash);
       issuedCerts.push({ certificateId: cert.certificateId, semester: 'FINAL', hash: certHash });
     }
 
@@ -769,6 +739,217 @@ export const verifyByEnrollment = async (req, res) => {
     res.json({ data: certs });
   } catch (error) {
     res.status(500).json({ error: 'Search failed.' });
+  }
+};
+
+// ── Shared anchor helper used by approveCertificate and retryAnchor ──────────
+async function runAnchor(cert, university, actorUser) {
+  const encKey = university.encryptedPrivateKey;
+  try {
+    const receipt = await issueCertificateOnChain(
+      cert.id,
+      cert.certificateHash,
+      CERTIFICATE_TYPE_CODES[cert.certificateType] ?? 0,
+      encKey
+    );
+
+    const nextLog = [
+      ...(cert.workflowLog || []),
+      { stage: 'Anchoring to Blockchain', actorId: actorUser.id, actorName: actorUser.name || university.name, timestamp: new Date() },
+    ];
+
+    await Registry.update('certificates', { id: cert.id }, {
+      blockchainTxHash: receipt.hash,
+      status: 'CONFIRMED',
+      workflowStatus: 'ISSUED',
+      workflowLog: nextLog,
+      reviewedBy: actorUser.email,
+      reviewedAt: new Date(),
+    });
+
+    await Registry.insert('ledger', {
+      type: 'ISSUE',
+      studentName: cert.studentName,
+      universityName: cert.issuer,
+      certificateId: cert.id,
+      txHash: receipt.hash,
+      status: 'SUCCESS',
+      metadata: { certificateType: cert.certificateType, source: 'adminApprove' },
+    });
+
+    emitToInstitution(university.id, 'anchoring:success', { certificateId: cert.certificateId, id: cert.id, txHash: receipt.hash });
+
+    // Trigger PDF generation async (best-effort)
+    try {
+      const { generateCertificatePDF } = await import('../utils/pdfService.js');
+      const pdfBuffer = await generateCertificatePDF({
+        universityName: cert.issuer,
+        studentName: cert.studentName,
+        programName: cert.course,
+        branch: cert.metadata?.branch || '',
+        cgpa: cert.metadata?.finalCGPA,
+        graduationYear: cert.metadata?.graduationYear,
+        certificateId: cert.certificateId,
+        txHash: receipt.hash,
+      });
+      const { uploadFileToPinata } = await import('../utils/ipfsService.js');
+      if (uploadFileToPinata) {
+        const r = await uploadFileToPinata(pdfBuffer, `${cert.certificateId}.pdf`, 'application/pdf');
+        if (r?.cid) {
+          await Registry.update('certificates', { id: cert.id }, { fileUrl: `https://gateway.pinata.cloud/ipfs/${r.cid}` });
+        }
+      }
+    } catch (pdfErr) {
+      console.error(`[PDF] Generation failed for ${cert.certificateId}:`, pdfErr.message);
+    }
+
+    return { success: true, txHash: receipt.hash };
+  } catch (bcErr) {
+    console.error(`[CHAIN] Anchoring failed for ${cert.certificateId}:`, bcErr.message);
+    await Registry.update('certificates', { id: cert.id }, { status: 'ANCHOR_FAILED' });
+    emitToInstitution(university.id, 'anchoring:failed', { certificateId: cert.certificateId, id: cert.id, error: bcErr.message });
+    throw bcErr;
+  }
+}
+
+export const approveCertificate = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const cert = await Registry.findById('certificates', id);
+    if (!cert) return res.status(404).json({ error: 'Certificate not found.' });
+    if (!['PENDING_REVIEW', 'ANCHOR_FAILED'].includes(cert.status)) {
+      return res.status(400).json({ error: `Certificate is already ${cert.status}. Cannot re-approve.` });
+    }
+
+    const university = await Registry.findById('universities', cert.universityId);
+    if (!university) return res.status(404).json({ error: 'Issuing institution not found.' });
+
+    await Registry.update('certificates', { id: cert.id }, {
+      status: 'PROCESSING',
+      workflowLog: [
+        ...(cert.workflowLog || []),
+        { stage: 'Approved by Admin', actorId: req.user.id, actorName: req.user.name, timestamp: new Date() },
+      ],
+      reviewedBy: req.user.email,
+      reviewedAt: new Date(),
+    });
+
+    // Fire anchoring non-blocking so the HTTP response is fast
+    runAnchor({ ...cert, status: 'PROCESSING', workflowLog: cert.workflowLog || [] }, university, req.user)
+      .catch((e) => console.error('[APPROVE_ANCHOR_FAIL]', e.message));
+
+    res.json({ success: true, message: 'Certificate approved. Blockchain anchoring started.' });
+  } catch (err) {
+    console.error('[APPROVE_CERT_ERROR]', err);
+    res.status(500).json({ error: 'Failed to approve certificate.', details: err.message });
+  }
+};
+
+export const retryAnchor = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const cert = await Registry.findById('certificates', id);
+    if (!cert) return res.status(404).json({ error: 'Certificate not found.' });
+    if (cert.status !== 'ANCHOR_FAILED') {
+      return res.status(400).json({ error: `Retry is only allowed for ANCHOR_FAILED certificates. Current status: ${cert.status}` });
+    }
+
+    const university = await Registry.findById('universities', cert.universityId);
+    if (!university) return res.status(404).json({ error: 'Issuing institution not found.' });
+
+    await Registry.update('certificates', { id: cert.id }, { status: 'PROCESSING' });
+
+    runAnchor({ ...cert, status: 'PROCESSING' }, university, req.user)
+      .catch((e) => console.error('[RETRY_ANCHOR_FAIL]', e.message));
+
+    res.json({ success: true, message: 'Retry anchoring started.' });
+  } catch (err) {
+    res.status(500).json({ error: 'Retry failed.', details: err.message });
+  }
+};
+
+export const editCertificate = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const cert = await Registry.findById('certificates', id);
+    if (!cert) return res.status(404).json({ error: 'Certificate not found.' });
+
+    const { university, error: signerError } = await resolveInstitutionSigner(req);
+    if (signerError) return res.status(signerError.status).json(signerError.body);
+
+    if (String(cert.universityId) !== String(university.id)) {
+      return res.status(403).json({ error: 'You are not allowed to edit this certificate.' });
+    }
+
+    if (cert.status !== 'PENDING_REVIEW') {
+      return res.status(400).json({ error: 'Certificate can only be edited while in PENDING_REVIEW status. Once approved it is immutable.' });
+    }
+
+    const { studentName, email, rollNumber, program, branch, graduationYear, finalCGPA, semesters } = req.body;
+
+    const newHash = generateHash({ rollNumber, semester: semesters?.[0]?.semester || 'FINAL', sgpa: semesters?.[0]?.sgpa, subjects: semesters?.[0]?.subjects, finalCGPA });
+
+    await Registry.update('certificates', { id: cert.id }, {
+      studentName: studentName || cert.studentName,
+      studentEmail: email || cert.studentEmail,
+      certificateHash: newHash,
+      metadata: {
+        ...cert.metadata,
+        studentEnrollmentNumber: rollNumber || cert.metadata?.studentEnrollmentNumber,
+        branch: branch || cert.metadata?.branch,
+        graduationYear: graduationYear || cert.metadata?.graduationYear,
+        finalCGPA: finalCGPA !== undefined ? finalCGPA : cert.metadata?.finalCGPA,
+        ...(semesters?.[0] ? { semester: semesters[0].semester, sgpa: semesters[0].sgpa, subjects: semesters[0].subjects } : {}),
+      },
+      workflowLog: [
+        ...(cert.workflowLog || []),
+        { stage: 'Record Edited by Institution', actorId: req.user.id, actorName: req.user.name, timestamp: new Date() },
+      ],
+    });
+
+    res.json({ success: true, message: 'Certificate updated. Awaiting admin review.' });
+  } catch (err) {
+    res.status(500).json({ error: 'Edit failed.', details: err.message });
+  }
+};
+
+export const getAllCertificatesForAdmin = async (req, res) => {
+  try {
+    const certs = await Registry.find('certificates');
+    const universities = await Registry.find('universities');
+    const uniMap = Object.fromEntries(universities.map(u => [String(u.id), u.name]));
+    const enriched = certs.map(c => ({
+      ...buildPublicCertificatePayload(c),
+      universityName: uniMap[String(c.universityId)] || c.issuer,
+      reviewedBy: c.reviewedBy || null,
+      reviewedAt: c.reviewedAt || null,
+    }));
+    res.json({ data: enriched });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to fetch certificates.' });
+  }
+};
+
+export const rejectCertificate = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { reason } = req.body;
+    const cert = await Registry.findById('certificates', id);
+    if (!cert) return res.status(404).json({ error: 'Certificate not found.' });
+
+    await Registry.update('certificates', { id: cert.id }, {
+      status: 'REJECTED',
+      workflowLog: [
+        ...(cert.workflowLog || []),
+        { stage: 'Rejected by Admin', actorId: req.user.id, actorName: req.user.name, reason: reason || '', timestamp: new Date() },
+      ],
+      reviewedBy: req.user.email,
+      reviewedAt: new Date(),
+    });
+
+    res.json({ success: true, message: 'Certificate rejected.' });
+  } catch (err) {
+    res.status(500).json({ error: 'Rejection failed.', details: err.message });
   }
 };
 
