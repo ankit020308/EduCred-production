@@ -174,15 +174,18 @@ export const register = async (req, res) => {
       }, { transaction: t });
 
       if (role === 'university') {
-        const { documents, description } = req.body;
-        const isInstitutional = email.endsWith('.edu') || email.endsWith('.ac.in');
-        
+        const { documents, description, officialDomain } = req.body;
+        const domainToCheck = officialDomain ? officialDomain.toLowerCase().trim() : email.split('@')[1] || '';
+        const isInstitutional = domainToCheck.endsWith('.edu') || domainToCheck.endsWith('.ac.in') ||
+          email.endsWith('.edu') || email.endsWith('.ac.in');
+        const fullDescription = [description, officialDomain ? `Domain: ${officialDomain}` : ''].filter(Boolean).join(' | ');
+
         await Registry.insert('universities', {
           name: universityName,
           email,
           userId: user.id,
           documents: documents || [],
-          description: description || '',
+          description: fullDescription,
           isFlagged: !isInstitutional,
           status: 'PENDING',
           isVerified: false,

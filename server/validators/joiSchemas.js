@@ -73,7 +73,9 @@ export const registrationSchema = Joi.object({
     otherwise: Joi.optional().allow('', null)
   }),
   description: Joi.string().optional().allow('', null),
-  documents: Joi.array().items(Joi.string()).optional()
+  documents: Joi.array().items(Joi.string()).optional(),
+  officialDomain: Joi.string().optional().allow('', null),
+  adminContactName: Joi.string().optional().allow('', null)
 });
 
 
