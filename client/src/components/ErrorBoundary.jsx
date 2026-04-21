@@ -12,7 +12,13 @@ class ErrorBoundary extends React.Component {
   }
 
   componentDidCatch(error, errorInfo) {
-    console.error("ErrorBoundary caught an error:", error, errorInfo);
+    // Log the raw message first — before anything else swallows it.
+    // For chunk load failures the message contains the dead asset URL, e.g.:
+    //   "Failed to fetch dynamically imported module: https://…/assets/SystemAdmin-OLDHASH.js"
+    //   "text/html is not a valid JavaScript MIME type"
+    console.error('[ErrorBoundary] message:', error.message);
+    console.error('[ErrorBoundary] stack:', error.stack);
+    console.error('[ErrorBoundary] componentStack:', errorInfo.componentStack);
   }
 
   resetBoundary = () => {
@@ -31,9 +37,14 @@ class ErrorBoundary extends React.Component {
             </div>
             
             <h2 className="text-2xl font-black text-white uppercase tracking-tight mb-2">Component Failure</h2>
-            <p className="text-[11px] font-bold uppercase tracking-widest text-slate-500 mb-8">
+            <p className="text-[11px] font-bold uppercase tracking-widest text-slate-500 mb-3">
               {this.state.error?.message || "An unexpected rendering exception occurred"}
             </p>
+            {this.state.error?.message && (
+              <pre className="text-left text-[10px] text-rose-400/80 bg-rose-500/5 border border-rose-500/10 rounded-xl p-3 mb-6 overflow-auto max-h-24 break-all whitespace-pre-wrap">
+                {this.state.error.message}
+              </pre>
+            )}
             
             <button 
               onClick={this.resetBoundary}
