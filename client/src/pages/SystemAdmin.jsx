@@ -4,7 +4,7 @@ import {
   ShieldCheck, Users, CheckCircle2, XCircle, Clock,
   Search, Loader2, RefreshCcw, ExternalLink, ShieldAlert,
   Activity, AlertTriangle, Check, X, LogOut,
-  FileText, RotateCcw, User, ChevronDown, ChevronUp,
+  FileText, RotateCcw, User, ChevronDown, ChevronUp, Wallet, AlertCircle,
 } from 'lucide-react';
 import api from '../services/api';
 import { useAuth } from '../context/AuthContext';
@@ -18,12 +18,13 @@ const vt = {
 };
 
 const CERT_STATUS = {
-  CONFIRMED:      { label: 'On-Chain',       bg: 'bg-[#2b9a66]/10',  text: 'text-[#2b9a66]',  border: 'border-[#2b9a66]/20',  dot: 'bg-[#2b9a66]' },
-  PENDING_REVIEW: { label: 'Pending Review', bg: 'bg-amber-50',       text: 'text-amber-600',   border: 'border-amber-200',      dot: 'bg-amber-500' },
-  PROCESSING:     { label: 'Under Review',   bg: 'bg-blue-50',        text: 'text-blue-600',    border: 'border-blue-200',       dot: 'bg-blue-500' },
-  ANCHOR_FAILED:  { label: 'Anchor Failed',  bg: 'bg-[#ea2804]/10',  text: 'text-[#ea2804]',  border: 'border-[#ea2804]/20',  dot: 'bg-[#ea2804]' },
-  REJECTED:       { label: 'Rejected',       bg: 'bg-[#ea2804]/10',  text: 'text-[#ea2804]',  border: 'border-[#ea2804]/20',  dot: 'bg-[#ea2804]' },
-  REVOKED:        { label: 'Revoked',        bg: 'bg-[#202020]/5',   text: 'text-[#202020]',  border: 'border-[#202020]/10',  dot: 'bg-[#202020]' },
+  CONFIRMED:           { label: 'On-Chain',          bg: 'bg-[#2b9a66]/10',  text: 'text-[#2b9a66]',  border: 'border-[#2b9a66]/20',  dot: 'bg-[#2b9a66]' },
+  PENDING_REVIEW:      { label: 'Pending Review',    bg: 'bg-amber-50',       text: 'text-amber-600',   border: 'border-amber-200',      dot: 'bg-amber-500' },
+  PROCESSING:          { label: 'Under Review',      bg: 'bg-blue-50',        text: 'text-blue-600',    border: 'border-blue-200',       dot: 'bg-blue-500' },
+  ANCHOR_FAILED:       { label: 'Anchor Failed',     bg: 'bg-[#ea2804]/10',  text: 'text-[#ea2804]',  border: 'border-[#ea2804]/20',  dot: 'bg-[#ea2804]' },
+  ANCHOR_PENDING_FUNDS:{ label: 'Needs Funding',     bg: 'bg-orange-50',      text: 'text-orange-600',  border: 'border-orange-200',     dot: 'bg-orange-500' },
+  REJECTED:            { label: 'Rejected',          bg: 'bg-[#ea2804]/10',  text: 'text-[#ea2804]',  border: 'border-[#ea2804]/20',  dot: 'bg-[#ea2804]' },
+  REVOKED:             { label: 'Revoked',           bg: 'bg-[#202020]/5',   text: 'text-[#202020]',  border: 'border-[#202020]/10',  dot: 'bg-[#202020]' },
 };
 
 const INST_STATUS = {
@@ -275,6 +276,77 @@ function InstitutionsTab({ toast }) {
   );
 }
 
+// ─── Wallet Status Panel ──────────────────────────────────────────────────────
+function WalletStatusPanel({ toast }) {
+  const [walletInfo, setWalletInfo] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  const fetchStatus = useCallback(async () => {
+    setLoading(true);
+    try {
+      const res = await api.get('/api/certificates/admin/wallet-status');
+      setWalletInfo(res.data);
+    } catch { toast.error('Failed to load wallet status.'); }
+    finally { setLoading(false); }
+  }, [toast]);
+
+  useEffect(() => { fetchStatus(); }, [fetchStatus]);
+
+  if (loading) return <div className="py-6 flex items-center gap-3"><Loader2 size={16} className="animate-spin text-[#ea2804]" /><span className="text-[10px] font-black uppercase tracking-widest text-[#646464]">Loading wallet info…</span></div>;
+  if (!walletInfo) return null;
+
+  const { serverWallet, pendingFundsCerts, faucetUrl } = walletInfo;
+
+  return (
+    <div className="bg-white border border-[#e0e0e0] rounded-3xl overflow-hidden mb-4">
+      <div className="px-6 py-4 border-b border-[#e0e0e0] flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <Wallet size={14} className="text-[#646464]" />
+          <span className="text-[10px] font-black uppercase tracking-widest text-[#202020]">Institution Wallet Status</span>
+        </div>
+        <a href={faucetUrl} target="_blank" rel="noopener noreferrer"
+          className="text-[9px] font-black uppercase tracking-widest text-[#ea2804] hover:underline flex items-center gap-1">
+          <ExternalLink size={10} /> Sepolia Faucet
+        </a>
+      </div>
+      <div className="px-6 py-4 space-y-3">
+        <div className="flex items-center justify-between bg-[#f6f6f6] border border-[#e0e0e0] rounded-xl px-4 py-3">
+          <div>
+            <p className="text-[9px] font-black text-[#646464] uppercase tracking-widest">Server Wallet (Authorization)</p>
+            <p className="font-mono text-[10px] text-[#202020] mt-0.5">{serverWallet.address || 'Not configured'}</p>
+          </div>
+          <div className="text-right">
+            <p className="text-[10px] font-black text-[#202020]">{serverWallet.balanceEth} ETH</p>
+            <p className="text-[9px] text-[#646464]">{serverWallet.networkName}</p>
+          </div>
+          <span className={`ml-4 px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest ${serverWallet.sufficient ? 'bg-[#2b9a66]/10 text-[#2b9a66] border border-[#2b9a66]/20' : 'bg-orange-50 text-orange-600 border border-orange-200'}`}>
+            {serverWallet.sufficient ? 'OK' : 'Low Funds'}
+          </span>
+        </div>
+        {pendingFundsCerts.length > 0 && (
+          <div className="space-y-2">
+            <p className="text-[9px] font-black text-orange-600 uppercase tracking-widest flex items-center gap-1.5">
+              <AlertCircle size={11} /> {pendingFundsCerts.length} certificate(s) waiting for wallet funding
+            </p>
+            {pendingFundsCerts.map((item) => (
+              <div key={item.certDbId} className="flex items-center justify-between bg-orange-50 border border-orange-200 rounded-xl px-4 py-2.5">
+                <div>
+                  <p className="text-[10px] font-black text-[#202020]">{item.universityName}</p>
+                  <p className="font-mono text-[9px] text-orange-600">{item.walletAddress}</p>
+                </div>
+                <span className="text-[10px] font-black text-orange-700">{item.balanceEth} ETH</span>
+              </div>
+            ))}
+            <p className="text-[9px] text-[#646464] font-bold leading-relaxed">
+              Fund the institution wallet(s) above from <a href={faucetUrl} target="_blank" rel="noopener noreferrer" className="text-[#ea2804] hover:underline">{faucetUrl}</a>, then retry anchoring.
+            </p>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 // ─── Certificates Tab ─────────────────────────────────────────────────────────
 function CertificatesTab({ toast }) {
   const [certs, setCerts] = useState([]);
@@ -335,17 +407,21 @@ function CertificatesTab({ toast }) {
     pending: certs.filter(c => c.status === 'PENDING_REVIEW').length,
     confirmed: certs.filter(c => c.status === 'CONFIRMED').length,
     failed: certs.filter(c => c.status === 'ANCHOR_FAILED').length,
+    pendingFunds: certs.filter(c => c.status === 'ANCHOR_PENDING_FUNDS').length,
   };
 
   return (
     <div className="space-y-6">
+      {/* Wallet status panel */}
+      <WalletStatusPanel toast={toast} />
+
       {/* Stats */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         {[
-          { label: 'Total Certs',    val: stats.total,     icon: FileText,     cfg: CERT_STATUS.CONFIRMED     },
-          { label: 'Pending Review', val: stats.pending,   icon: Clock,        cfg: CERT_STATUS.PENDING_REVIEW },
-          { label: 'On-Chain',       val: stats.confirmed, icon: CheckCircle2, cfg: CERT_STATUS.CONFIRMED     },
-          { label: 'Anchor Failed',  val: stats.failed,    icon: ShieldAlert,  cfg: CERT_STATUS.ANCHOR_FAILED  },
+          { label: 'Total Certs',    val: stats.total,        icon: FileText,     cfg: CERT_STATUS.CONFIRMED          },
+          { label: 'Pending Review', val: stats.pending,      icon: Clock,        cfg: CERT_STATUS.PENDING_REVIEW     },
+          { label: 'On-Chain',       val: stats.confirmed,    icon: CheckCircle2, cfg: CERT_STATUS.CONFIRMED          },
+          { label: 'Needs Funding',  val: stats.pendingFunds, icon: Wallet,       cfg: CERT_STATUS.ANCHOR_PENDING_FUNDS },
         ].map((s, i) => (
           <motion.div key={i} {...vt} transition={{ delay: i * 0.05 }}
             className="bg-white border border-[#e0e0e0] rounded-3xl p-6 hover:-translate-y-0.5 transition-all duration-300 group">
@@ -361,13 +437,16 @@ function CertificatesTab({ toast }) {
       {/* Controls */}
       <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-4">
         <div className="flex flex-wrap gap-2 p-1.5 bg-[#f6f6f6] rounded-2xl border border-[#e0e0e0]">
-          {['ALL', 'PENDING_REVIEW', 'CONFIRMED', 'ANCHOR_FAILED', 'REJECTED'].map(f => (
+          {['ALL', 'PENDING_REVIEW', 'CONFIRMED', 'ANCHOR_FAILED', 'ANCHOR_PENDING_FUNDS', 'REJECTED'].map(f => (
             <button key={f} onClick={() => setFilter(f)}
               className={`px-4 py-2 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all flex items-center gap-1.5 ${
                 filter === f ? 'bg-[#202020] text-white' : 'text-[#646464] hover:text-[#202020] hover:bg-white'}`}>
-              {f.replace('_', ' ')}
+              {f.replace(/_/g, ' ')}
               {f === 'PENDING_REVIEW' && stats.pending > 0 && (
                 <span className="bg-amber-500 text-white text-[8px] font-black px-1.5 py-0.5 rounded-full">{stats.pending}</span>
+              )}
+              {f === 'ANCHOR_PENDING_FUNDS' && stats.pendingFunds > 0 && (
+                <span className="bg-orange-500 text-white text-[8px] font-black px-1.5 py-0.5 rounded-full">{stats.pendingFunds}</span>
               )}
             </button>
           ))}
@@ -431,13 +510,17 @@ function CertificatesTab({ toast }) {
                         <span className="text-[9px] font-bold text-[#646464]">{cert.reviewedBy || '—'}</span>
                       </td>
                       <td className="px-5 py-4">
-                        {(cert.status === 'PENDING_REVIEW' || cert.status === 'ANCHOR_FAILED') && (
+                        {['PENDING_REVIEW', 'ANCHOR_FAILED', 'ANCHOR_PENDING_FUNDS'].includes(cert.status) && (
                           <div className="flex items-center gap-2">
                             <button onClick={() => handleApprove(cert.id, cert.certificateId)}
                               disabled={processingId === cert.id}
-                              className="flex items-center gap-1.5 h-8 px-4 bg-[#202020] text-white rounded-xl text-[9px] font-black uppercase tracking-widest hover:bg-[#2b9a66] transition-all">
+                              className={`flex items-center gap-1.5 h-8 px-4 text-white rounded-xl text-[9px] font-black uppercase tracking-widest transition-all ${
+                                cert.status === 'ANCHOR_PENDING_FUNDS'
+                                  ? 'bg-orange-500 hover:bg-orange-600'
+                                  : 'bg-[#202020] hover:bg-[#2b9a66]'
+                              }`}>
                               {processingId === cert.id ? <Loader2 size={10} className="animate-spin" /> : <Check size={12} />}
-                              {cert.status === 'ANCHOR_FAILED' ? 'Retry' : 'Approve'}
+                              {cert.status === 'ANCHOR_FAILED' ? 'Retry' : cert.status === 'ANCHOR_PENDING_FUNDS' ? 'Retry (Fund First)' : 'Approve'}
                             </button>
                             {cert.status === 'PENDING_REVIEW' && (
                               <button onClick={() => setRejectModal({ open: true, id: cert.id, certId: cert.certificateId })}

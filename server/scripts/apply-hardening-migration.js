@@ -178,7 +178,7 @@ async function run() {
   // ─── Extend Certificate status enum with workflow values ──────────────────
   // ALTER TYPE ... ADD VALUE cannot run inside a transaction, which is fine
   // because IF NOT EXISTS makes it idempotent across redeploys.
-  const newStatusValues = ['PENDING_REVIEW', 'ANCHOR_FAILED', 'REJECTED'];
+  const newStatusValues = ['PENDING_REVIEW', 'ANCHOR_FAILED', 'ANCHOR_PENDING_FUNDS', 'REJECTED'];
   for (const val of newStatusValues) {
     try {
       await sequelize.query(
@@ -192,6 +192,21 @@ async function run() {
       } else {
         throw err;
       }
+    }
+  }
+
+  // Add pdfHash column if missing (idempotent via try/catch)
+  try {
+    await queryInterface.addColumn('Certificate', 'pdfHash', {
+      type: DataTypes.STRING,
+      allowNull: true,
+    });
+    console.log('[migration] [SUCCESS] Certificate.pdfHash column added');
+  } catch (err) {
+    if (/already exists/i.test(err.message) || /duplicate column/i.test(err.message)) {
+      console.log('[migration] [SKIP] Certificate.pdfHash already exists');
+    } else {
+      throw err;
     }
   }
 

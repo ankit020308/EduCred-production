@@ -21,11 +21,12 @@ const PIPELINE = [
 ];
 
 function getPipelineStep(status) {
-  if (status === 'PENDING_REVIEW') return 0;
-  if (status === 'PROCESSING')     return 1;
-  if (status === 'CONFIRMED')      return 3;
-  if (status === 'ANCHOR_FAILED')  return 2;
-  if (status === 'REJECTED')       return -1;
+  if (status === 'PENDING_REVIEW')       return 0;
+  if (status === 'PROCESSING')           return 1;
+  if (status === 'CONFIRMED')            return 3;
+  if (status === 'ANCHOR_FAILED')        return 2;
+  if (status === 'ANCHOR_PENDING_FUNDS') return 2;
+  if (status === 'REJECTED')             return -1;
   return 0;
 }
 
@@ -73,12 +74,13 @@ function CertStepper({ status }) {
 }
 
 const STATUS_BADGE = {
-  CONFIRMED:      { bg: 'bg-[#2b9a66]',  label: 'Verified On-Chain' },
-  PENDING_REVIEW: { bg: 'bg-amber-500',   label: 'Pending Review' },
-  PROCESSING:     { bg: 'bg-blue-500',    label: 'Under Review' },
-  ANCHOR_FAILED:  { bg: 'bg-[#ea2804]',  label: 'Anchor Failed' },
-  REJECTED:       { bg: 'bg-[#ea2804]',  label: 'Rejected' },
-  default:        { bg: 'bg-[#646464]',  label: 'Processing' },
+  CONFIRMED:            { bg: 'bg-[#2b9a66]',   label: 'Verified On-Chain' },
+  PENDING_REVIEW:       { bg: 'bg-amber-500',    label: 'Pending Review' },
+  PROCESSING:           { bg: 'bg-blue-500',     label: 'Under Review' },
+  ANCHOR_FAILED:        { bg: 'bg-[#ea2804]',   label: 'Anchor Failed' },
+  ANCHOR_PENDING_FUNDS: { bg: 'bg-orange-500',   label: 'Awaiting Funds' },
+  REJECTED:             { bg: 'bg-[#ea2804]',   label: 'Rejected' },
+  default:              { bg: 'bg-[#646464]',   label: 'Processing' },
 };
 
 export default function StudentDashboard() {
@@ -347,6 +349,12 @@ export default function StudentDashboard() {
                                 <div className="flex items-center gap-2 px-4 py-2 bg-amber-50 border border-amber-200 rounded-xl text-[9px] font-black text-amber-700 uppercase tracking-widest">
                                   <Clock size={11} />
                                   Awaiting admin review — PDF available after verification
+                                </div>
+                              )}
+                              {cert.status === 'ANCHOR_PENDING_FUNDS' && (
+                                <div className="flex items-center gap-2 px-4 py-2 bg-orange-50 border border-orange-200 rounded-xl text-[9px] font-black text-orange-700 uppercase tracking-widest">
+                                  <AlertCircle size={11} />
+                                  Anchoring paused — institution wallet needs Sepolia ETH
                                 </div>
                               )}
                             </div>

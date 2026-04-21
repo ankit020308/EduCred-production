@@ -18,17 +18,17 @@ const vt = {
   transition: { duration: 0.45, ease: [0.22, 1, 0.36, 1] },
 };
 
-const emptySubject  = () => ({ code: '', marks: '' });
+const emptySubject = () => ({ code: '', marks: '' });
 const emptySemester = (n) => ({ semester: n, sgpa: '', subjects: [emptySubject()] });
 const INPUT = 'w-full h-11 bg-[#f6f6f6] border border-[#e0e0e0] rounded-xl px-4 text-sm text-[#202020] font-medium outline-none focus:bg-white focus:border-[#ea2804] transition-all placeholder:text-[#bbbbbb]';
 
 const STATUS_CONFIG = {
-  CONFIRMED:     { label: 'On-Chain',       bg: 'bg-[#2b9a66]/10',  text: 'text-[#2b9a66]',  border: 'border-[#2b9a66]/20',  dot: 'bg-[#2b9a66]' },
-  PENDING_REVIEW:{ label: 'Pending Review', bg: 'bg-amber-50',       text: 'text-amber-600',   border: 'border-amber-200',      dot: 'bg-amber-500' },
-  PROCESSING:    { label: 'Under Review',   bg: 'bg-blue-50',        text: 'text-blue-600',    border: 'border-blue-200',       dot: 'bg-blue-500' },
-  ANCHOR_FAILED: { label: 'Anchor Failed',  bg: 'bg-[#ea2804]/10',  text: 'text-[#ea2804]',  border: 'border-[#ea2804]/20',  dot: 'bg-[#ea2804]' },
-  REVOKED:       { label: 'Revoked',        bg: 'bg-[#202020]/5',   text: 'text-[#202020]',  border: 'border-[#202020]/10',  dot: 'bg-[#202020]' },
-  REJECTED:      { label: 'Rejected',       bg: 'bg-[#ea2804]/10',  text: 'text-[#ea2804]',  border: 'border-[#ea2804]/20',  dot: 'bg-[#ea2804]' },
+  CONFIRMED: { label: 'On-Chain', bg: 'bg-[#2b9a66]/10', text: 'text-[#2b9a66]', border: 'border-[#2b9a66]/20', dot: 'bg-[#2b9a66]' },
+  PENDING_REVIEW: { label: 'Pending Review', bg: 'bg-amber-50', text: 'text-amber-600', border: 'border-amber-200', dot: 'bg-amber-500' },
+  PROCESSING: { label: 'Under Review', bg: 'bg-blue-50', text: 'text-blue-600', border: 'border-blue-200', dot: 'bg-blue-500' },
+  ANCHOR_FAILED: { label: 'Anchor Failed', bg: 'bg-[#ea2804]/10', text: 'text-[#ea2804]', border: 'border-[#ea2804]/20', dot: 'bg-[#ea2804]' },
+  REVOKED: { label: 'Revoked', bg: 'bg-[#202020]/5', text: 'text-[#202020]', border: 'border-[#202020]/10', dot: 'bg-[#202020]' },
+  REJECTED: { label: 'Rejected', bg: 'bg-[#ea2804]/10', text: 'text-[#ea2804]', border: 'border-[#ea2804]/20', dot: 'bg-[#ea2804]' },
 };
 
 function StatusPill({ status }) {
@@ -46,18 +46,18 @@ function AdminDashboard() {
   const { toast } = useToast();
   const navigate = useNavigate();
 
-  const [certs, setCerts]               = useState([]);
-  const [loading, setLoading]           = useState(true);
-  const [search, setSearch]             = useState('');
-  const [showModal, setShowModal]       = useState(false);
-  const [issuing, setIssuing]           = useState(false);
-  const [uniStatus, setUniStatus]       = useState(null);
-  const [stats, setStats]               = useState({ total: 0, confirmed: 0, pending: 0, failed: 0 });
-  const [copiedId, setCopiedId]         = useState(null);
-  const [expandedRow, setExpandedRow]   = useState(null);
+  const [certs, setCerts] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState('');
+  const [showModal, setShowModal] = useState(false);
+  const [issuing, setIssuing] = useState(false);
+  const [uniStatus, setUniStatus] = useState(null);
+  const [stats, setStats] = useState({ total: 0, confirmed: 0, pending: 0, failed: 0 });
+  const [copiedId, setCopiedId] = useState(null);
+  const [expandedRow, setExpandedRow] = useState(null);
   const [issuedResult, setIssuedResult] = useState(null);
-  const [retrying, setRetrying]         = useState(null);
-  const [editingCert, setEditingCert]   = useState(null);
+  const [retrying, setRetrying] = useState(null);
+  const [editingCert, setEditingCert] = useState(null);
 
   const [form, setForm] = useState({
     studentName: '', email: '', rollNumber: '', program: '', branch: '', finalCGPA: '',
@@ -92,14 +92,14 @@ function AdminDashboard() {
       joinInstitutionalRoom(user.universityId);
       const onPending = (d) => toast.info(`Anchoring ${d.certificateId}…`);
       const onSuccess = (d) => { fetchCerts(); fetchStats(); toast.success(`${d.certificateId} anchored ✓`); };
-      const onFailed  = (d) => { fetchCerts(); fetchStats(); toast.error(`Anchoring failed: ${d.certificateId}`); };
+      const onFailed = (d) => { fetchCerts(); fetchStats(); toast.error(`Anchoring failed: ${d.certificateId}`); };
       socket.on('anchoring:pending', onPending);
       socket.on('anchoring:success', onSuccess);
-      socket.on('anchoring:failed',  onFailed);
+      socket.on('anchoring:failed', onFailed);
       return () => {
         socket.off('anchoring:pending', onPending);
         socket.off('anchoring:success', onSuccess);
-        socket.off('anchoring:failed',  onFailed);
+        socket.off('anchoring:failed', onFailed);
         if (socket.connected) socket.disconnect();
       };
     }
@@ -107,12 +107,12 @@ function AdminDashboard() {
   }, [user, fetchUniStatus, fetchCerts, fetchStats]);
 
   // Semester helpers
-  const addSemester    = () => setForm(p => ({ ...p, semesters: [...p.semesters, emptySemester(p.semesters.length + 1)] }));
+  const addSemester = () => setForm(p => ({ ...p, semesters: [...p.semesters, emptySemester(p.semesters.length + 1)] }));
   const removeSemester = (i) => setForm(p => ({ ...p, semesters: p.semesters.filter((_, j) => j !== i) }));
-  const setSem         = (i, field, val) => setForm(p => { const s = [...p.semesters]; s[i] = { ...s[i], [field]: val }; return { ...p, semesters: s }; });
-  const addSubject     = (si) => setForm(p => { const s = [...p.semesters]; s[si] = { ...s[si], subjects: [...s[si].subjects, emptySubject()] }; return { ...p, semesters: s }; });
-  const removeSubject  = (si, xi) => setForm(p => { const s = [...p.semesters]; s[si] = { ...s[si], subjects: s[si].subjects.filter((_, j) => j !== xi) }; return { ...p, semesters: s }; });
-  const setSub         = (si, xi, field, val) => setForm(p => { const s = [...p.semesters]; const subs = [...s[si].subjects]; subs[xi] = { ...subs[xi], [field]: val }; s[si] = { ...s[si], subjects: subs }; return { ...p, semesters: s }; });
+  const setSem = (i, field, val) => setForm(p => { const s = [...p.semesters]; s[i] = { ...s[i], [field]: val }; return { ...p, semesters: s }; });
+  const addSubject = (si) => setForm(p => { const s = [...p.semesters]; s[si] = { ...s[si], subjects: [...s[si].subjects, emptySubject()] }; return { ...p, semesters: s }; });
+  const removeSubject = (si, xi) => setForm(p => { const s = [...p.semesters]; s[si] = { ...s[si], subjects: s[si].subjects.filter((_, j) => j !== xi) }; return { ...p, semesters: s }; });
+  const setSub = (si, xi, field, val) => setForm(p => { const s = [...p.semesters]; const subs = [...s[si].subjects]; subs[xi] = { ...subs[xi], [field]: val }; s[si] = { ...s[si], subjects: subs }; return { ...p, semesters: s }; });
 
   const handleIssue = async (e) => {
     e.preventDefault();
@@ -299,10 +299,10 @@ function AdminDashboard() {
             {/* Stats */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               {[
-                { icon: FileText,     label: 'Total Issued',  val: stats.total,     cfg: STATUS_CONFIG.CONFIRMED  },
-                { icon: CheckCircle2, label: 'On-Chain',       val: stats.confirmed, cfg: STATUS_CONFIG.CONFIRMED  },
-                { icon: Clock,        label: 'Processing',     val: stats.pending,   cfg: STATUS_CONFIG.PROCESSING },
-                { icon: ShieldAlert,  label: 'Revoked',        val: stats.failed,    cfg: STATUS_CONFIG.REVOKED    },
+                { icon: FileText, label: 'Total Issued', val: stats.total, cfg: STATUS_CONFIG.CONFIRMED },
+                { icon: CheckCircle2, label: 'On-Chain', val: stats.confirmed, cfg: STATUS_CONFIG.CONFIRMED },
+                { icon: Clock, label: 'Processing', val: stats.pending, cfg: STATUS_CONFIG.PROCESSING },
+                { icon: ShieldAlert, label: 'Revoked', val: stats.failed, cfg: STATUS_CONFIG.REVOKED },
               ].map((s, i) => (
                 <motion.div key={i} {...vt} transition={{ delay: i * 0.06 }}
                   className="bg-white border border-[#202020] rounded-3xl p-6 hover:-translate-y-0.5 transition-all duration-300 group">

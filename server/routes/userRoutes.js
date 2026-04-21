@@ -1,9 +1,39 @@
 import express from 'express';
+import fs from 'fs';
 import Registry from '../services/registryService.js';
 import crypto from 'crypto';
 import { protect, requireRole } from '../middleware/authMiddleware.js';
+import { upload } from '../middleware/uploadMiddleware.js';
+import { uploadFileToPinata, isPinataConfigured } from '../utils/ipfsService.js';
 
 const router = express.Router();
+
+// ─── UPLOAD PROFILE PHOTO ─────────────────────────────
+router.post('/profile/upload-photo', protect, upload.single('photo'), async (req, res) => {
+  let tempPath = req.file?.path;
+  try {
+    if (!req.file) return res.status(400).json({ error: 'No file provided.' });
+
+    if (!isPinataConfigured()) {
+      return res.status(503).json({ error: 'IPFS storage not configured.' });
+    }
+
+    const buffer = fs.readFileSync(tempPath);
+    const { url } = await uploadFileToPinata(buffer, req.file.originalname, {
+      userId: req.user.id,
+      type: 'profile-photo',
+    });
+
+    if (tempPath && fs.existsSync(tempPath)) fs.unlinkSync(tempPath);
+
+    await Registry.update('users', { id: req.user.id }, { profileImageUrl: url });
+
+    res.json({ success: true, profileImageUrl: url });
+  } catch (err) {
+    if (tempPath && fs.existsSync(tempPath)) { try { fs.unlinkSync(tempPath); } catch { /* ignore */ } }
+    res.status(500).json({ error: err.message });
+  }
+});
 
 // ─── GET User Profile (PROTECTED) ─────────────────────
 router.get('/profile', protect, async (req, res) => {

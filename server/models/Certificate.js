@@ -70,7 +70,7 @@ const Certificate = sequelize.define('Certificate', {
         type: DataTypes.ENUM(
             'PENDING', 'PROCESSING', 'COMPLETED', 'CONFIRMED',
             'FAILED', 'REVOKED',
-            'PENDING_REVIEW', 'ANCHOR_FAILED', 'REJECTED'
+            'PENDING_REVIEW', 'ANCHOR_FAILED', 'ANCHOR_PENDING_FUNDS', 'REJECTED'
         ),
         defaultValue: 'PENDING_REVIEW'
     },
@@ -105,6 +105,10 @@ const Certificate = sequelize.define('Certificate', {
     metadata: {
         type: DataTypes.JSON,
         defaultValue: {}
+    },
+    pdfHash: {
+        type: DataTypes.STRING,
+        allowNull: true
     },
     workflowLog: {
         type: DataTypes.JSON,

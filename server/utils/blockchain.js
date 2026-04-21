@@ -11,6 +11,8 @@ const __dirname = path.dirname(__filename);
 dotenv.config({ path: path.join(__dirname, '../../.env') });
 
 const CONFIRMATION_TIMEOUT_MS = 60000;
+// 400k gas × 50 gwei = minimum viable balance for one anchor tx
+const MIN_GAS_WEI = BigInt(400000) * BigInt(50e9);
 
 function loadContractMetadata() {
   const metadataPath = path.join(__dirname, 'EduCred.json');
@@ -218,6 +220,45 @@ export async function verifyHashDetailsOnChain(certificateHash) {
     issuer,
     timestamp: Number(timestamp),
   };
+}
+
+export async function checkUniversityWalletFunds(encryptedPrivateKey) {
+  if (!provider) {
+    return { address: null, balanceEth: '0', sufficient: false, error: 'Blockchain offline' };
+  }
+  try {
+    const privateKey = decryptSecret(encryptedPrivateKey);
+    const address = new ethers.Wallet(privateKey).address;
+    const balance = await provider.getBalance(address);
+    return {
+      address,
+      balanceWei: balance.toString(),
+      balanceEth: ethers.formatEther(balance),
+      sufficient: balance >= MIN_GAS_WEI,
+    };
+  } catch (err) {
+    return { address: null, balanceEth: '0', sufficient: false, error: err.message };
+  }
+}
+
+export async function getServerWalletInfo() {
+  if (!provider || !wallet) {
+    return { address: null, balanceEth: '0', networkName: 'unknown', sufficient: false };
+  }
+  try {
+    const [balance, network] = await Promise.all([
+      provider.getBalance(wallet.address),
+      provider.getNetwork(),
+    ]);
+    return {
+      address: wallet.address,
+      balanceEth: ethers.formatEther(balance),
+      networkName: network.name,
+      sufficient: balance >= MIN_GAS_WEI,
+    };
+  } catch (err) {
+    return { address: wallet.address, balanceEth: '0', networkName: 'unknown', sufficient: false, error: err.message };
+  }
 }
 
 export async function revokeHashOnChain(certificateHash, reasonCode = 0, encryptedUniversityPrivateKey = null) {

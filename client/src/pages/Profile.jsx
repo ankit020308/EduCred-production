@@ -1,10 +1,11 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import {
   ShieldCheck, User, Mail, Phone, Building2, MapPin, BookOpen,
   Hash, Layers, Save, Edit3, ArrowLeft, Loader2, CheckCircle2,
   AlertCircle, Lock, Globe, FileText, Calendar,
+  Camera, Wallet, UserCheck,
 } from 'lucide-react';
 import api from '../services/api';
 import { useAuth } from '../context/AuthContext';
@@ -64,6 +65,7 @@ export default function Profile() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
+  const [photoUploading, setPhotoUploading] = useState(false);
   const [draft, setDraft] = useState({});
   const [roleDraft, setRoleDraft] = useState({});
   const [toast, setToast] = useState(null);
@@ -141,6 +143,25 @@ export default function Profile() {
   const setField = (key, val) => setDraft(d => ({ ...d, [key]: val }));
   const setRoleField = (key, val) => setRoleDraft(d => ({ ...d, [key]: val }));
 
+  const handlePhotoUpload = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setPhotoUploading(true);
+    try {
+      const formData = new FormData();
+      formData.append('photo', file);
+      const res = await api.post('/api/user/profile/upload-photo', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+      setUserProfile(p => ({ ...p, profileImageUrl: res.data.profileImageUrl }));
+      showToast('success', 'Photo updated.');
+    } catch {
+      showToast('error', 'Photo upload failed.');
+    } finally {
+      setPhotoUploading(false);
+    }
+  };
+
   const cancelEdit = () => {
     setDraft({ name: userProfile?.name || '', phoneNumber: userProfile?.phoneNumber || '', bio: userProfile?.bio || '' });
     if (isStudent) setRoleDraft({ regNo: roleProfile?.regNo || '', degree: roleProfile?.degree || '', branch: roleProfile?.branch || '' });
@@ -195,16 +216,54 @@ export default function Profile() {
         {/* Avatar + name hero */}
         <motion.div initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }}
           className="bg-white border border-[#e0e0e0] rounded-3xl p-6 flex items-center gap-5">
-          <div className="w-16 h-16 rounded-2xl bg-[#ea2804]/10 border border-[#ea2804]/20 flex items-center justify-center shrink-0">
-            <span className="text-2xl font-black text-[#ea2804]">{initials}</span>
+
+          {/* Avatar uploader */}
+          <div className="relative group shrink-0">
+            <input
+              id="photo-upload"
+              type="file"
+              accept="image/png,image/jpeg,image/jpg"
+              className="hidden"
+              onChange={handlePhotoUpload}
+              disabled={photoUploading}
+            />
+            <label htmlFor="photo-upload" className="block cursor-pointer">
+              <AnimatePresence mode="wait">
+                {photoUploading ? (
+                  <motion.div key="uploading"
+                    initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.9 }}
+                    className="w-16 h-16 rounded-full bg-[#ea2804]/10 border border-[#ea2804]/20 flex items-center justify-center">
+                    <Loader2 className="animate-spin text-[#ea2804]" size={20} />
+                  </motion.div>
+                ) : userProfile?.profileImageUrl ? (
+                  <motion.img key="photo"
+                    initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0 }}
+                    src={userProfile.profileImageUrl}
+                    alt="Profile"
+                    className="w-16 h-16 rounded-full object-cover border-2 border-[#ea2804]/20" />
+                ) : (
+                  <motion.div key="placeholder"
+                    initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.9 }}
+                    className="w-16 h-16 rounded-full bg-[#ea2804]/10 border border-[#ea2804]/20 flex items-center justify-center">
+                    <Camera size={20} className="text-[#ea2804]" />
+                  </motion.div>
+                )}
+              </AnimatePresence>
+              <div className="absolute inset-0 rounded-full bg-black/25 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center pointer-events-none">
+                <Camera size={13} className="text-white" />
+              </div>
+            </label>
           </div>
+
           <div className="flex-1 min-w-0">
             <h1 className="text-xl font-black text-[#202020] tracking-tight truncate">
               {userProfile?.name || 'Your Profile'}
             </h1>
             <p className="text-[10px] font-bold text-[#646464] mt-0.5">{userProfile?.email}</p>
             <div className="flex items-center gap-2 mt-2">
-              <span className="px-2 py-0.5 bg-[#ea2804]/10 border border-[#ea2804]/20 rounded-full text-[8px] font-black text-[#ea2804] uppercase tracking-widest">{roleLabel}</span>
+              <span className="flex items-center gap-1 px-2 py-0.5 bg-[#ea2804]/10 border border-[#ea2804]/20 rounded-full text-[8px] font-black text-[#ea2804] uppercase tracking-widest">
+                <UserCheck size={8} /> {roleLabel}
+              </span>
               {userProfile?.isEmailVerified && (
                 <span className="flex items-center gap-1 px-2 py-0.5 bg-emerald-50 border border-emerald-200 rounded-full text-[8px] font-black text-emerald-700 uppercase tracking-widest">
                   <CheckCircle2 size={8} /> Verified
@@ -267,6 +326,24 @@ export default function Profile() {
                 editKey="degree" isEditing={isEditing} onChange={setRoleField} placeholder="e.g. B.Tech" />
               <Field label="Branch / Specialization" icon={Layers} value={isEditing ? roleDraft.branch : roleProfile?.branch}
                 editKey="branch" isEditing={isEditing} onChange={setRoleField} placeholder="e.g. Computer Science" />
+
+              {/* Wallet Address */}
+              <div className="col-span-full space-y-1.5">
+                <label className="text-[9px] font-black text-[#646464] uppercase tracking-widest flex items-center justify-between">
+                  <span className="flex items-center gap-1.5"><Wallet size={10} /> Wallet Address</span>
+                  {roleProfile?.publicWalletAddress && (
+                    <button
+                      onClick={() => { navigator.clipboard.writeText(roleProfile.publicWalletAddress); showToast('success', 'Address copied!'); }}
+                      className="flex items-center gap-1 text-[8px] font-black text-[#646464] hover:text-[#ea2804] uppercase tracking-widest transition-colors"
+                    >
+                      <Wallet size={9} /> Copy
+                    </button>
+                  )}
+                </label>
+                <div className="ds-input bg-[#f6f6f6] text-[#646464] cursor-default select-all font-mono text-[10px] break-all leading-relaxed">
+                  {roleProfile?.publicWalletAddress || <span className="text-[#bbbbbb] italic">Not assigned</span>}
+                </div>
+              </div>
             </div>
             {!isEditing && !roleProfile?.regNo && (
               <div className="flex items-center gap-2 px-4 py-3 bg-amber-50 border border-amber-200 rounded-xl">
@@ -300,9 +377,23 @@ export default function Profile() {
                 editKey="email" isEditing={false} onChange={() => {}} readOnly />
               <Field label="City" icon={MapPin} value={isEditing ? roleDraft.city : roleProfile?.city}
                 editKey="city" isEditing={isEditing} onChange={setRoleField} placeholder="e.g. Chennai" />
-              <Field label="Wallet Address" icon={Lock}
-                value={roleProfile?.publicWalletAddress ? `${roleProfile.publicWalletAddress.slice(0, 8)}...${roleProfile.publicWalletAddress.slice(-6)}` : ''}
-                editKey="" isEditing={false} onChange={() => {}} readOnly />
+              {/* University wallet with copy */}
+              <div className="col-span-full space-y-1.5">
+                <label className="text-[9px] font-black text-[#646464] uppercase tracking-widest flex items-center justify-between">
+                  <span className="flex items-center gap-1.5"><Wallet size={10} /> Wallet Address</span>
+                  {roleProfile?.publicWalletAddress && (
+                    <button
+                      onClick={() => { navigator.clipboard.writeText(roleProfile.publicWalletAddress); showToast('success', 'Address copied!'); }}
+                      className="flex items-center gap-1 text-[8px] font-black text-[#646464] hover:text-[#ea2804] uppercase tracking-widest transition-colors"
+                    >
+                      <Wallet size={9} /> Copy
+                    </button>
+                  )}
+                </label>
+                <div className="ds-input bg-[#f6f6f6] text-[#646464] cursor-default select-all font-mono text-[10px] break-all leading-relaxed">
+                  {roleProfile?.publicWalletAddress || <span className="text-[#bbbbbb] italic">Not assigned</span>}
+                </div>
+              </div>
             </div>
             <TextArea label="About the Institution" icon={Globe}
               value={isEditing ? roleDraft.description : roleProfile?.description}

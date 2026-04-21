@@ -17,7 +17,8 @@ const buildUserPayload = async (userId) => {
   const user = await Registry.findById('users', userId);
   if (!user) return null;
   const university = user.role === 'university' ? await Registry.findOne('universities', { userId: user.id }) : null;
-  
+  const student = user.role === 'student' ? await Registry.findOne('students', { userId: user.id }) : null;
+
   return {
     id: user.id,
     name: user.name,
@@ -26,7 +27,11 @@ const buildUserPayload = async (userId) => {
     universityName: user.universityName || (university ? university.name : null),
     universityId: university ? university.id : null,
     universityStatus: university ? university.status : null,
-    isVerified: university ? university.isVerified : user.isEmailVerified
+    isVerified: university ? university.isVerified : user.isEmailVerified,
+    walletAddress: university
+      ? (university.publicWalletAddress || null)
+      : (student ? (student.publicWalletAddress || null) : null),
+    profileImageUrl: user.profileImageUrl || null,
   };
 };
 
@@ -201,7 +206,7 @@ export const register = async (req, res) => {
         console.log(`[AUTH] Protocol activation code dispatched to ${email}`);
       } catch (error) {
         console.warn(`[⚠️ SMTP_FAILURE] Could not deliver OTP to ${email}:`, error.message);
-        
+
         if (process.env.NODE_ENV === 'production') {
           // In production, SMTP failure aborts the transaction
           throw new Error(`SMTP_DISPATCH_FAILED: ${error.message}`);
@@ -223,12 +228,12 @@ export const register = async (req, res) => {
   } catch (err) {
     const isSmtpError = err.message.includes('SMTP_DISPATCH_FAILED');
     const details = err.errors ? err.errors.map(e => `${e.path}: ${e.message}`).join(', ') : err.message;
-    
+
     await logAudit(req, 'AUTH_REGISTRATION', 'FAILURE', 'Account provisioning failed.', { email: req.body.email, error: details });
-    
-    res.status(isSmtpError ? 502 : 500).json({ 
-      error: isSmtpError ? 'Email delivery failed.' : 'Registration failed.', 
-      details: isSmtpError ? 'The verification system could not reach your inbox. Check SMTP settings.' : details 
+
+    res.status(isSmtpError ? 502 : 500).json({
+      error: isSmtpError ? 'Email delivery failed.' : 'Registration failed.',
+      details: isSmtpError ? 'The verification system could not reach your inbox. Check SMTP settings.' : details
     });
   }
 };
@@ -580,7 +585,7 @@ export const createAdmin = async (req, res) => {
   try {
     // SECURITY CHECK: Only SUPER_ADMIN can create other admins
     if (!req.user || req.user.role !== 'super_admin') {
-       return res.status(403).json({ error: 'Forbidden: Requires SUPER_ADMIN privileges.' });
+      return res.status(403).json({ error: 'Forbidden: Requires SUPER_ADMIN privileges.' });
     }
 
     const { name, email: rawEmail, password, role } = req.body;
@@ -632,11 +637,11 @@ export const completeOnboarding = async (req, res) => {
     }
 
     const { role, documents } = req.body;
-    
+
     // Proactive Field Mapping: Support both 'universityName' and 'name' fallbacks
     const resolvedUniversityName = req.body.universityName || req.body.name;
     const resolvedDescription = req.body.description || '';
-    
+
     const user = req.user;
 
     if (user.role !== 'pending') {
@@ -653,7 +658,7 @@ export const completeOnboarding = async (req, res) => {
         update.universityName = resolvedUniversityName;
 
         const isInstitutional = user.email.endsWith('.edu') || user.email.endsWith('.ac.in');
-        
+
         await Registry.insert('universities', {
           name: resolvedUniversityName,
           email: user.email,
@@ -672,7 +677,7 @@ export const completeOnboarding = async (req, res) => {
     });
 
     await logAudit(req, 'PROTOCOL_ONBOARDING', 'SUCCESS', `Account configured as ${role}.`, { userId: user.id, role });
-    
+
     res.status(200).json({
       message: 'Identity protocol successfully established.',
       user: updatedUser

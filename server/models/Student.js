@@ -52,6 +52,10 @@ const Student = sequelize.define('Student', {
     digilockerUsername: {
         type: DataTypes.STRING,
         allowNull: true
+    },
+    publicWalletAddress: {
+        type: DataTypes.STRING,
+        allowNull: true
     }
 }, {
     indexes: [
