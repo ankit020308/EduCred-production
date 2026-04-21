@@ -84,6 +84,63 @@ router.post('/verify-email', protect, async (req, res) => {
     }
 });
 
+// ─── STUDENT PROFILE DETAILS ──────────────────────────
+router.get('/profile/student-details', protect, requireRole('student'), async (req, res) => {
+    try {
+        const student = await Registry.findOne('students', { userId: req.user.id });
+        if (!student) return res.json({});
+        const { id, userId, digilockerAccessToken, digilockerRefreshToken, ...safe } = student.dataValues || student;
+        res.json(safe);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+router.put('/profile/student-details', protect, requireRole('student'), async (req, res) => {
+    try {
+        const { regNo, degree, branch } = req.body;
+        const updates = {};
+        if (regNo !== undefined) updates.regNo = String(regNo).trim().slice(0, 50);
+        if (degree !== undefined) updates.degree = String(degree).trim().slice(0, 100);
+        if (branch !== undefined) updates.branch = String(branch).trim().slice(0, 100);
+        if (Object.keys(updates).length === 0) return res.status(400).json({ error: 'No valid fields provided.' });
+        await Registry.update('students', { userId: req.user.id }, updates);
+        const student = await Registry.findOne('students', { userId: req.user.id });
+        const { id, userId, digilockerAccessToken, digilockerRefreshToken, ...safe } = student.dataValues || student;
+        res.json(safe);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// ─── INSTITUTION PROFILE DETAILS ──────────────────────
+router.get('/profile/institution-details', protect, requireRole('university', 'UNIVERSITY'), async (req, res) => {
+    try {
+        const uni = await Registry.findOne('universities', { userId: req.user.id });
+        if (!uni) return res.json({});
+        const { encryptedPrivateKey, ...safe } = uni.dataValues || uni;
+        res.json(safe);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+router.put('/profile/institution-details', protect, requireRole('university', 'UNIVERSITY'), async (req, res) => {
+    try {
+        const { description, city } = req.body;
+        const updates = {};
+        if (description !== undefined) updates.description = String(description).trim().slice(0, 500);
+        if (city !== undefined) updates.city = String(city).trim().slice(0, 100);
+        if (Object.keys(updates).length === 0) return res.status(400).json({ error: 'No valid fields provided.' });
+        await Registry.update('universities', { userId: req.user.id }, updates);
+        const uni = await Registry.findOne('universities', { userId: req.user.id });
+        const { encryptedPrivateKey, ...safe } = uni.dataValues || uni;
+        res.json(safe);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
 // ─── 🎯 STUDENT WALLET (FINAL VERSION) ────────────────
 router.get('/certificates', protect, requireRole('student'), async (req, res) => {
     try {
