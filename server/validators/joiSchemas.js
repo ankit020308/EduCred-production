@@ -6,9 +6,17 @@ import Joi from 'joi';
  */
 
 export const certificateIssuanceSchema = Joi.object({
+  // Frontend contract fields
   studentName: Joi.string().required().min(1).max(100),
-  studentEmail: Joi.string().email().required(),
-  studentPhone: Joi.string().allow('', null),
+  email: Joi.string().email().required(),
+  rollNumber: Joi.string().required(),
+  program: Joi.string().required(),
+  finalCGPA: Joi.number().required(),
+
+  // Optional form fields
+  branch: Joi.string().allow('', null).optional(),
+  graduationYear: Joi.number().integer().min(1900).max(2100).allow('', null).optional(),
+  phone: Joi.string().allow('', null).optional(),
   certificateType: Joi.string().valid(
     'Degree Certificate',
     'Provisional Certificate',
@@ -16,20 +24,21 @@ export const certificateIssuanceSchema = Joi.object({
     'Migration Certificate',
     'Transfer Certificate',
     'Character Certificate'
-  ).default('Degree Certificate'),
-  course: Joi.string().required(),
-  programName: Joi.string().optional(),
-  issuanceMode: Joi.string().valid('UPLOAD', 'GENERATE').default('UPLOAD'),
-  
-  // Metadata fields
-  branch: Joi.string().allow('', null),
-  graduationYear: Joi.number().integer().min(1900).max(2100).allow('', null),
-  cgpa: Joi.string().allow('', null),
-  mediumOfInstruction: Joi.string().allow('', null),
-  dateOfIssue: Joi.date().allow('', null),
-  studentEnrollmentNumber: Joi.string().allow('', null),
-  studentDateOfBirth: Joi.date().allow('', null),
-  additionalNotes: Joi.string().allow('', null),
+  ).optional().default('Degree Certificate'),
+
+  // Structured academic record
+  semesters: Joi.array().items(
+    Joi.object({
+      semester: Joi.number().integer().min(1).required(),
+      subjects: Joi.array().items(
+        Joi.object({
+          code: Joi.string().required(),
+          marks: Joi.number().required(),
+        })
+      ).min(1).required(),
+      sgpa: Joi.number().required(),
+    })
+  ).optional(),
 });
 
 export const requestFulfillmentSchema = Joi.object({

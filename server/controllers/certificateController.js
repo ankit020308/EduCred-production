@@ -7,7 +7,7 @@ import sequelize from '../config/database.js';
 import Registry from '../services/registryService.js';
 import { Certificate } from '../models/index.js';
 import { issueCertificateOnChain, revokeHashOnChain, verifyHashDetailsOnChain } from '../utils/blockchain.js';
-import { generateStructuralHash, generateBinaryHash } from '../utils/hashing.js';
+import { generateStructuralHash, generateBinaryHash, generateHash } from '../utils/hashing.js';
 import { emitToInstitution } from '../utils/socketService.js';
 import { logAudit } from '../utils/logger.js';
 import { certificateIssuanceSchema } from '../validators/joiSchemas.js';
@@ -136,222 +136,136 @@ async function recordFraudAlert(payload) {
 }
 
 export const issueCertificate = async (req, res) => {
+  // Temp file from optional upload — cleaned up in finally
   let tempPath = req.file?.path;
-  let cert = null;
 
   try {
     console.log(`[UPLOAD] Certificate upload started: institutionId=${req.user?.id}`);
+
+    // semesters arrives as a JSON string when POSTed via multipart/form-data
+    if (typeof req.body.semesters === 'string') {
+      try { req.body.semesters = JSON.parse(req.body.semesters); }
+      catch { /* Joi will reject the malformed value */ }
+    }
+
     const { error, value } = certificateIssuanceSchema.validate(req.body, { abortEarly: false });
     if (error) {
       return res.status(400).json({
         error: 'Validation Failed',
-        details: error.details.map((detail) => detail.message),
+        details: error.details.map((d) => d.message),
       });
     }
 
     const { university, error: signerError } = await resolveInstitutionSigner(req);
-    if (signerError) {
-      return res.status(signerError.status).json(signerError.body);
-    }
+    if (signerError) return res.status(signerError.status).json(signerError.body);
 
-    const {
-      certificateType,
-      studentName,
-      studentEmail,
-      studentEnrollmentNumber,
-      studentDateOfBirth,
-      branch,
-      graduationYear,
-      cgpa,
-      mediumOfInstruction,
-      dateOfIssue,
-      additionalNotes,
-    } = value;
+    const { studentName, email, rollNumber, program, branch, graduationYear, phone, certificateType, semesters, finalCGPA } = value;
 
-    const programName = value.programName || value.course || 'General Degree';
-
-    // Read file buffer early so hash is computed from raw binary, not metadata
-    let fileBuffer = null;
-    if (tempPath && fs.existsSync(tempPath)) {
-      fileBuffer = fs.readFileSync(tempPath);
-    }
-
-    const certificateHash = fileBuffer
-      ? generateBinaryHash(fileBuffer)
-      : generateStructuralHash({ studentName, course: programName, issuerId: university.id });
-
-    console.log(`[HASH] SHA-256 generated: ${certificateHash.substring(0, 16)}...`);
-
+    // Optional: link to an existing student account
     let studentId = null;
     try {
-      const studentUser = await Registry.findOne('users', { email: studentEmail });
+      const studentUser = await Registry.findOne('users', { email });
       if (studentUser) {
         const studentRecord = await Registry.findOne('students', { userId: studentUser.id });
-        if (studentRecord) {
-          studentId = studentRecord.id;
-        }
+        if (studentRecord) studentId = studentRecord.id;
       }
-    } catch {
-      // Student linkage is optional; issuance should still proceed.
-    }
+    } catch { /* student linkage is optional */ }
 
-    cert = await createCertificateRecord({
-      studentName,
-      studentEmail,
-      studentPhone: value.studentPhone || '0000000000',
-      studentId,
-      course: programName,
-      issuer: university.name,
-      certificateHash,
-      status: 'PROCESSING',
-      workflowStatus: 'STAGE2',
-      issuedBy: req.user.id,
-      universityId: university.id,
-      certificateType: certificateType || 'Degree Certificate',
-      metadata: {
-        studentEnrollmentNumber,
-        studentDateOfBirth,
-        branch,
-        graduationYear,
-        cgpa,
-        mediumOfInstruction,
-        dateOfIssue,
-        additionalNotes,
-      },
-      workflowLog: [
-        {
-          stage: 'Academic Record Verified',
-          actorId: req.user.id,
-          actorName: req.user.name,
-          timestamp: new Date(),
-        },
-      ],
-    });
-    console.log(`[DB] Certificate saved: certificateId=${cert.certificateId}`);
+    const baseWorkflowEntry = { stage: 'Academic Record Verified', actorId: req.user.id, actorName: req.user.name, timestamp: new Date() };
 
-    let ipfsCid = null;
-    let metadataIpfsCid = null;
-    let fileUrl = null;
-
-    if (fileBuffer) {
-      const filename = `Certificate_${cert.certificateId}.pdf`;
-
-      if (isPinataConfigured()) {
-        try {
-          // 1. Upload PDF to IPFS
-          const fileResult = await uploadFileToPinata(fileBuffer, filename, {
-            certificateId: cert.certificateId,
-            studentName: cert.studentName,
-            issuer: university.name,
+    // ── Helper: anchor one cert to the blockchain non-blocking ──────────────
+    const anchorAsync = (cert, certHash) => {
+      const { id: certId, certificateId: certCertificateId, certificateType: certType } = cert;
+      emitToInstitution(university.id, 'anchoring:pending', { certificateId: certCertificateId, id: certId });
+      issueCertificateOnChain(certId, certHash, CERTIFICATE_TYPE_CODES[certType] ?? 0, university.encryptedPrivateKey)
+        .then(async (receipt) => {
+          emitToInstitution(university.id, 'anchoring:success', { certificateId: certCertificateId, id: certId, txHash: receipt.hash });
+          await Registry.update('certificates', { id: certId }, {
+            blockchainTxHash: receipt.hash,
+            status: 'CONFIRMED',
+            workflowStatus: 'ISSUED',
           });
-          ipfsCid = fileResult.cid;
-          fileUrl = fileResult.url;
+          await Registry.insert('ledger', {
+            type: 'ISSUE',
+            studentName,
+            universityName: university.name,
+            certificateId: certId,
+            txHash: receipt.hash,
+            status: 'SUCCESS',
+            metadata: { certificateType: certType, source: 'issueCertificate' },
+          });
+        })
+        .catch((bcErr) => {
+          console.error(`[CHAIN] Anchoring failed for ${certCertificateId}:`, bcErr.message);
+          emitToInstitution(university.id, 'anchoring:failed', { certificateId: certCertificateId, id: certId, error: bcErr.message });
+        });
+    };
 
-          // 2. Upload Metadata JSON to IPFS (Proactive Transparency)
-          const metadataResult = await uploadJSONToPinata({
-            ...cert,
-            institution: university.name,
-            anchoredHash: certificateHash,
-          }, `${cert.certificateId}_metadata.json`);
-          metadataIpfsCid = metadataResult.cid;
+    const issuedCerts = [];
 
-          console.log(`[📦 IPFS] Successfully anchored certificate assets. CID: ${ipfsCid}`);
-        } catch (ipfsError) {
-          console.error('[⚠️ IPFS_FAILURE]: Falling back to local storage.', ipfsError.message);
-          // Move file to permanent uploads dir so the finally block doesn't delete the only copy
-          const permanentDir = path.join(__dirname, '../../uploads');
-          if (!fs.existsSync(permanentDir)) fs.mkdirSync(permanentDir, { recursive: true });
-          const permanentFilename = path.basename(tempPath);
-          fs.renameSync(tempPath, path.join(permanentDir, permanentFilename));
-          tempPath = null; // file has been moved; prevent finally from unlinking it
-          fileUrl = `/uploads/${permanentFilename}`;
-        }
-      } else {
-        // Pinata not configured — move temp file to permanent local dir before finally deletes it
-        console.warn('[⚠️ PROACTIVE_WARNING]: Pinata not configured — persisting to local storage.');
-        const permanentDir = path.join(__dirname, '../../uploads');
-        if (!fs.existsSync(permanentDir)) fs.mkdirSync(permanentDir, { recursive: true });
-        const permanentFilename = path.basename(tempPath);
-        fs.renameSync(tempPath, path.join(permanentDir, permanentFilename));
-        tempPath = null;
-        fileUrl = `/uploads/${permanentFilename}`;
+    if (semesters && semesters.length > 0) {
+      // ── Per-semester certificate records ─────────────────────────────────
+      for (const semEntry of semesters) {
+        const { semester, subjects, sgpa } = semEntry;
+
+        // Deterministic tamper-evident hash per semester
+        const certHash = generateHash({ rollNumber, semester, sgpa, subjects, finalCGPA });
+        console.log(`[HASH] Semester ${semester} SHA-256: ${certHash.substring(0, 16)}...`);
+
+        const cert = await createCertificateRecord({
+          studentName,
+          studentEmail: email,
+          studentPhone: phone || '0000000000',
+          studentId,
+          course: program,
+          issuer: university.name,
+          certificateHash: certHash,
+          status: 'PROCESSING',
+          workflowStatus: 'STAGE2',
+          issuedBy: req.user.id,
+          universityId: university.id,
+          certificateType: certificateType || 'Consolidated Marks Sheet',
+          metadata: { studentEnrollmentNumber: rollNumber, branch, graduationYear, semester, sgpa, subjects, finalCGPA },
+          workflowLog: [baseWorkflowEntry],
+        });
+        console.log(`[DB] Semester ${semester} cert saved: ${cert.certificateId}`);
+
+        anchorAsync(cert, certHash);
+        issuedCerts.push({ certificateId: cert.certificateId, semester, hash: certHash });
       }
-    }
+    } else {
+      // ── No semesters provided — single summary certificate ────────────────
+      const certHash = generateHash({ rollNumber, semester: 'FINAL', finalCGPA });
+      console.log(`[HASH] Final SHA-256: ${certHash.substring(0, 16)}...`);
 
-    // Persist file metadata before blockchain so a network failure doesn't lose the file reference
-    await Registry.update('certificates', { id: cert.id }, { ipfsCid, metadataIpfsCid, fileUrl });
-
-    // Blockchain call is isolated — failure defers anchoring to confirmIssuance, never blocks issuance
-    let receipt = null;
-    emitToInstitution(university.id, 'anchoring:pending', { certificateId: cert.certificateId, id: cert.id });
-    try {
-      console.log(`[CHAIN] Blockchain call started | issueCertificate: ${cert.certificateId}`);
-      receipt = await issueCertificateOnChain(
-        cert.id,
-        certificateHash,
-        CERTIFICATE_TYPE_CODES[cert.certificateType] ?? 0,
-        university.encryptedPrivateKey
-      );
-      console.log(`[CHAIN] Blockchain call success | issueCertificate: ${cert.certificateId} txHash=${receipt.hash}`);
-      emitToInstitution(university.id, 'anchoring:success', { certificateId: cert.certificateId, id: cert.id, txHash: receipt.hash });
-    } catch (bcErr) {
-      console.error(`[CHAIN] Blockchain call failed | issueCertificate: ${cert.certificateId} error=${bcErr.message}`);
-      emitToInstitution(university.id, 'anchoring:failed', { certificateId: cert.certificateId, id: cert.id, error: bcErr.message });
-    }
-
-    if (receipt) {
-      await Registry.update('certificates', { id: cert.id }, {
-        blockchainTxHash: receipt.hash,
-        status: 'CONFIRMED',
-        workflowStatus: 'ISSUED',
-        workflowLog: [
-          ...(cert.workflowLog || []),
-          {
-            stage: 'Anchored to Blockchain',
-            actorId: req.user.id,
-            actorName: university.name,
-            timestamp: new Date(),
-          },
-        ],
+      const cert = await createCertificateRecord({
+        studentName,
+        studentEmail: email,
+        studentPhone: phone || '0000000000',
+        studentId,
+        course: program,
+        issuer: university.name,
+        certificateHash: certHash,
+        status: 'PROCESSING',
+        workflowStatus: 'STAGE2',
+        issuedBy: req.user.id,
+        universityId: university.id,
+        certificateType: certificateType || 'Degree Certificate',
+        metadata: { studentEnrollmentNumber: rollNumber, branch, graduationYear, finalCGPA },
+        workflowLog: [baseWorkflowEntry],
       });
+      console.log(`[DB] Final cert saved: ${cert.certificateId}`);
 
-      await Registry.insert('ledger', {
-        type: 'ISSUE',
-        studentName: cert.studentName,
-        universityName: university.name,
-        certificateId: cert.id,
-        txHash: receipt.hash,
-        status: 'SUCCESS',
-        metadata: { certificateType: cert.certificateType, source: 'issueCertificate' },
-      });
+      anchorAsync(cert, certHash);
+      issuedCerts.push({ certificateId: cert.certificateId, semester: 'FINAL', hash: certHash });
     }
 
     res.status(201).json({
       success: true,
-      message: receipt
-        ? 'Certificate issued and anchored on blockchain.'
-        : 'Certificate created. Use "Confirm Issuance" to anchor to blockchain.',
-      certificateId: cert.certificateId,
-      status: receipt ? 'CONFIRMED' : 'PROCESSING',
-      txHash: receipt?.hash || null,
+      message: `${issuedCerts.length} certificate(s) issued. Blockchain anchoring in progress.`,
+      certificates: issuedCerts,
     });
   } catch (err) {
-    if (cert?.id) {
-      try {
-        await Registry.update('certificates', { id: cert.id }, { status: 'FAILED' });
-        await Registry.insert('ledger', {
-          type: 'ISSUE',
-          studentName: cert.studentName,
-          universityName: cert.issuer,
-          certificateId: cert.id,
-          status: 'FAILED',
-          metadata: { error: err.message, source: 'issueCertificate' },
-        });
-      } catch (updateError) {
-        console.error('[ISSUANCE_FAILURE_PERSISTENCE_ERROR]:', updateError.message);
-      }
-    }
-
     if (err.statusCode === 409) {
       return res.status(409).json({
         error: 'Duplicate Credential Detected',
@@ -359,13 +273,10 @@ export const issueCertificate = async (req, res) => {
         existingCertificateId: err.existingCertificateId,
       });
     }
-
     console.error('[ISSUANCE_CRASH]:', err);
     res.status(500).json({ error: 'Certificate issuance failed.', details: err.message });
   } finally {
-    if (tempPath && fs.existsSync(tempPath)) {
-      fs.unlinkSync(tempPath);
-    }
+    if (tempPath && fs.existsSync(tempPath)) fs.unlinkSync(tempPath);
   }
 };
 
