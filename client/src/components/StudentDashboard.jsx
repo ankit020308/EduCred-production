@@ -334,12 +334,20 @@ export default function StudentDashboard() {
 
                             <div className="flex flex-wrap gap-3 pt-3 border-t border-[#e0e0e0]">
                               {cert.status === 'CONFIRMED' && (
-                                <button onClick={(e) => {
+                                <button onClick={async (e) => {
                                   e.stopPropagation();
                                   if (cert.fileUrl?.startsWith('http')) {
                                     window.open(cert.fileUrl, '_blank');
                                   } else {
-                                    window.open(`${import.meta.env.VITE_API_URL || ''}/api/certificates/${cert.id}/file`, '_blank');
+                                    try {
+                                      const res = await api.get(`/api/certificates/${cert.id}/file`, { responseType: 'blob' });
+                                      const url = URL.createObjectURL(res.data);
+                                      const a = document.createElement('a');
+                                      a.href = url;
+                                      a.download = `Certificate_${cert.certificateId || cert.id}.pdf`;
+                                      a.click();
+                                      URL.revokeObjectURL(url);
+                                    } catch { /* silently fail */ }
                                   }
                                 }} className="btn-primary text-xs">
                                   <Download size={13} /> {cert.fileUrl ? 'Download Certificate PDF' : 'Re-Generate PDF'}

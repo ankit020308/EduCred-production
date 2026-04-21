@@ -5,14 +5,17 @@ import {
   Copy,
   FileUp,
   Fingerprint,
+  LayoutDashboard,
   Loader2,
+  LogOut,
   Search,
   ShieldAlert,
   ShieldCheck,
   XCircle,
 } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import api from '../services/api';
+import { useAuth } from '../context/AuthContext';
 
 const steps = [
   'Analyzing syntax payload',
@@ -24,6 +27,8 @@ const steps = [
 const transition = { duration: 0.5, ease: [0.22, 1, 0.36, 1] };
 
 export default function Verifier() {
+  const { user, logout } = useAuth();
+  const navigate = useNavigate();
   const [mode, setMode] = useState('HASH');
   const [file, setFile] = useState(null);
   const [certificateId, setCertificateId] = useState('');
@@ -104,12 +109,27 @@ export default function Verifier() {
             </span>
           </Link>
           <div className="flex items-center gap-4">
-            <Link to="/login" className="text-[10px] font-black uppercase tracking-widest text-[#646464] hover:text-white transition-colors">
-              Sign In
-            </Link>
-            <Link to="/signup" className="btn-primary text-xs">
-              Get Started
-            </Link>
+            {user ? (
+              <>
+                <button onClick={() => navigate('/dashboard')}
+                  className="btn-primary !px-4 !py-2 !text-[10px]">
+                  <LayoutDashboard size={13} /> Dashboard
+                </button>
+                <button onClick={() => { logout(); navigate('/login'); }}
+                  className="flex items-center gap-1.5 text-[10px] font-black uppercase tracking-widest text-[#646464] hover:text-white transition-colors">
+                  <LogOut size={13} /> Sign Out
+                </button>
+              </>
+            ) : (
+              <>
+                <Link to="/login" className="text-[10px] font-black uppercase tracking-widest text-[#646464] hover:text-white transition-colors">
+                  Sign In
+                </Link>
+                <Link to="/signup" className="btn-primary text-xs">
+                  Get Started
+                </Link>
+              </>
+            )}
           </div>
         </div>
       </header>

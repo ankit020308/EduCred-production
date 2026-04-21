@@ -27,7 +27,7 @@ const __dirname = path.dirname(__filename);
 dotenv.config({ path: path.join(__dirname, '../../.env') });
 const isProduction = process.env.NODE_ENV === 'production';
 
-const PINATA_JWT     = process.env.PINATA_JWT;
+const PINATA_JWT = process.env.PINATA_JWT;
 const PINATA_GATEWAY = process.env.PINATA_GATEWAY || 'gateway.pinata.cloud';
 
 
@@ -39,7 +39,7 @@ function getPinataClient() {
   if (_pinataClient) return _pinataClient;
   if (!PINATA_JWT) return null;
   _pinataClient = new PinataSDK({
-    pinataJwt:     PINATA_JWT,
+    pinataJwt: PINATA_JWT,
     pinataGateway: PINATA_GATEWAY,
   });
   return _pinataClient;
@@ -94,13 +94,16 @@ export async function uploadFileToPinata(buffer, filename, keyvalueMetadata = {}
 
   const uploadWithRetry = async (attempt = 0) => {
     try {
+      const safeMetadata = (keyvalueMetadata && typeof keyvalueMetadata === 'object' && !Array.isArray(keyvalueMetadata))
+        ? keyvalueMetadata
+        : {};
       return await pinata.upload.public.file(file)
         .name(filename)
         .keyvalues({
           source: 'EduCred',
           uploadedAt: new Date().toISOString(),
           ...Object.fromEntries(
-            Object.entries(keyvalueMetadata).map(([k, v]) => [k, String(v)])
+            Object.entries(safeMetadata).slice(0, 7).map(([k, v]) => [k, String(v)])
           ),
         });
     } catch (error) {
@@ -149,8 +152,8 @@ export async function uploadJSONToPinata(jsonData, pinName) {
       return await pinata.upload.public.json(jsonData)
         .name(pinName || 'EduCred-Metadata')
         .keyvalues({
-          source:    'EduCred',
-          type:      'certificate-metadata',
+          source: 'EduCred',
+          type: 'certificate-metadata',
           uploadedAt: new Date().toISOString(),
         });
     } catch (error) {

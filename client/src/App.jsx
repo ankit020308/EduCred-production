@@ -133,11 +133,12 @@ const NavigationWrapper = () => {
   const isLandingPage = path === '/';
   const isAuthPage = ['/login', '/signup', '/verify-otp', '/onboarding', '/auth/success', '/auth/error'].includes(path);
   const isDashboard = ['/university-node', '/sys-admin', '/student-portal', '/profile'].some(d => path.startsWith(d));
+  const isSelfHeadered = path.startsWith('/verify') || path.startsWith('/student/');
 
   return (
     <>
       <GlobalErrorListener />
-      {!isLandingPage && !isAuthPage && !isDashboard && <Navbar />}
+      {!isLandingPage && !isAuthPage && !isDashboard && !isSelfHeadered && <Navbar />}
 
       <main className="flex-1 w-full">
         <AnimatePresence mode="wait">

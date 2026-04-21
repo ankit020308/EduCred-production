@@ -157,6 +157,7 @@ export default function Profile() {
         headers: { 'Content-Type': 'multipart/form-data' },
       });
       setUserProfile(p => ({ ...p, profileImageUrl: res.data.profileImageUrl }));
+      updateUser({ ...user, profileImageUrl: res.data.profileImageUrl });
       showToast('success', 'Photo updated.');
     } catch {
       showToast('error', 'Photo upload failed.');

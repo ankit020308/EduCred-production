@@ -10,29 +10,29 @@ const router = express.Router();
 
 // ─── UPLOAD PROFILE PHOTO ─────────────────────────────
 router.post('/profile/upload-photo', protect, upload.single('photo'), async (req, res) => {
-  let tempPath = req.file?.path;
-  try {
-    if (!req.file) return res.status(400).json({ error: 'No file provided.' });
+    let tempPath = req.file?.path;
+    try {
+        if (!req.file) return res.status(400).json({ error: 'No file provided.' });
 
-    if (!isPinataConfigured()) {
-      return res.status(503).json({ error: 'IPFS storage not configured.' });
+        if (!isPinataConfigured()) {
+            return res.status(503).json({ error: 'IPFS storage not configured.' });
+        }
+
+        const buffer = fs.readFileSync(tempPath);
+        const { url } = await uploadFileToPinata(buffer, req.file.originalname, {
+            userId: req.user.id,
+            type: 'profile-photo',
+        });
+
+        if (tempPath && fs.existsSync(tempPath)) fs.unlinkSync(tempPath);
+
+        await Registry.update('users', { id: req.user.id }, { profileImageUrl: url });
+
+        res.json({ success: true, profileImageUrl: url });
+    } catch (err) {
+        if (tempPath && fs.existsSync(tempPath)) { try { fs.unlinkSync(tempPath); } catch { /* ignore */ } }
+        res.status(500).json({ error: err.message });
     }
-
-    const buffer = fs.readFileSync(tempPath);
-    const { url } = await uploadFileToPinata(buffer, req.file.originalname, {
-      userId: req.user.id,
-      type: 'profile-photo',
-    });
-
-    if (tempPath && fs.existsSync(tempPath)) fs.unlinkSync(tempPath);
-
-    await Registry.update('users', { id: req.user.id }, { profileImageUrl: url });
-
-    res.json({ success: true, profileImageUrl: url });
-  } catch (err) {
-    if (tempPath && fs.existsSync(tempPath)) { try { fs.unlinkSync(tempPath); } catch { /* ignore */ } }
-    res.status(500).json({ error: err.message });
-  }
 });
 
 // ─── GET User Profile (PROTECTED) ─────────────────────
@@ -77,6 +77,17 @@ router.put('/profile', protect, async (req, res) => {
         }
 
         await Registry.update('users', { id: req.user.id }, updates);
+
+        // Sync name to the role-specific record so it stays consistent
+        if (updates.name) {
+            const user0 = await Registry.findById('users', req.user.id);
+            if (user0?.role === 'student') {
+                await Registry.update('students', { userId: req.user.id }, { name: updates.name }).catch(() => {});
+            } else if (user0?.role === 'university') {
+                await Registry.update('universities', { userId: req.user.id }, { name: updates.name }).catch(() => {});
+            }
+        }
+
         const user = await Registry.findById('users', req.user.id);
 
         if (!user) return res.status(404).json({ error: 'User not found.' });
@@ -120,7 +131,8 @@ router.get('/profile/student-details', protect, requireRole('student'), async (r
         const student = await Registry.findOne('students', { userId: req.user.id });
         if (!student) return res.json({});
         const { id, userId, digilockerAccessToken, digilockerRefreshToken, ...safe } = student.dataValues || student;
-        res.json(safe);
+        const userRecord = await Registry.findById('users', req.user.id).catch(() => null);
+        res.json({ ...safe, profileImageUrl: userRecord?.profileImageUrl || null });
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
@@ -149,7 +161,8 @@ router.get('/profile/institution-details', protect, requireRole('university', 'U
         const uni = await Registry.findOne('universities', { userId: req.user.id });
         if (!uni) return res.json({});
         const { encryptedPrivateKey, ...safe } = uni.dataValues || uni;
-        res.json(safe);
+        const userRecord = await Registry.findById('users', req.user.id).catch(() => null);
+        res.json({ ...safe, profileImageUrl: userRecord?.profileImageUrl || null });
     } catch (err) {
         res.status(500).json({ error: err.message });
     }

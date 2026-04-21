@@ -59,13 +59,13 @@ function InstitutionsTab({ toast }) {
     return () => { document.body.style.overflow = ''; };
   }, [confirm.open]);
 
-  const fetchUniversities = useCallback(async () => {
-    setLoading(true);
+  const fetchUniversities = useCallback(async (silent = false) => {
+    if (!silent) setLoading(true);
     try {
       const res = await api.get('/api/universities/all');
       setUniversities(res.data.data || []);
     } catch { toast.error('Failed to load institutions.'); }
-    finally { setLoading(false); }
+    finally { if (!silent) setLoading(false); }
   }, [toast]);
 
   useEffect(() => { fetchUniversities(); }, [fetchUniversities]);
@@ -77,7 +77,7 @@ function InstitutionsTab({ toast }) {
       await api.post(`/api/universities/${action}/${id}`);
       toast.success(`${name} ${action === 'approve' ? 'approved' : 'rejected'}.`);
       setConfirm({ open: false, action: null, id: null, name: '' });
-      fetchUniversities();
+      fetchUniversities(true);
     } catch (err) {
       toast.error(`Action failed: ${err.response?.data?.error || 'Unknown error'}`);
     } finally { setProcessingId(null); }
@@ -370,13 +370,13 @@ function CertificatesTab({ toast }) {
     return () => { document.body.style.overflow = ''; };
   }, [rejectModal.open]);
 
-  const fetchCerts = useCallback(async () => {
-    setLoading(true);
+  const fetchCerts = useCallback(async (silent = false) => {
+    if (!silent) setLoading(true);
     try {
       const res = await api.get('/api/certificates/admin/all');
       setCerts(res.data.data || []);
     } catch { toast.error('Failed to load certificates.'); }
-    finally { setLoading(false); }
+    finally { if (!silent) setLoading(false); }
   }, [toast]);
 
   useEffect(() => { fetchCerts(); }, [fetchCerts]);
@@ -386,7 +386,7 @@ function CertificatesTab({ toast }) {
     try {
       await api.post(`/api/certificates/admin/${id}/approve`);
       toast.success(`${certId} approved — anchoring started.`);
-      fetchCerts();
+      fetchCerts(true);
     } catch (err) {
       toast.error(err.response?.data?.error || 'Approval failed.');
     } finally { setProcessingId(null); }
@@ -400,7 +400,7 @@ function CertificatesTab({ toast }) {
       toast.success(`${certId} rejected.`);
       setRejectModal({ open: false, id: null, certId: '' });
       setRejectReason('');
-      fetchCerts();
+      fetchCerts(true);
     } catch (err) {
       toast.error(err.response?.data?.error || 'Rejection failed.');
     } finally { setProcessingId(null); }

@@ -675,7 +675,7 @@ export const verifyCertificate = async (req, res) => {
       try {
         const institution = await Registry.findById('universities', metadata.universityId);
         if (institution?.publicWalletAddress &&
-            onChainDetails.issuer.toLowerCase() !== institution.publicWalletAddress.toLowerCase()) {
+          onChainDetails.issuer.toLowerCase() !== institution.publicWalletAddress.toLowerCase()) {
           walletMismatch = true;
         }
       } catch (walletErr) {
@@ -894,7 +894,7 @@ async function runAnchor(cert, university, actorUser) {
       const pdfHash = result.pdfHash;
       const { uploadFileToPinata } = await import('../utils/ipfsService.js');
       if (uploadFileToPinata) {
-        const r = await uploadFileToPinata(pdfBuffer, `${cert.certificateId}.pdf`, 'application/pdf');
+        const r = await uploadFileToPinata(pdfBuffer, `${cert.certificateId}.pdf`, { contentType: 'application/pdf' });
         if (r?.cid) {
           await Registry.update('certificates', { id: cert.id }, {
             fileUrl: `https://gateway.pinata.cloud/ipfs/${r.cid}`,
@@ -1089,10 +1089,10 @@ export const getCertificates = async (req, res) => {
 
 export const getStats = async (req, res) => {
   try {
-    const total     = await Registry.count('certificates', { issuedBy: req.user.id });
+    const total = await Registry.count('certificates', { issuedBy: req.user.id });
     const confirmed = await Registry.count('certificates', { issuedBy: req.user.id, status: 'CONFIRMED' });
-    const pending   = await Registry.count('certificates', { issuedBy: req.user.id, status: 'PENDING_REVIEW' });
-    const failed    = await Registry.count('certificates', { issuedBy: req.user.id, status: 'ANCHOR_FAILED' });
+    const pending = await Registry.count('certificates', { issuedBy: req.user.id, status: 'PENDING_REVIEW' });
+    const failed = await Registry.count('certificates', { issuedBy: req.user.id, status: 'ANCHOR_FAILED' });
 
     res.json({ total, confirmed, pending, failed });
   } catch (err) {
@@ -1148,7 +1148,7 @@ export const verifyPDFCertificate = async (req, res) => {
       result: storedHash && uploadedHash === storedHash ? 'valid' : 'tampered',
       verifierIp: requestIp,
       submittedHash: uploadedHash,
-    }).catch(() => {});
+    }).catch(() => { });
 
     if (!storedHash) {
       // PDF was generated before pdfHash tracking was added — fall back to info-field comparison

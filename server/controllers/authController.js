@@ -9,6 +9,7 @@ import { sendOTP } from '../utils/emailService.js';
 import { sendPhoneOTP } from '../utils/smsService.js';
 import { logAudit } from '../utils/logger.js';
 import { jwtSecret, refreshSecret } from '../utils/runtimeConfig.js';
+import { createEncryptedWalletRecord } from '../utils/keyVault.js';
 
 const JWT_EXPIRES = '1h';
 const REFRESH_EXPIRES = '7d';
@@ -185,6 +186,7 @@ export const register = async (req, res) => {
           email.endsWith('.edu') || email.endsWith('.ac.in');
         const fullDescription = [description, officialDomain ? `Domain: ${officialDomain}` : ''].filter(Boolean).join(' | ');
 
+        const uniWallet = createEncryptedWalletRecord();
         await Registry.insert('universities', {
           name: universityName,
           email,
@@ -194,10 +196,16 @@ export const register = async (req, res) => {
           isFlagged: !isInstitutional,
           status: 'PENDING',
           isVerified: false,
+          publicWalletAddress: uniWallet.publicWalletAddress,
+          encryptedPrivateKey: uniWallet.encryptedPrivateKey,
         }, { transaction: t });
       } else {
-        // Only provision student if gate is bypassed (handled by our earlier resilience fix)
-        await Registry.insert('students', { name, userId: user.id }, { transaction: t });
+        const studentWallet = createEncryptedWalletRecord();
+        await Registry.insert('students', {
+          name,
+          userId: user.id,
+          publicWalletAddress: studentWallet.publicWalletAddress,
+        }, { transaction: t });
       }
 
       // 📧 DISPATCH OTP

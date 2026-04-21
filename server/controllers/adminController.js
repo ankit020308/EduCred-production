@@ -25,16 +25,22 @@ export const approveUniversity = async (req, res) => {
 
     // 🏥 Security Check: Institutional Integrity
     const isInstitutional = university.email.endsWith('.edu') || university.email.endsWith('.ac.in');
-    
+
     // Provide a "Pitch Override" for admins during demos
     if (university.isFlagged && !isInstitutional && !overrideRisk) {
-      return res.status(403).json({ 
-        error: 'High Risk Node Detected', 
-        message: 'This node is flagged due to a non-institutional email domain. Manual domain verification required.' 
+      return res.status(403).json({
+        error: 'High Risk Node Detected',
+        message: 'This node is flagged due to a non-institutional email domain. Manual domain verification required.'
       });
     }
-    
-    const { publicWalletAddress, encryptedPrivateKey } = createEncryptedWalletRecord();
+
+    // Reuse wallet allocated at registration; only generate a new one if missing
+    let { publicWalletAddress, encryptedPrivateKey } = university;
+    if (!publicWalletAddress || !encryptedPrivateKey) {
+      const newWallet = createEncryptedWalletRecord();
+      publicWalletAddress = newWallet.publicWalletAddress;
+      encryptedPrivateKey = newWallet.encryptedPrivateKey;
+    }
 
     console.log(`[CHAIN] Blockchain call started | authorizeUniversity: ${publicWalletAddress}`);
     try {
@@ -49,15 +55,16 @@ export const approveUniversity = async (req, res) => {
       approvedBy: req.user.id,
       approvedAt: new Date(),
       isVerified: true,
+      isFlagged: false,
       publicWalletAddress,
-      encryptedPrivateKey
+      encryptedPrivateKey,
     });
 
     // Update the associated User node status
     await Registry.update('users', { id: university.userId }, {
       'isEmailVerified': true
     });
-    
+
     const updatedUni = await Registry.findById('universities', universityId);
     res.json({ message: 'University identity node authorized.', university: updatedUni });
   } catch (error) {
@@ -70,9 +77,9 @@ export const rejectUniversity = async (req, res) => {
     const { universityId, reason } = req.body;
     const university = await Registry.findById('universities', universityId);
     if (!university) return res.status(404).json({ error: 'University not found' });
-    
+
     await Registry.update('universities', { id: universityId }, { status: 'REJECTED' });
-    
+
     const updatedUni = await Registry.findById('universities', universityId);
     res.json({ message: 'University rejected successfully', university: updatedUni });
   } catch (error) {
@@ -94,12 +101,12 @@ export const suspendUniversity = async (req, res) => {
     const { universityId, reason } = req.body;
     const university = await Registry.findById('universities', universityId);
     if (!university) return res.status(404).json({ error: 'University not found' });
-    
+
     await Registry.update('universities', { id: universityId }, {
-        status: 'SUSPENDED',
-        suspendedReason: reason
+      status: 'SUSPENDED',
+      suspendedReason: reason
     });
-    
+
     const updatedUni = await Registry.findById('universities', universityId);
     res.json({ message: 'University suspended successfully', university: updatedUni });
   } catch (error) {
@@ -115,7 +122,7 @@ export const getAdminStats = async (req, res) => {
     const unreviewedAlerts = await Registry.count('fraudAlerts', { isReviewed: false });
     const approvedUniversities = await Registry.count('universities', { status: 'APPROVED' });
     const pendingUniversities = await Registry.count('universities', { status: 'PENDING' });
-    
+
     res.json({
       totalCertificates,
       totalVerifications,
@@ -142,14 +149,14 @@ export const updateFraudAlert = async (req, res) => {
     const { notes } = req.body;
     const alert = await Registry.findById('fraudAlerts', req.params.id);
     if (!alert) return res.status(404).json({ error: 'Alert not found' });
-    
+
     await Registry.update('fraudAlerts', { id: req.params.id }, {
-        isReviewed: true,
-        reviewNotes: notes,
-        reviewedBy: req.user.name || req.user.email,
-        reviewedAt: new Date()
+      isReviewed: true,
+      reviewNotes: notes,
+      reviewedBy: req.user.name || req.user.email,
+      reviewedAt: new Date()
     });
-    
+
     const updatedAlert = await Registry.findById('fraudAlerts', req.params.id);
     res.json({ message: 'Alert updated', alert: updatedAlert });
   } catch (error) {
