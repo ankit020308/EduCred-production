@@ -964,10 +964,10 @@ export const getCertificates = async (req, res) => {
 
 export const getStats = async (req, res) => {
   try {
-    const total = await Registry.count('certificates', { issuedBy: req.user.id });
+    const total     = await Registry.count('certificates', { issuedBy: req.user.id });
     const confirmed = await Registry.count('certificates', { issuedBy: req.user.id, status: 'CONFIRMED' });
-    const pending = await Registry.count('certificates', { issuedBy: req.user.id, status: 'PENDING' });
-    const failed = await Registry.count('certificates', { issuedBy: req.user.id, status: 'FAILED' });
+    const pending   = await Registry.count('certificates', { issuedBy: req.user.id, status: 'PENDING_REVIEW' });
+    const failed    = await Registry.count('certificates', { issuedBy: req.user.id, status: 'ANCHOR_FAILED' });
 
     res.json({ total, confirmed, pending, failed });
   } catch (err) {

@@ -67,8 +67,12 @@ const Certificate = sequelize.define('Certificate', {
         allowNull: true
     },
     status: {
-        type: DataTypes.ENUM('PENDING', 'PROCESSING', 'COMPLETED', 'CONFIRMED', 'FAILED', 'REVOKED'),
-        defaultValue: 'PENDING'
+        type: DataTypes.ENUM(
+            'PENDING', 'PROCESSING', 'COMPLETED', 'CONFIRMED',
+            'FAILED', 'REVOKED',
+            'PENDING_REVIEW', 'ANCHOR_FAILED', 'REJECTED'
+        ),
+        defaultValue: 'PENDING_REVIEW'
     },
     workflowStatus: {
         type: DataTypes.ENUM('STAGE1', 'STAGE2', 'ISSUED'),

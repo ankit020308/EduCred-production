@@ -175,6 +175,26 @@ async function run() {
     },
   });
 
+  // ─── Extend Certificate status enum with workflow values ──────────────────
+  // ALTER TYPE ... ADD VALUE cannot run inside a transaction, which is fine
+  // because IF NOT EXISTS makes it idempotent across redeploys.
+  const newStatusValues = ['PENDING_REVIEW', 'ANCHOR_FAILED', 'REJECTED'];
+  for (const val of newStatusValues) {
+    try {
+      await sequelize.query(
+        `ALTER TYPE "enum_Certificate_status" ADD VALUE IF NOT EXISTS '${val}';`
+      );
+      console.log(`[migration] [SUCCESS] enum_Certificate_status: added '${val}'`);
+    } catch (err) {
+      // Postgres < 9.6 doesn't support IF NOT EXISTS — skip silently if value already exists
+      if (/already exists/.test(err.message)) {
+        console.log(`[migration] [SKIP] enum_Certificate_status: '${val}' already present`);
+      } else {
+        throw err;
+      }
+    }
+  }
+
   await ensureIndex('Certificate', 'certificate_certificateId_unique_idx', ['certificateId'], { unique: true });
   await ensureIndex('Certificate', 'certificate_certificateHash_unique_idx', ['certificateHash'], { unique: true });
   await ensureIndex('University', 'university_userId_unique_idx', ['userId'], { unique: true });
