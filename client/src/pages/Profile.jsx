@@ -123,13 +123,16 @@ export default function Profile() {
       ].filter(Boolean));
 
       setUserProfile(userRes.data);
+      setDraft({ name: userRes.data.name || '', phoneNumber: userRes.data.phoneNumber || '', bio: userRes.data.bio || '' });
       updateUser({ ...user, name: userRes.data.name });
       if (isStudent) {
         const r = await api.get('/api/user/profile/student-details');
         setRoleProfile(r.data);
+        setRoleDraft({ regNo: r.data.regNo || '', degree: r.data.degree || '', branch: r.data.branch || '' });
       } else if (isUniversity) {
         const r = await api.get('/api/user/profile/institution-details');
         setRoleProfile(r.data);
+        setRoleDraft({ description: r.data.description || '', city: r.data.city || '' });
       }
       setIsEditing(false);
       showToast('success', 'Profile saved.');

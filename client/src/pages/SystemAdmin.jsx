@@ -53,6 +53,12 @@ function InstitutionsTab({ toast }) {
   const [expandedRow, setExpandedRow] = useState(null);
   const [confirm, setConfirm] = useState({ open: false, action: null, id: null, name: '' });
 
+  useEffect(() => {
+    if (confirm.open) { document.body.style.overflow = 'hidden'; }
+    else { document.body.style.overflow = ''; }
+    return () => { document.body.style.overflow = ''; };
+  }, [confirm.open]);
+
   const fetchUniversities = useCallback(async () => {
     setLoading(true);
     try {
@@ -357,6 +363,12 @@ function CertificatesTab({ toast }) {
   const [expandedRow, setExpandedRow] = useState(null);
   const [rejectModal, setRejectModal] = useState({ open: false, id: null, certId: '' });
   const [rejectReason, setRejectReason] = useState('');
+
+  useEffect(() => {
+    if (rejectModal.open) { document.body.style.overflow = 'hidden'; }
+    else { document.body.style.overflow = ''; }
+    return () => { document.body.style.overflow = ''; };
+  }, [rejectModal.open]);
 
   const fetchCerts = useCallback(async () => {
     setLoading(true);

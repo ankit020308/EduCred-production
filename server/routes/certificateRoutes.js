@@ -21,7 +21,7 @@ import {
     verifyPDFCertificate,
 } from '../controllers/certificateController.js';
 import { protect, requireRole } from '../middleware/authMiddleware.js';
-import { upload } from '../middleware/uploadMiddleware.js';
+import { upload, csvUpload } from '../middleware/uploadMiddleware.js';
 
 import { authLimiter } from '../middleware/rateLimiter.js';
 
@@ -35,7 +35,7 @@ router.get('/stats', protect, requireRole('university', 'UNIVERSITY'), getStats)
 
 router.post('/issue', protect, requireRole('university', 'UNIVERSITY'), issueCertificate);
 router.post('/confirm-issuance', protect, requireRole('university', 'UNIVERSITY'), confirmIssuance);
-router.post('/batch', protect, requireRole('university', 'UNIVERSITY'), upload.single('file'), batchIssue);
+router.post('/batch', protect, requireRole('university', 'UNIVERSITY'), csvUpload.single('file'), batchIssue);
 router.post('/revoke', protect, requireRole('university', 'UNIVERSITY'), revokeCertificate);
 router.put('/:id/edit', protect, requireRole('university', 'UNIVERSITY'), editCertificate);
 router.post('/:id/retry-anchor', protect, retryAnchor);

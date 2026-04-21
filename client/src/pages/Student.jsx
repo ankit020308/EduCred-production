@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
-import { ArrowLeft, Fingerprint, GraduationCap, ShieldCheck } from 'lucide-react';
+import { ArrowLeft, Download, Fingerprint, GraduationCap, ShieldCheck } from 'lucide-react';
 import { Link, useParams, useNavigate } from 'react-router-dom';
 import api from '../services/api';
 
@@ -155,6 +155,20 @@ export default function Student() {
                 {certificate.certificateHash}
               </p>
             </div>
+
+            {/* PDF Download — only when fileUrl is available */}
+            {certificate.fileUrl && (
+              <div className="mt-10 flex justify-center">
+                <a
+                  href={certificate.fileUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="btn-primary"
+                >
+                  <Download size={16} /> Download Certificate PDF
+                </a>
+              </div>
+            )}
 
             {/* Trust badges */}
             <div className="mt-12 grid gap-8 md:grid-cols-3">

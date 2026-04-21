@@ -29,9 +29,9 @@ const ALLOWED_MIME_TYPES = new Set([
     'image/jpg',
 ]);
 
-export const upload = multer({ 
+export const upload = multer({
     storage,
-    limits: { 
+    limits: {
         fileSize: 20 * 1024 * 1024, // 20MB Limit
     },
     fileFilter: (req, file, cb) => {
@@ -41,4 +41,23 @@ export const upload = multer({
         }
         cb(null, true);
     }
+});
+
+const CSV_MIME_TYPES = new Set([
+    'text/csv',
+    'application/csv',
+    'text/plain',
+    'application/vnd.ms-excel',
+]);
+
+export const csvUpload = multer({
+    storage,
+    limits: { fileSize: 5 * 1024 * 1024 },
+    fileFilter: (req, file, cb) => {
+        if (CSV_MIME_TYPES.has(file.mimetype) || file.originalname.toLowerCase().endsWith('.csv')) {
+            cb(null, true);
+        } else {
+            cb(new Error('Only CSV files are allowed for batch issuance.'));
+        }
+    },
 });

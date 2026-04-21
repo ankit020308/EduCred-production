@@ -1,11 +1,13 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Plus, Search, ShieldCheck, Loader2, Clock, CheckCircle2,
   X, ShieldAlert, RefreshCcw, Database, Copy, ExternalLink,
   Check, FileText, History, Trash2, ChevronDown, ChevronUp,
   LogOut, Edit2, AlertTriangle, RotateCcw, Lock, User,
+  Upload, Download, CheckCircle, XCircle,
 } from 'lucide-react';
+import Papa from 'papaparse';
 import api from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import { ToastProvider, useToast } from '../components/Toast';
@@ -34,8 +36,8 @@ const STATUS_CONFIG = {
 function StatusPill({ status }) {
   const cfg = STATUS_CONFIG[status] || { label: status, bg: 'bg-[#f6f6f6]', text: 'text-[#646464]', border: 'border-[#e0e0e0]', dot: 'bg-[#646464]' };
   return (
-    <span className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[9px] font-black uppercase tracking-widest border ${cfg.bg} ${cfg.text} ${cfg.border}`}>
-      <span className={`w-1.5 h-1.5 rounded-full ${cfg.dot} animate-pulse`} />
+    <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[8px] font-black uppercase tracking-widest border whitespace-nowrap shrink-0 ${cfg.bg} ${cfg.text} ${cfg.border}`}>
+      <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${cfg.dot} animate-pulse`} />
       {cfg.label}
     </span>
   );
@@ -58,6 +60,19 @@ function AdminDashboard() {
   const [issuedResult, setIssuedResult] = useState(null);
   const [retrying, setRetrying] = useState(null);
   const [editingCert, setEditingCert] = useState(null);
+
+  const [showBatchModal, setShowBatchModal] = useState(false);
+  const [batchFile, setBatchFile] = useState(null);
+  const [batchPreview, setBatchPreview] = useState([]);
+  const [batchUploading, setBatchUploading] = useState(false);
+  const [batchResults, setBatchResults] = useState(null);
+  const [batchDragOver, setBatchDragOver] = useState(false);
+  const batchFileRef = useRef(null);
+
+  useEffect(() => {
+    document.body.style.overflow = (showModal || showBatchModal) ? 'hidden' : '';
+    return () => { document.body.style.overflow = ''; };
+  }, [showModal, showBatchModal]);
 
   const [form, setForm] = useState({
     studentName: '', email: '', rollNumber: '', program: '', branch: '', finalCGPA: '',
@@ -188,6 +203,54 @@ function AdminDashboard() {
     catch { toast.error('Copy failed.'); }
   };
 
+  const handleBatchFile = (file) => {
+    if (!file) return;
+    if (!file.name.toLowerCase().endsWith('.csv')) { toast.error('Please select a .csv file.'); return; }
+    setBatchFile(file);
+    setBatchResults(null);
+    Papa.parse(file, {
+      header: true,
+      skipEmptyLines: true,
+      complete: ({ data }) => setBatchPreview(data.slice(0, 5)),
+    });
+  };
+
+  const downloadTemplate = () => {
+    const csv = 'studentName,email,rollNumber,program,branch,finalCGPA,graduationYear,phone\n';
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = 'educred-batch-template.csv';
+    a.click(); URL.revokeObjectURL(url);
+  };
+
+  const handleBatchIssue = async () => {
+    if (!batchFile) return;
+    setBatchUploading(true);
+    setBatchResults(null);
+    try {
+      const fd = new FormData();
+      fd.append('file', batchFile);
+      const res = await api.post('/api/certificates/batch', fd, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+      setBatchResults(res.data);
+      fetchCerts(); fetchStats();
+    } catch (err) {
+      toast.error(err.response?.data?.error || 'Batch upload failed.');
+    } finally {
+      setBatchUploading(false);
+    }
+  };
+
+  const closeBatchModal = () => {
+    if (batchUploading) return;
+    setShowBatchModal(false);
+    setBatchFile(null);
+    setBatchPreview([]);
+    setBatchResults(null);
+  };
+
   const filtered = certs.filter(c =>
     c.studentName?.toLowerCase().includes(search.toLowerCase()) ||
     c.course?.toLowerCase().includes(search.toLowerCase()) ||
@@ -291,9 +354,14 @@ function AdminDashboard() {
                   <Database size={12} className="text-[#ea2804]" /> {user?.universityName || 'Institution Dashboard'}
                 </p>
               </div>
-              <button onClick={() => { setEditingCert(null); setIssuedResult(null); setShowModal(true); }} className="btn-primary shrink-0">
-                <Plus size={15} /> Issue Certificate
-              </button>
+              <div className="flex items-center gap-3 shrink-0">
+                <button onClick={() => setShowBatchModal(true)} className="btn-secondary">
+                  <Upload size={15} /> Batch Upload
+                </button>
+                <button onClick={() => { setEditingCert(null); setIssuedResult(null); setShowModal(true); }} className="btn-primary">
+                  <Plus size={15} /> Issue Certificate
+                </button>
+              </div>
             </motion.div>
 
             {/* Stats */}
@@ -376,8 +444,8 @@ function AdminDashboard() {
                           <td className="px-5 py-4"><span className="text-[10px] font-black uppercase text-[#646464]">{cert.course}</span></td>
                           <td className="px-5 py-4"><span className="text-[10px] font-black text-[#646464]">{cert.metadata?.semester ?? '—'}</span></td>
                           <td className="px-5 py-4"><span className="text-[10px] font-black text-[#202020]">{cert.metadata?.finalCGPA ?? '—'}</span></td>
-                          <td className="px-5 py-4">
-                            <div className="flex flex-col gap-1.5">
+                          <td className="px-5 py-4 min-w-[140px]">
+                            <div className="flex flex-col gap-1.5 items-start">
                               <StatusPill status={cert.status} />
                               {cert.status === 'ANCHOR_FAILED' && (
                                 <button onClick={() => handleRetryAnchor(cert.certificateId, cert.id)}
@@ -638,6 +706,195 @@ function AdminDashboard() {
                     </button>
                   </div>
                 </form>
+              )}
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* ── Batch Upload Modal ── */}
+      <AnimatePresence>
+        {showBatchModal && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+              onClick={closeBatchModal}
+              className="absolute inset-0 bg-[#202020]/70 backdrop-blur-sm" />
+
+            <motion.div initial={{ scale: 0.96, opacity: 0, y: 12 }} animate={{ scale: 1, opacity: 1, y: 0 }} exit={{ scale: 0.96, opacity: 0, y: 12 }}
+              className="relative w-full max-w-2xl bg-white border border-[#e0e0e0] rounded-3xl flex flex-col max-h-[92vh]">
+
+              {/* Header */}
+              <div className="px-7 py-5 border-b border-[#e0e0e0] flex items-center justify-between bg-[#f6f6f6]/80 shrink-0 rounded-t-3xl">
+                <div>
+                  <h2 className="text-lg font-black text-[#202020] tracking-tight">
+                    Batch <span className="text-[#ea2804]">Issuance.</span>
+                  </h2>
+                  <p className="text-[#646464] text-[9px] font-black uppercase tracking-widest mt-0.5">
+                    Upload a CSV to issue multiple certificates at once
+                  </p>
+                </div>
+                <button onClick={closeBatchModal} disabled={batchUploading}
+                  className="w-8 h-8 rounded-full border border-[#e0e0e0] bg-white hover:border-[#ea2804] hover:text-[#ea2804] flex items-center justify-center text-[#bbbbbb] transition-all">
+                  <X size={14} />
+                </button>
+              </div>
+
+              <div className="overflow-y-auto flex-1 px-7 py-6 space-y-6">
+
+                {/* Results view */}
+                {batchResults ? (
+                  <div className="space-y-5">
+                    <div className="grid grid-cols-3 gap-3">
+                      {[
+                        { label: 'Processed', val: batchResults.processed, color: 'text-[#202020]' },
+                        { label: 'Succeeded', val: batchResults.succeeded?.length ?? 0, color: 'text-[#2b9a66]' },
+                        { label: 'Failed', val: batchResults.failed?.length ?? 0, color: 'text-[#ea2804]' },
+                      ].map(({ label, val, color }) => (
+                        <div key={label} className="bg-[#f6f6f6] border border-[#e0e0e0] rounded-2xl p-4 text-center">
+                          <p className={`text-3xl font-black ${color}`}>{val}</p>
+                          <p className="text-[9px] font-black text-[#646464] uppercase tracking-widest mt-1">{label}</p>
+                        </div>
+                      ))}
+                    </div>
+
+                    {batchResults.succeeded?.length > 0 && (
+                      <div className="space-y-2">
+                        <p className="text-[9px] font-black text-[#646464] uppercase tracking-widest flex items-center gap-2">
+                          <CheckCircle size={12} className="text-[#2b9a66]" /> Succeeded
+                        </p>
+                        <div className="max-h-48 overflow-y-auto space-y-1.5">
+                          {batchResults.succeeded.map((s, i) => (
+                            <div key={i} className="flex items-center justify-between bg-[#2b9a66]/5 border border-[#2b9a66]/20 rounded-xl px-4 py-2.5 gap-3">
+                              <div className="min-w-0">
+                                <p className="text-[9px] font-black text-[#202020] uppercase truncate">{s.studentName}</p>
+                                <p className="text-[9px] font-mono text-[#646464] truncate">{s.email}</p>
+                              </div>
+                              <span className="text-[9px] font-mono text-[#2b9a66] shrink-0">{s.certificateId}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {batchResults.failed?.length > 0 && (
+                      <div className="space-y-2">
+                        <p className="text-[9px] font-black text-[#646464] uppercase tracking-widest flex items-center gap-2">
+                          <XCircle size={12} className="text-[#ea2804]" /> Failed
+                        </p>
+                        <div className="max-h-48 overflow-y-auto space-y-1.5">
+                          {batchResults.failed.map((f, i) => (
+                            <div key={i} className="flex items-center justify-between bg-[#ea2804]/5 border border-[#ea2804]/20 rounded-xl px-4 py-2.5 gap-3">
+                              <span className="text-[9px] font-black text-[#646464] shrink-0">Row {f.row}</span>
+                              <p className="text-[9px] font-bold text-[#ea2804] truncate">{f.error}</p>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    <button onClick={closeBatchModal} className="btn-primary w-full">
+                      Done
+                    </button>
+                  </div>
+                ) : (
+                  <>
+                    {/* Template download */}
+                    <div className="flex items-center justify-between bg-[#f6f6f6] border border-[#e0e0e0] rounded-2xl px-5 py-4">
+                      <div>
+                        <p className="text-[10px] font-black text-[#202020] uppercase tracking-widest">CSV Template</p>
+                        <p className="text-[9px] text-[#646464] font-bold mt-0.5">
+                          studentName, email, rollNumber, program, branch, finalCGPA, graduationYear, phone
+                        </p>
+                      </div>
+                      <button onClick={downloadTemplate}
+                        className="flex items-center gap-1.5 px-4 py-2 rounded-full bg-[#ea2804]/10 border border-[#ea2804]/20 text-[9px] font-black text-[#ea2804] uppercase tracking-widest hover:bg-[#ea2804]/20 transition-all shrink-0">
+                        <Download size={11} /> Template
+                      </button>
+                    </div>
+
+                    {/* Dropzone */}
+                    <div
+                      onDragOver={e => { e.preventDefault(); setBatchDragOver(true); }}
+                      onDragLeave={() => setBatchDragOver(false)}
+                      onDrop={e => { e.preventDefault(); setBatchDragOver(false); handleBatchFile(e.dataTransfer.files[0]); }}
+                      onClick={() => batchFileRef.current?.click()}
+                      className={`relative border-2 border-dashed rounded-2xl p-10 flex flex-col items-center justify-center gap-4 cursor-pointer transition-all ${
+                        batchDragOver
+                          ? 'border-[#ea2804] bg-[#ea2804]/5'
+                          : batchFile
+                            ? 'border-[#2b9a66] bg-[#2b9a66]/5'
+                            : 'border-[#e0e0e0] hover:border-[#ea2804]/40 hover:bg-[#f6f6f6]'
+                      }`}
+                    >
+                      <input ref={batchFileRef} type="file" accept=".csv" className="hidden"
+                        onChange={e => handleBatchFile(e.target.files[0])} />
+                      <div className={`w-12 h-12 rounded-full flex items-center justify-center border ${
+                        batchFile ? 'bg-[#2b9a66]/10 border-[#2b9a66]/20 text-[#2b9a66]' : 'bg-[#f6f6f6] border-[#e0e0e0] text-[#646464]'
+                      }`}>
+                        <Upload size={20} />
+                      </div>
+                      {batchFile ? (
+                        <div className="text-center">
+                          <p className="text-[10px] font-black text-[#2b9a66] uppercase tracking-widest">{batchFile.name}</p>
+                          <p className="text-[9px] text-[#646464] font-bold mt-1">{(batchFile.size / 1024).toFixed(1)} KB — click to change</p>
+                        </div>
+                      ) : (
+                        <div className="text-center">
+                          <p className="text-[10px] font-black text-[#202020] uppercase tracking-widest">Drop CSV here or click to browse</p>
+                          <p className="text-[9px] text-[#646464] font-bold mt-1">CSV files only — max 5 MB</p>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Preview table */}
+                    {batchPreview.length > 0 && (
+                      <div className="space-y-2">
+                        <p className="text-[9px] font-black text-[#646464] uppercase tracking-widest">
+                          Preview — first {batchPreview.length} row{batchPreview.length > 1 ? 's' : ''}
+                        </p>
+                        <div className="overflow-x-auto rounded-xl border border-[#e0e0e0]">
+                          <table className="w-full text-left text-[8px] font-black uppercase tracking-widest">
+                            <thead>
+                              <tr className="bg-[#f6f6f6] border-b border-[#e0e0e0]">
+                                {Object.keys(batchPreview[0]).map(k => (
+                                  <th key={k} className="px-3 py-2.5 text-[#646464] whitespace-nowrap">{k}</th>
+                                ))}
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-[#f0f0f0]">
+                              {batchPreview.map((row, i) => (
+                                <tr key={i} className="hover:bg-[#f6f6f6]/60">
+                                  {Object.values(row).map((v, j) => (
+                                    <td key={j} className="px-3 py-2 text-[#202020] max-w-[100px] truncate">{v || '—'}</td>
+                                  ))}
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Warning */}
+                    <div className="flex items-start gap-2 bg-amber-50 border border-amber-200 rounded-xl px-4 py-3">
+                      <AlertTriangle size={13} className="text-amber-600 shrink-0 mt-0.5" />
+                      <p className="text-[9px] font-black text-amber-700 uppercase tracking-widest leading-relaxed">
+                        All batch records require admin review before blockchain anchoring. Duplicate entries will be skipped.
+                      </p>
+                    </div>
+                  </>
+                )}
+              </div>
+
+              {/* Footer */}
+              {!batchResults && (
+                <div className="px-7 py-4 border-t border-[#e0e0e0] shrink-0 rounded-b-3xl">
+                  <button onClick={handleBatchIssue} disabled={!batchFile || batchUploading} className="btn-primary w-full">
+                    {batchUploading
+                      ? <><Loader2 size={16} className="animate-spin" /> Uploading…</>
+                      : <><Upload size={16} /> Confirm & Issue All</>}
+                  </button>
+                </div>
               )}
             </motion.div>
           </div>

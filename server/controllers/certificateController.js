@@ -1,6 +1,7 @@
 import crypto from 'crypto';
 import fs from 'fs';
 import path from 'path';
+import csvParser from 'csv-parser';
 import { fileURLToPath } from 'url';
 import { UniqueConstraintError, Op } from 'sequelize';
 import sequelize from '../config/database.js';
@@ -484,13 +485,89 @@ export const batchIssue = async (req, res) => {
     return res.status(400).json({ error: 'CSV file required for bulk issuance.' });
   }
 
-  if (req.file?.path && fs.existsSync(req.file.path)) {
-    fs.unlinkSync(req.file.path);
-  }
+  const tempPath = req.file.path;
 
-  res.status(503).json({
-    error: 'Batch issuance is unavailable because the asynchronous worker pipeline is not configured.',
-  });
+  try {
+    const { university, error: signerError } = await resolveInstitutionSigner(req);
+    if (signerError) return res.status(signerError.status).json(signerError.body);
+
+    const rows = await new Promise((resolve, reject) => {
+      const results = [];
+      fs.createReadStream(tempPath)
+        .pipe(csvParser())
+        .on('data', (row) => results.push(row))
+        .on('end', () => resolve(results))
+        .on('error', reject);
+    });
+
+    const succeeded = [];
+    const failed = [];
+
+    for (let i = 0; i < rows.length; i++) {
+      const row = rows[i];
+      const rowNum = i + 2;
+      try {
+        const { studentName, email, rollNumber, program, branch, finalCGPA, graduationYear, phone } = row;
+
+        if (!studentName?.trim() || !email?.trim() || !rollNumber?.trim() || !program?.trim() || !branch?.trim() || !finalCGPA?.trim()) {
+          failed.push({ row: rowNum, error: 'Missing required field(s): studentName, email, rollNumber, program, branch, finalCGPA.' });
+          continue;
+        }
+
+        const cgpa = parseFloat(finalCGPA);
+        if (isNaN(cgpa) || cgpa < 0 || cgpa > 10) {
+          failed.push({ row: rowNum, error: `Invalid finalCGPA value: "${finalCGPA}".` });
+          continue;
+        }
+
+        const certHash = generateHash({ rollNumber: rollNumber.trim(), semester: 'FINAL', finalCGPA: cgpa });
+
+        let studentId = null;
+        try {
+          const studentUser = await Registry.findOne('users', { email: email.trim() });
+          if (studentUser) {
+            const studentRecord = await Registry.findOne('students', { userId: studentUser.id });
+            if (studentRecord) studentId = studentRecord.id;
+          }
+        } catch { /* student linkage is optional */ }
+
+        const cert = await createCertificateRecord({
+          studentName: studentName.trim(),
+          studentEmail: email.trim(),
+          studentPhone: phone?.trim() || '0000000000',
+          studentId,
+          course: program.trim(),
+          issuer: university.name,
+          certificateHash: certHash,
+          status: 'PENDING_REVIEW',
+          workflowStatus: 'STAGE2',
+          issuedBy: req.user.id,
+          universityId: university.id,
+          certificateType: 'Degree Certificate',
+          metadata: {
+            studentEnrollmentNumber: rollNumber.trim(),
+            branch: branch.trim(),
+            graduationYear: graduationYear?.trim() || String(new Date().getFullYear()),
+            finalCGPA: cgpa,
+          },
+          workflowLog: [{
+            stage: 'Academic Record Verified (Batch)',
+            actorId: req.user.id,
+            actorName: req.user.name,
+            timestamp: new Date(),
+          }],
+        });
+
+        succeeded.push({ row: rowNum, studentName: studentName.trim(), email: email.trim(), certificateId: cert.certificateId });
+      } catch (err) {
+        failed.push({ row: rowNum, error: err.message });
+      }
+    }
+
+    res.json({ processed: rows.length, succeeded, failed });
+  } finally {
+    if (fs.existsSync(tempPath)) fs.unlinkSync(tempPath);
+  }
 };
 
 export const verifyCertificate = async (req, res) => {

@@ -247,17 +247,17 @@ export default function StudentDashboard() {
               <p className="text-[9px] font-black uppercase tracking-widest text-[#646464]">Loading records…</p>
             </div>
           ) : certificates.length === 0 ? (
-            <div className="bg-white border border-[#e0e0e0] rounded-3xl p-16 text-center space-y-5">
-              <div className="w-16 h-16 bg-[#f6f6f6] border border-[#e0e0e0] rounded-full mx-auto flex items-center justify-center">
+            <div className="bg-white border border-[#e0e0e0] rounded-3xl p-16 flex flex-col items-center text-center space-y-5">
+              <div className="w-16 h-16 bg-[#f6f6f6] border border-[#e0e0e0] rounded-full flex items-center justify-center">
                 <GraduationCap className="text-[#bbbbbb]" size={28} />
               </div>
               <div className="space-y-2">
                 <p className="text-xl font-black text-[#202020] tracking-tight">No certificates yet</p>
-                <p className="text-[#646464] text-[10px] font-bold uppercase tracking-widest max-w-xs mx-auto leading-relaxed">
+                <p className="text-[#646464] text-[10px] font-bold uppercase tracking-widest max-w-xs leading-relaxed">
                   Your institution hasn't issued any records yet. They'll appear here once issued and approved.
                 </p>
               </div>
-              <button onClick={() => navigate('/verify')} className="btn-primary text-xs mx-auto">
+              <button onClick={() => navigate('/verify')} className="btn-primary text-xs">
                 Verify a Document <ExternalLink size={12} />
               </button>
             </div>
@@ -333,10 +333,16 @@ export default function StudentDashboard() {
                             </div>
 
                             <div className="flex flex-wrap gap-3 pt-3 border-t border-[#e0e0e0]">
-                              {cert.fileUrl && cert.status === 'CONFIRMED' && (
-                                <button onClick={(e) => { e.stopPropagation(); window.open(`/api/certificates/${cert.id}/file`, '_blank'); }}
-                                  className="btn-primary text-xs">
-                                  <Download size={13} /> Download Certificate PDF
+                              {cert.status === 'CONFIRMED' && (
+                                <button onClick={(e) => {
+                                  e.stopPropagation();
+                                  if (cert.fileUrl?.startsWith('http')) {
+                                    window.open(cert.fileUrl, '_blank');
+                                  } else {
+                                    window.open(`${import.meta.env.VITE_API_URL || ''}/api/certificates/${cert.id}/file`, '_blank');
+                                  }
+                                }} className="btn-primary text-xs">
+                                  <Download size={13} /> {cert.fileUrl ? 'Download Certificate PDF' : 'Re-Generate PDF'}
                                 </button>
                               )}
                               {cert.status === 'CONFIRMED' && (
