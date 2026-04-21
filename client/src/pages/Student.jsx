@@ -143,7 +143,53 @@ export default function Student() {
               />
               <InfoCard label="Academic Branch" value={certificate.metadata?.branch || 'General'} />
               <InfoCard label="Year of Completion" value={certificate.metadata?.graduationYear || 'N/A'} />
+              {certificate.metadata?.finalCGPA != null && (
+                <InfoCard label="Final CGPA" value={certificate.metadata.finalCGPA} />
+              )}
+              {certificate.metadata?.semester != null && (
+                <InfoCard label="Semester" value={`Semester ${certificate.metadata.semester}`} />
+              )}
+              {certificate.metadata?.sgpa != null && (
+                <InfoCard label="SGPA" value={certificate.metadata.sgpa} />
+              )}
             </div>
+
+            {/* Subjects table */}
+            {certificate.metadata?.subjects?.length > 0 && (
+              <div className="mt-10 border border-[#e0e0e0] rounded-full overflow-hidden">
+                <div className="bg-[#202020] px-8 py-5 flex items-center justify-between">
+                  <p className="text-[10px] font-black uppercase tracking-widest text-white">
+                    {certificate.metadata.semester != null
+                      ? `Semester ${certificate.metadata.semester} — Subject Marks`
+                      : 'Academic Record — Subject Marks'}
+                  </p>
+                  {certificate.metadata.sgpa != null && (
+                    <p className="text-[10px] font-black uppercase tracking-widest text-[#ea2804]">
+                      SGPA: {certificate.metadata.sgpa}
+                    </p>
+                  )}
+                </div>
+                <div className="divide-y divide-[#e0e0e0]">
+                  <div className="grid grid-cols-4 px-8 py-3 bg-[#f6f6f6]">
+                    {['Code', 'Subject', 'Marks', 'Grade'].map(h => (
+                      <p key={h} className="text-[9px] font-black uppercase tracking-widest text-[#646464]">{h}</p>
+                    ))}
+                  </div>
+                  {certificate.metadata.subjects.map((sub, i) => {
+                    const marks = Number(sub.marks);
+                    const grade = sub.grade || (isNaN(marks) ? '—' : marks >= 90 ? 'O' : marks >= 80 ? 'A+' : marks >= 70 ? 'A' : marks >= 60 ? 'B+' : marks >= 50 ? 'B' : marks >= 40 ? 'C' : 'F');
+                    return (
+                      <div key={i} className={`grid grid-cols-4 px-8 py-4 ${i % 2 === 0 ? 'bg-white' : 'bg-[#f6f6f6]'}`}>
+                        <p className="text-[11px] font-black text-[#646464] uppercase tracking-wider font-mono">{sub.code || sub.subjectCode || `S${String(i + 1).padStart(2, '0')}`}</p>
+                        <p className="text-[11px] font-black text-[#202020] uppercase tracking-wider col-span-1">{sub.name || sub.subjectName || sub.subject || '—'}</p>
+                        <p className="text-[11px] font-black text-[#202020]">{sub.marks ?? '—'}</p>
+                        <p className="text-[11px] font-black text-[#ea2804]">{grade}</p>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
 
             {/* Hash */}
             <div className="mt-12 rounded-full border border-[#e0e0e0] bg-[#f6f6f6] p-10 group hover:border-[#ea2804]/30 transition-all">

@@ -40,6 +40,7 @@ function buildPublicCertificatePayload(cert) {
     isRevoked: cert.isRevoked,
     certificateHash: cert.certificateHash,
     certificateType: cert.certificateType,
+    fileUrl: cert.fileUrl || null,
     metadata: {
       branch: cert.metadata?.branch,
       graduationYear: cert.metadata?.graduationYear,
@@ -1119,7 +1120,7 @@ export const verifyPDFCertificate = async (req, res) => {
     // Extract certId from PDF Info.Subject via pdf-parse
     let certId;
     try {
-      const pdfParse = (await import('pdf-parse/lib/pdf-parse.js')).default;
+      const { default: pdfParse } = await import('pdf-parse');
       const parsed = await pdfParse(fileBuffer);
       certId = parsed.info?.Subject;
     } catch (parseErr) {
@@ -1156,9 +1157,10 @@ export const verifyPDFCertificate = async (req, res) => {
     if (!storedHash) {
       // PDF was generated before pdfHash tracking was added — fall back to info-field comparison
       const embeddedHash = cert.certificateHash;
-      const pdfInfoHash = (await import('pdf-parse/lib/pdf-parse.js').then(m => m.default)(fileBuffer)
+      const pdfInfoHash = await import('pdf-parse')
+        .then(m => m.default(fileBuffer))
         .then(p => p.info?.Keywords)
-        .catch(() => null));
+        .catch(() => null);
       if (pdfInfoHash && pdfInfoHash === embeddedHash) {
         return res.json({
           verified: true,
