@@ -17,7 +17,7 @@ export default function Navbar() {
     return () => window.removeEventListener('scroll', handler);
   }, []);
 
-  const handleLogout = () => { logout(); navigate('/'); };
+  const handleLogout = () => { logout(); navigate('/login'); };
 
   useEffect(() => { setMobileOpen(false); }, [location.pathname]);
 

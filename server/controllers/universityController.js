@@ -57,6 +57,7 @@ export const approveUniversity = async (req, res) => {
     await Registry.update('universities', { id }, {
         status: 'APPROVED',
         isVerified: true,
+        isFlagged: false,
         approvedBy: req.user.id,
         approvedAt: new Date(),
         publicWalletAddress,

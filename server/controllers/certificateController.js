@@ -835,7 +835,8 @@ export const approveCertificate = async (req, res) => {
     });
 
     // Fire anchoring non-blocking so the HTTP response is fast
-    runAnchor({ ...cert, status: 'PROCESSING', workflowLog: cert.workflowLog || [] }, university, req.user)
+    const plainCert = cert.get ? cert.get({ plain: true }) : { ...cert };
+    runAnchor({ ...plainCert, status: 'PROCESSING', workflowLog: plainCert.workflowLog || [] }, university, req.user)
       .catch((e) => console.error('[APPROVE_ANCHOR_FAIL]', e.message));
 
     res.json({ success: true, message: 'Certificate approved. Blockchain anchoring started.' });
@@ -859,7 +860,8 @@ export const retryAnchor = async (req, res) => {
 
     await Registry.update('certificates', { id: cert.id }, { status: 'PROCESSING' });
 
-    runAnchor({ ...cert, status: 'PROCESSING' }, university, req.user)
+    const plainCert = cert.get ? cert.get({ plain: true }) : { ...cert };
+    runAnchor({ ...plainCert, status: 'PROCESSING' }, university, req.user)
       .catch((e) => console.error('[RETRY_ANCHOR_FAIL]', e.message));
 
     res.json({ success: true, message: 'Retry anchoring started.' });

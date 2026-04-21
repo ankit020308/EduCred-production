@@ -163,7 +163,7 @@ export default function StudentDashboard() {
               className="w-7 h-7 rounded-lg bg-white/10 border border-white/20 flex items-center justify-center hover:bg-white/20 transition-all">
               <User size={13} className="text-white/70" />
             </button>
-            <button onClick={() => { logout(); navigate('/'); }}
+            <button onClick={() => { logout(); navigate('/login'); }}
               className="flex items-center gap-1.5 text-[9px] font-black uppercase tracking-widest text-white/60 hover:text-[#ea2804] transition-colors">
               <LogOut size={13} />
               <span className="hidden sm:inline">Sign Out</span>

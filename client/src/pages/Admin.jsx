@@ -231,7 +231,7 @@ function AdminDashboard() {
               className="w-7 h-7 rounded-lg bg-[#f6f6f6] border border-[#e0e0e0] flex items-center justify-center hover:border-[#ea2804] transition-all">
               <User size={13} className="text-[#646464]" />
             </button>
-            <button onClick={() => { logout(); navigate('/'); }}
+            <button onClick={() => { logout(); navigate('/login'); }}
               className="flex items-center gap-1.5 text-[9px] font-black uppercase tracking-widest text-[#646464] hover:text-[#ea2804] transition-colors">
               <LogOut size={13} /> Sign Out
             </button>

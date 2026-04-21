@@ -570,7 +570,7 @@ function SystemAdminDashboard() {
               {user?.name || 'Administrator'}
               <span className="px-2 py-0.5 rounded-full bg-[#ea2804]/10 border border-[#ea2804]/20 text-[#ea2804]">ADMIN</span>
             </span>
-            <button onClick={() => { logout(); navigate('/'); }}
+            <button onClick={() => { logout(); navigate('/login'); }}
               className="flex items-center gap-1.5 text-[9px] font-black uppercase tracking-widest text-[#646464] hover:text-[#ea2804] transition-colors">
               <LogOut size={13} /> Sign Out
             </button>
