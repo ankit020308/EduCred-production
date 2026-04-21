@@ -46,22 +46,6 @@ try {
 
 validateServerEnv();
 
-// ── STARTUP ENV GUARD ────────────────────────────────────────────────────────
-// Checks for blockchain-layer vars not covered by validateServerEnv().
-// These are non-fatal warnings in dev (blockchain runs in OFFLINE mode),
-// but must be present in production.
-const BLOCKCHAIN_ENV = ['CONTRACT_ADDRESS', 'RPC_URL'];
-const missingBlockchainEnv = BLOCKCHAIN_ENV.filter(k => !process.env[k]);
-if (missingBlockchainEnv.length) {
-  if (process.env.NODE_ENV === 'production') {
-    console.error('[STARTUP] [CRITICAL] Missing required blockchain env vars:', missingBlockchainEnv.join(', '));
-    process.exit(1);
-  } else {
-    console.warn('[STARTUP] [WARNING] Missing blockchain env vars (blockchain will run in OFFLINE mode):', missingBlockchainEnv.join(', '));
-  }
-}
-
-
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 

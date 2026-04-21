@@ -12,6 +12,7 @@ dotenv.config({ path: path.join(__dirname, '../../.env') });
 const ENV_ALIASES = {
   DATABASE_URL: ['DB_URI', 'DB_URL'],
   RPC_URL: ['SEPOLIA_RPC_URL'],
+  CONTRACT_ADDRESS: ['EDUCRED_CONTRACT_ADDRESS', 'DEPLOYED_ADDRESS'],
 };
 for (const [canonical, aliases] of Object.entries(ENV_ALIASES)) {
   if (!process.env[canonical]) {
@@ -37,6 +38,8 @@ const REQUIRED_SERVER_ENV = [
   'EMAIL_USER',
   'EMAIL_PASS',
   'EMAIL_FROM',
+  'RPC_URL',
+  'CONTRACT_ADDRESS',
 ];
 
 const OPTIONAL_PROD_ENV = [
