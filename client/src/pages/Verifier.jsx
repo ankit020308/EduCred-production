@@ -283,7 +283,7 @@ export default function Verifier() {
                          </div>
                        </div>
                        
-                       {result.valid && (
+                       {result.valid && result.metadata?.certificateId && (
                          <Link to={`/student/${result.metadata.certificateId}`} className="btn-primary !px-10 !py-5 shadow-emerald-500/10">
                             View Details
                          </Link>

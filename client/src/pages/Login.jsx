@@ -43,6 +43,7 @@ export default function Login() {
       }
       const msg = typeof err === 'string' ? err : err?.response?.data?.error || 'Authentication failed.';
       setError(msg);
+    } finally {
       setLoading(false);
     }
   };

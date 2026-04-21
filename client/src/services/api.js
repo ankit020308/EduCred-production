@@ -1,21 +1,19 @@
 import axios from 'axios';
 
-/**
- * Centralized Axios instance for the EduCred platform.
- * Automatically switches between local development proxy and the live production API URL.
- */
 const PRODUCTION_BACKEND_URL = 'https://educred-backend.onrender.com';
+const TOKEN_KEY = 'educred_access_token';
+
+export const storeToken = (token) => { if (token) localStorage.setItem(TOKEN_KEY, token); };
+export const clearToken = () => localStorage.removeItem(TOKEN_KEY);
+export const getToken = () => localStorage.getItem(TOKEN_KEY);
 
 const api = axios.create({
-    baseURL: import.meta.env.VITE_API_URL || (['educred.in', 'www.educred.in'].includes(window.location.hostname) ? PRODUCTION_BACKEND_URL : ''), 
-    timeout: 15000, // 15s to be safe for slow SMTP/Blockchain ops
+    baseURL: import.meta.env.VITE_API_URL || (['educred.in', 'www.educred.in'].includes(window.location.hostname) ? PRODUCTION_BACKEND_URL : ''),
+    timeout: 15000,
     withCredentials: true,
-    headers: {
-        'Content-Type': 'application/json'
-    }
+    headers: { 'Content-Type': 'application/json' }
 });
 
-// 🛰️ PROACTIVE NETWORK DIAGNOSTIC
 if (import.meta.env.PROD) {
     console.log(`[NETWORK] EduCred Protocol target: ${api.defaults.baseURL || 'RELATIVE_PATH (Verify Proxy)'}`);
 }
@@ -24,57 +22,67 @@ const refreshClient = axios.create({
     baseURL: import.meta.env.VITE_API_URL || (['educred.in', 'www.educred.in'].includes(window.location.hostname) ? PRODUCTION_BACKEND_URL : ''),
     timeout: 15000,
     withCredentials: true,
-    headers: {
-        'Content-Type': 'application/json'
-    }
+    headers: { 'Content-Type': 'application/json' }
 });
 
 let refreshPromise = null;
 
-/**
- * Request interceptor removed. 
- * Browsers now automatically transport secure accessToken/refreshToken cookies.
- */
+// Attach stored Bearer token to every outgoing request
+api.interceptors.request.use((config) => {
+    const token = getToken();
+    if (token) {
+        config.headers['Authorization'] = `Bearer ${token}`;
+        console.log(`[AUTH_DEBUG] request: Bearer attached (${token.substring(0, 20)}...) → ${config.url}`);
+    } else {
+        console.log(`[AUTH_DEBUG] request: no token in storage → ${config.url}`);
+    }
+    return config;
+}, (err) => Promise.reject(err));
 
-/**
- * Handle global errors:
- * - 401 + failed refresh → session_expired event (triggers logout + toast)
- * - Network timeout → network_timeout event
- * - All other errors → re-reject so the calling component can handle them.
- *   We do NOT dispatch a global toast for regular 4xx/5xx so that in-component
- *   error handling (OTP failures, login errors, etc.) is not overridden.
- */
 api.interceptors.response.use(
     (response) => response,
     async (error) => {
         const originalRequest = error.config || {};
         const requestUrl = originalRequest.url || '';
         const isRefreshRequest = requestUrl.includes('/api/auth/refresh');
+        const isLogoutRequest = requestUrl.includes('/api/auth/logout');
 
-        if (error.response?.status === 401 && !originalRequest._retry && !isRefreshRequest) {
+        if (error.response?.status === 401 && !originalRequest._retry && !isRefreshRequest && !isLogoutRequest) {
             originalRequest._retry = true;
+
+            // Only refresh if we actually have a refresh token (cookie) or stored access token
+            const hasToken = !!getToken();
+            if (!hasToken) {
+                clearToken();
+                localStorage.removeItem('user');
+                window.dispatchEvent(new CustomEvent('apiError', { detail: 'session_expired' }));
+                return Promise.reject(error);
+            }
 
             try {
                 refreshPromise ??= refreshClient.post('/api/auth/refresh');
+                const refreshRes = await refreshPromise;
 
-                await refreshPromise;
+                if (refreshRes.data?.accessToken) {
+                    storeToken(refreshRes.data.accessToken);
+                    console.log(`[AUTH_DEBUG] token refreshed, new token stored`);
+                }
+
                 return api(originalRequest);
             } catch (refreshError) {
+                clearToken();
                 localStorage.removeItem('user');
                 window.dispatchEvent(new CustomEvent('apiError', { detail: 'session_expired' }));
                 return Promise.reject(refreshError);
             } finally {
                 refreshPromise = null;
             }
-        } else if (error.response?.status === 401) {
-            // 401 with _retry true → both access and refresh attempted and failed
+        } else if (error.response?.status === 401 && !isLogoutRequest) {
             window.dispatchEvent(new CustomEvent('apiError', { detail: 'session_expired' }));
         } else if (!error.response && error.code === 'ECONNABORTED') {
-            // Hard network timeout
             window.dispatchEvent(new CustomEvent('apiError', { detail: 'network_timeout' }));
         }
-        // All other errors (400, 403, 404, 422, 500, etc.) are re-rejected
-        // so callers can show contextual messages without a duplicate global toast.
+
         return Promise.reject(error);
     }
 );

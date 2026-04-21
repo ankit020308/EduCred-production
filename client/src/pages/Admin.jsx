@@ -48,33 +48,38 @@ function AdminDashboard() {
 
     // ⚡ Socket.io Lifecycle
     if (user?.universityId) {
-      // socket.connect() logic...
       socket.connect();
       joinInstitutionalRoom(user.universityId);
 
-      socket.on('certificateIssued', (data) => {
+      const onPending = (data) => {
+        toast.info(`Certificate ${data.certificateId} is being anchored to blockchain...`);
+      };
+      const onSuccess = (data) => {
         fetchLocalCerts();
         fetchStats();
-        toast.info(`New certificate for ${data.studentName} issued.`);
-      });
+        toast.success(`Certificate ${data.certificateId} anchored successfully.`);
+      };
+      const onFailed = (data) => {
+        fetchLocalCerts();
+        fetchStats();
+        toast.error(`Blockchain anchoring failed for ${data.certificateId}. Use Confirm Issuance to retry.`);
+      };
 
-      socket.on('certificateConfirmed', (data) => {
-        fetchLocalCerts();
-        fetchStats();
-      });
+      socket.on('anchoring:pending', onPending);
+      socket.on('anchoring:success', onSuccess);
+      socket.on('anchoring:failed', onFailed);
 
-      socket.on('certificateRevoked', (data) => {
-        fetchLocalCerts();
-        fetchStats();
-        toast.warning(`Certificate has been revoked.`);
-      });
+      return () => {
+        socket.off('anchoring:pending', onPending);
+        socket.off('anchoring:success', onSuccess);
+        socket.off('anchoring:failed', onFailed);
+        if (socket.connected) {
+          socket.disconnect();
+        }
+      };
     }
 
-    return () => {
-      if (socket.connected) {
-        socket.disconnect();
-      }
-    };
+    return undefined;
   }, [user]);
 
   const fetchUniversityStatus = async () => {
@@ -222,6 +227,12 @@ function AdminDashboard() {
                 <Database size={14} className="text-blue-600" /> {user?.universityName || 'Institution Dashboard'}
               </p>
             </div>
+            <button
+              onClick={() => setShowIssueModal(true)}
+              className="flex items-center gap-3 h-14 px-8 bg-blue-600 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-blue-700 transition-all shadow-xl shadow-blue-500/20 shrink-0"
+            >
+              <Plus size={18} /> Issue Certificate
+            </button>
           </motion.div>
 
           {/* INSIGHTS GRID */}

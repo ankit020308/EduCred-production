@@ -100,7 +100,11 @@ export const logout = async (req, res) => {
 
 // 🛡️ Google Auth Client (google-auth-library) disabled for stabilization.
 
-export const signToken = (id, extraPayload = {}) => jwt.sign({ id, ...extraPayload }, jwtSecret, { expiresIn: JWT_EXPIRES });
+export const signToken = (id, role, extraPayload = {}) => {
+  const token = jwt.sign({ userId: id, role, ...extraPayload }, jwtSecret, { expiresIn: JWT_EXPIRES });
+  console.log(`[AUTH_DEBUG] token generated: userId=${id} role=${role} exp=${JWT_EXPIRES}`);
+  return token;
+};
 export const signRefreshToken = (id) => jwt.sign({ id }, refreshSecret, { expiresIn: REFRESH_EXPIRES });
 
 export const setCookies = (res, accessToken, refreshToken) => {
@@ -240,6 +244,7 @@ export const register = async (req, res) => {
 };
 
 export const login = async (req, res) => {
+  console.log(`[AUTH] Login attempt: ${req.body?.email || 'unknown'}, status: pending`);
   console.log(`[AUTH_ENTRY] /login invoked for ${req.body?.email}`);
   try {
     const { error } = loginSchema.validate(req.body);
@@ -250,9 +255,24 @@ export const login = async (req, res) => {
 
     const { email: rawEmail, password } = req.body;
     const email = rawEmail.toLowerCase();
+
+    // Admin login via env credentials (bypasses DB)
+    const adminEmail = process.env.ADMIN_EMAIL?.toLowerCase();
+    const adminPassword = process.env.ADMIN_PASSWORD;
+    if (adminEmail && adminPassword && email === adminEmail && password === adminPassword) {
+      const accessToken = signToken('admin', 'admin');
+      const refreshToken = signRefreshToken('admin');
+      setCookies(res, accessToken, refreshToken);
+      return res.json({
+        accessToken,
+        user: { id: 'admin', name: 'Admin', email: adminEmail, role: 'admin', isVerified: true },
+      });
+    }
+
     const user = await Registry.findOne('users', { email });
 
     if (!user || !(await bcrypt.compare(password, user.passwordHash))) {
+      console.log(`[AUTH] Login attempt: ${email}, status: INVALID_CREDENTIALS`);
       return res.status(401).json({ error: 'Invalid credentials.' });
     }
 
@@ -266,6 +286,7 @@ export const login = async (req, res) => {
     const university = user.role === 'university' ? await Registry.findOne('universities', { userId: user.id }) : null;
 
     if (university && university.status === 'PENDING') {
+      console.log(`[AUTH] Login attempt: ${email}, status: PENDING`);
       return res.status(403).json({
         error: 'Institution account is pending admin approval. You will be notified once approved.',
         status: 'PENDING',
@@ -273,6 +294,7 @@ export const login = async (req, res) => {
     }
 
     if (university && university.status === 'REJECTED') {
+      console.log(`[AUTH] Login attempt: ${email}, status: REJECTED`);
       return res.status(403).json({
         error: 'Institution account has been rejected. Contact support for assistance.',
         status: 'REJECTED',
@@ -283,15 +305,16 @@ export const login = async (req, res) => {
       ? { institutionId: university.id, walletAddress: university.publicWalletAddress || null }
       : {};
 
-    const accessToken = signToken(user.id, extraPayload);
+    const accessToken = signToken(user.id, user.role, extraPayload);
     const refreshToken = signRefreshToken(user.id);
 
     setCookies(res, accessToken, refreshToken);
 
     await logAudit(req, 'NODE_LOGIN', 'SUCCESS', 'Identity session established.', { userId: user.id });
+    console.log(`[AUTH] Login attempt: ${email}, status: APPROVED`);
 
     const payload = await buildUserPayload(user.id);
-    res.json({ user: payload });
+    res.json({ accessToken, user: payload });
   } catch (err) {
     console.error('[AUTH] [ERROR] Login failure:', err);
     await logAudit(req, 'AUTH_LOGIN', 'FAILURE', 'Account session establishment failed.', { email: req.body.email });
@@ -323,7 +346,8 @@ export const verifyOTP = async (req, res) => {
     }
 
     // 2. Check expiry FIRST — before any hash comparison to prevent timing oracle
-    if (!user.otpExpires || user.otpExpires < Date.now()) {
+    const otpExpiresAt = user.otpExpires instanceof Date ? user.otpExpires.getTime() : Number(user.otpExpires);
+    if (!user.otpExpires || otpExpiresAt < Date.now()) {
       return res.status(400).json({ error: 'Security key expired. Request a new one.' });
     }
 
@@ -357,15 +381,16 @@ export const verifyOTP = async (req, res) => {
       ? { institutionId: otpUniversity.id, walletAddress: otpUniversity.publicWalletAddress || null }
       : {};
 
-    const accessToken = signToken(user.id, otpExtraPayload);
+    const accessToken = signToken(user.id, user.role, otpExtraPayload);
     const refreshToken = signRefreshToken(user.id);
 
     setCookies(res, accessToken, refreshToken);
-    
+
     console.log(`[AUTH_POST_WRITE] OTP Verification completed for user ${user.id}`);
     const payload = await buildUserPayload(user.id);
     res.status(200).json({
       message: 'Account activated successfully.',
+      accessToken,
       user: payload
     });
 
@@ -398,7 +423,7 @@ export const resendOTP = async (req, res) => {
     const otp = generateOTP();
     await Registry.update('users', { id: user.id }, {
       otp: hashOTP(otp),
-      otpExpires: Date.now() + 10 * 60 * 1000,
+      otpExpires: new Date(Date.now() + 10 * 60 * 1000),
       otpAttempts: 0,
       lastOtpResend: now
     });
@@ -439,6 +464,16 @@ export const refreshToken = async (req, res) => {
     }
 
     const decoded = jwt.verify(token, refreshSecret);
+
+    // Admin refresh: not in DB, handle directly
+    if (decoded.id === 'admin') {
+      const accessToken = signToken('admin', 'admin');
+      const rotatedRefreshToken = signRefreshToken('admin');
+      await blacklistTokenIfPresent(token);
+      setCookies(res, accessToken, rotatedRefreshToken);
+      return res.status(200).json({ accessToken, success: true });
+    }
+
     const user = await Registry.findById('users', decoded.id);
 
     if (!user) {
@@ -456,13 +491,13 @@ export const refreshToken = async (req, res) => {
       ? { institutionId: refreshUniversity.id, walletAddress: refreshUniversity.publicWalletAddress || null }
       : {};
 
-    const accessToken = signToken(user.id, refreshExtraPayload);
+    const accessToken = signToken(user.id, user.role, refreshExtraPayload);
     const rotatedRefreshToken = signRefreshToken(user.id);
 
     await blacklistTokenIfPresent(token);
     setCookies(res, accessToken, rotatedRefreshToken);
 
-    res.status(200).json({ success: true });
+    res.status(200).json({ accessToken, success: true });
   } catch (err) {
     clearAuthCookies(res);
     res.status(401).json({ error: 'Invalid or expired refresh token.' });
@@ -545,6 +580,9 @@ export const verifyPhoneOTP = async (req, res) => {
 
 export const getMe = async (req, res) => {
   console.log(`[AUTH_ENTRY] /me invoked for user ${req.user?.id}`);
+  if (req.user.id === 'admin') {
+    return res.json({ id: 'admin', name: 'Admin', email: req.user.email, role: 'admin', isVerified: true });
+  }
   const payload = await buildUserPayload(req.user.id);
   res.json(payload);
 };

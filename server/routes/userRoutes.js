@@ -88,9 +88,14 @@ router.post('/verify-email', protect, async (req, res) => {
 router.get('/certificates', protect, requireRole('student'), async (req, res) => {
     try {
         const student = await Registry.findOne('students', { userId: req.user.id });
-        
+
+        // Guard: if no student record exists yet, return empty array (not an error)
+        if (!student) {
+            return res.json([]);
+        }
+
         const certificates = await Registry.find('certificates', {
-            studentId: student ? student.id : 'none'
+            studentId: student.id
         });
 
         res.json(certificates);

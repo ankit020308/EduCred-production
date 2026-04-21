@@ -1,5 +1,5 @@
 import { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
-import api from '../services/api';
+import api, { storeToken, clearToken } from '../services/api';
 
 const AuthContext = createContext(null);
 
@@ -73,7 +73,9 @@ export function AuthProvider({ children }) {
   const login = useCallback(async (email, password) => {
     try {
       const res = await api.post('/api/auth/login', { email, password });
-      const { user: u } = res.data;
+      const { user: u, accessToken } = res.data;
+      if (accessToken) storeToken(accessToken);
+      console.log(`[AUTH_DEBUG] login: token received=${!!accessToken}`);
       persistSession(u);
       return u;
     } catch (err) {
@@ -97,12 +99,12 @@ export function AuthProvider({ children }) {
   const verifyOTP = useCallback(async (email, otp) => {
     try {
       const res = await api.post('/api/auth/verify-otp', { email, otp });
-      const userFromResponse = res.data?.user;
+      const { user: userFromResponse, accessToken } = res.data;
+      if (accessToken) storeToken(accessToken);
       if (userFromResponse) {
         persistSession(userFromResponse);
         return userFromResponse;
       }
-      // Fallback: hydrate from session cookie
       const meRes = await api.get('/api/auth/me');
       persistSession(meRes.data);
       return meRes.data;
@@ -137,6 +139,7 @@ export function AuthProvider({ children }) {
   // 🔹 LOGOUT
   const logout = useCallback(async () => {
     try { await api.post('/api/auth/logout'); } catch { /* ignore */ }
+    clearToken();
     localStorage.removeItem('user');
     setUser(null);
   }, []);

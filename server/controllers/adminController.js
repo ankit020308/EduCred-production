@@ -36,7 +36,13 @@ export const approveUniversity = async (req, res) => {
     
     const { publicWalletAddress, encryptedPrivateKey } = createEncryptedWalletRecord();
 
-    await authorizeUniversityOnChain(publicWalletAddress);
+    console.log(`[CHAIN] Blockchain call started | authorizeUniversity: ${publicWalletAddress}`);
+    try {
+      await authorizeUniversityOnChain(publicWalletAddress);
+      console.log(`[CHAIN] Blockchain call success | authorizeUniversity: ${publicWalletAddress}`);
+    } catch (chainErr) {
+      console.error(`[CHAIN] Blockchain call failed | authorizeUniversity: ${chainErr.message} — continuing with DB approval`);
+    }
 
     await Registry.update('universities', { id: universityId }, {
       status: 'APPROVED',

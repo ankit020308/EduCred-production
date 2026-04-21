@@ -140,6 +140,7 @@ export const issueCertificate = async (req, res) => {
   let cert = null;
 
   try {
+    console.log(`[UPLOAD] Certificate upload started: institutionId=${req.user?.id}`);
     const { error, value } = certificateIssuanceSchema.validate(req.body, { abortEarly: false });
     if (error) {
       return res.status(400).json({
@@ -178,6 +179,8 @@ export const issueCertificate = async (req, res) => {
     const certificateHash = fileBuffer
       ? generateBinaryHash(fileBuffer)
       : generateStructuralHash({ studentName, course: programName, issuerId: university.id });
+
+    console.log(`[HASH] SHA-256 generated: ${certificateHash.substring(0, 16)}...`);
 
     let studentId = null;
     try {
@@ -224,6 +227,7 @@ export const issueCertificate = async (req, res) => {
         },
       ],
     });
+    console.log(`[DB] Certificate saved: certificateId=${cert.certificateId}`);
 
     let ipfsCid = null;
     let metadataIpfsCid = null;
@@ -281,15 +285,17 @@ export const issueCertificate = async (req, res) => {
     let receipt = null;
     emitToInstitution(university.id, 'anchoring:pending', { certificateId: cert.certificateId, id: cert.id });
     try {
+      console.log(`[CHAIN] Blockchain call started | issueCertificate: ${cert.certificateId}`);
       receipt = await issueCertificateOnChain(
         cert.id,
         certificateHash,
         CERTIFICATE_TYPE_CODES[cert.certificateType] ?? 0,
         university.encryptedPrivateKey
       );
+      console.log(`[CHAIN] Blockchain call success | issueCertificate: ${cert.certificateId} txHash=${receipt.hash}`);
       emitToInstitution(university.id, 'anchoring:success', { certificateId: cert.certificateId, id: cert.id, txHash: receipt.hash });
     } catch (bcErr) {
-      console.error('[⚠️ BLOCKCHAIN_DEFERRED] Anchor skipped — cert queued for confirmIssuance.', bcErr.message);
+      console.error(`[CHAIN] Blockchain call failed | issueCertificate: ${cert.certificateId} error=${bcErr.message}`);
       emitToInstitution(university.id, 'anchoring:failed', { certificateId: cert.certificateId, id: cert.id, error: bcErr.message });
     }
 
@@ -603,7 +609,7 @@ export const verifyCertificate = async (req, res) => {
   try {
     const { certificateId } = req.body;
     const file = req.file;
-
+    console.log(`[VERIFY] Verify request: certificateId=${certificateId || 'file-upload'}, method=${file ? 'upload' : 'id'}`);
     let verificationMethod = file ? 'upload' : 'id';
     let hashToVerify = '';
     let metadata = null;

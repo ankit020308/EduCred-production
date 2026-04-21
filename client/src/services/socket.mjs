@@ -20,7 +20,7 @@ export const socket = io(SOCKET_URL, {
  */
 export const joinInstitutionalRoom = (universityId) => {
     if (universityId) {
-        socket.emit('join_institutional_room', universityId);
+        socket.emit('join:institution', universityId);
         console.log(`📡 [SOCKET]: Requesting entrance to Institutional Node: ${universityId}`);
     }
 };

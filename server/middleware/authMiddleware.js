@@ -10,20 +10,32 @@ import { jwtSecret } from '../utils/runtimeConfig.js';
 export const protect = async (req, res, next) => {
   try {
     let token = req.cookies?.accessToken;
+    let tokenSource = 'cookie';
 
     if (!token && req.headers.authorization?.startsWith('Bearer ')) {
       token = req.headers.authorization.split(' ')[1];
+      tokenSource = 'header';
     }
+
+    console.log(`[AUTH_DEBUG] protect: token=${token ? 'present' : 'missing'} source=${tokenSource} url=${req.path}`);
 
     if (!token) {
       return res.status(401).json({ error: 'Identity proof required. No token provided.' });
     }
 
     const decoded = jwt.verify(token, jwtSecret);
+    const userId = decoded.userId || decoded.id;
+    console.log(`[AUTH_DEBUG] protect: decoded userId=${userId} role=${decoded.role}`);
+
+    // Admin token: not in DB, bypass DB lookup
+    if (userId === 'admin' && decoded.role === 'admin') {
+      req.user = { id: 'admin', role: 'admin', email: process.env.ADMIN_EMAIL || 'admin', isEmailVerified: true };
+      return next();
+    }
 
     const [isBlacklisted, user] = await Promise.all([
       Registry.findOne('blacklistedTokens', { token }),
-      Registry.findById('users', decoded.id),
+      Registry.findById('users', userId),
     ]);
 
     if (isBlacklisted) {
@@ -38,11 +50,11 @@ export const protect = async (req, res, next) => {
     }
 
     req.user = user;
-    // Forward enriched JWT claims so controllers can use them without extra DB lookups
     if (decoded.institutionId) req.user.institutionId = decoded.institutionId;
     if (decoded.walletAddress) req.user.walletAddress = decoded.walletAddress;
     next();
   } catch (err) {
+    console.log(`[AUTH_DEBUG] protect error: ${err.name} - ${err.message}`);
     if (err.name === 'TokenExpiredError') {
       return res.status(401).json({ error: 'Security token expired. Refresh required.', code: 'TOKEN_EXPIRED' });
     }

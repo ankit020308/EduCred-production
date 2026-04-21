@@ -23,7 +23,7 @@ router.post('/resend-otp', otpLimiter, resendOTP);
 router.post('/verify-phone', protect, otpLimiter, verifyPhoneOTP);
 router.post('/send-phone-otp', protect, otpLimiter, sendPhoneVerification);
 router.post('/refresh', refreshToken);
-router.post('/logout', protect, logout);
+router.post('/logout', logout);
 router.get('/me', protect, getMe);
 router.post('/complete-onboarding', protect, completeOnboarding);
 router.post('/admins', protect, requireRole('super_admin'), createAdmin);
@@ -66,7 +66,7 @@ const processGoogleCallback = (req, res) => {
     }
 
     // 🚀 TOKEN PROVISIONING: Use the standard 'id' from the SQL node
-    const accessToken = signToken(user.id);
+    const accessToken = signToken(user.id, user.role);
     const rToken = signRefreshToken(user.id);
 
     setCookies(res, accessToken, rToken);

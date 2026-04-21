@@ -38,12 +38,19 @@ import StudentDashboard from './components/StudentDashboard';
 function GlobalErrorListener() {
   const { toast } = useToast();
   const { logout } = useAuth();
+  const location = useLocation();
 
   useEffect(() => {
     const handleApiError = (event) => {
       const msg = event.detail;
+      const path = location.pathname.toLowerCase();
+      const isPublicPage = ['/', '/login', '/signup', '/verify-otp', '/verify'].some(p => path === p || path.startsWith('/verify/'));
+
       if (msg === 'session_expired') {
-        toast.error('Session expired. Please sign in again.');
+        // 🚀 PROACTIVE SUPPRESSION: Only show session toasts on protected routes
+        if (!isPublicPage) {
+          toast.error('Session expired. Please sign in again.');
+        }
         logout();
       } else if (msg === 'network_timeout') {
         toast.error('Network request timed out. Check your connection.');
@@ -52,7 +59,7 @@ function GlobalErrorListener() {
 
     window.addEventListener('apiError', handleApiError);
     return () => window.removeEventListener('apiError', handleApiError);
-  }, [toast, logout]);
+  }, [toast, logout, location.pathname]);
 
   return null;
 }
