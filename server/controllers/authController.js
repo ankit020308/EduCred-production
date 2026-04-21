@@ -20,6 +20,28 @@ const buildUserPayload = async (userId) => {
   const university = user.role === 'university' ? await Registry.findOne('universities', { userId: user.id }) : null;
   const student = user.role === 'student' ? await Registry.findOne('students', { userId: user.id }) : null;
 
+  // Lazy wallet allocation — generate and persist for users who registered before this was added
+  let walletAddress = university
+    ? (university?.publicWalletAddress || null)
+    : (student ? (student?.publicWalletAddress || null) : null);
+
+  if (!walletAddress) {
+    try {
+      const wallet = createEncryptedWalletRecord();
+      if (university) {
+        await Registry.update('universities', { userId: user.id }, {
+          publicWalletAddress: wallet.publicWalletAddress,
+          encryptedPrivateKey: wallet.encryptedPrivateKey,
+        });
+      } else if (student) {
+        await Registry.update('students', { userId: user.id }, {
+          publicWalletAddress: wallet.publicWalletAddress,
+        });
+      }
+      walletAddress = wallet.publicWalletAddress;
+    } catch { /* non-fatal — wallet will remain null until next call */ }
+  }
+
   return {
     id: user.id,
     name: user.name,
@@ -29,9 +51,7 @@ const buildUserPayload = async (userId) => {
     universityId: university ? university.id : null,
     universityStatus: university ? university.status : null,
     isVerified: university ? university.isVerified : user.isEmailVerified,
-    walletAddress: university
-      ? (university.publicWalletAddress || null)
-      : (student ? (student.publicWalletAddress || null) : null),
+    walletAddress,
     profileImageUrl: user.profileImageUrl || null,
   };
 };
@@ -49,10 +69,16 @@ const buildCookieOptions = () => {
   };
 };
 
+const buildClearCookieOptions = () => {
+  const isProd = isProduction;
+  // maxAge must be omitted from clearCookie options — Express v5 deprecates it
+  return { httpOnly: true, secure: isProd, sameSite: isProd ? 'none' : 'lax' };
+};
+
 const clearAuthCookies = (res) => {
-  const cookieOptions = buildCookieOptions();
-  res.clearCookie('accessToken', cookieOptions);
-  res.clearCookie('refreshToken', cookieOptions);
+  const opts = buildClearCookieOptions();
+  res.clearCookie('accessToken', opts);
+  res.clearCookie('refreshToken', opts);
 };
 
 const extractRefreshToken = (req) => req.cookies?.refreshToken || req.body?.token || null;

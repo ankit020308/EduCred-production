@@ -5,6 +5,7 @@ import crypto from 'crypto';
 import { protect, requireRole } from '../middleware/authMiddleware.js';
 import { upload } from '../middleware/uploadMiddleware.js';
 import { uploadFileToPinata, isPinataConfigured } from '../utils/ipfsService.js';
+import { createEncryptedWalletRecord } from '../utils/keyVault.js';
 
 const router = express.Router();
 
@@ -37,6 +38,7 @@ router.post('/profile/upload-photo', protect, upload.single('photo'), async (req
 
 // ─── GET User Profile (PROTECTED) ─────────────────────
 router.get('/profile', protect, async (req, res) => {
+    res.setHeader('Cache-Control', 'no-store');
     try {
         const user = await Registry.findById('users', req.user.id);
 
@@ -49,7 +51,7 @@ router.get('/profile', protect, async (req, res) => {
             .substring(0, 6)
             .toUpperCase()}`;
 
-        const userObj = { ...user };
+        const userObj = user.get ? user.get({ plain: true }) : { ...user };
         // Strip sensitive fields before sending
         delete userObj.passwordHash;
         delete userObj.otp;
@@ -92,7 +94,7 @@ router.put('/profile', protect, async (req, res) => {
 
         if (!user) return res.status(404).json({ error: 'User not found.' });
 
-        const userObj = { ...user };
+        const userObj = user.get ? user.get({ plain: true }) : { ...user };
         delete userObj.passwordHash;
         delete userObj.otp;
         delete userObj.otpExpires;
@@ -130,6 +132,16 @@ router.get('/profile/student-details', protect, requireRole('student'), async (r
     try {
         const student = await Registry.findOne('students', { userId: req.user.id });
         if (!student) return res.json({});
+
+        // Lazy wallet allocation for students who registered before wallet assignment was added
+        if (!student.publicWalletAddress) {
+            try {
+                const { publicWalletAddress } = createEncryptedWalletRecord();
+                await Registry.update('students', { userId: req.user.id }, { publicWalletAddress });
+                student.publicWalletAddress = publicWalletAddress;
+            } catch { /* non-fatal */ }
+        }
+
         const { id, userId, digilockerAccessToken, digilockerRefreshToken, ...safe } = student.dataValues || student;
         const userRecord = await Registry.findById('users', req.user.id).catch(() => null);
         res.json({ ...safe, profileImageUrl: userRecord?.profileImageUrl || null });
@@ -160,6 +172,19 @@ router.get('/profile/institution-details', protect, requireRole('university', 'U
     try {
         const uni = await Registry.findOne('universities', { userId: req.user.id });
         if (!uni) return res.json({});
+
+        // Lazy wallet allocation for universities that registered before wallet assignment was added
+        if (!uni.publicWalletAddress) {
+            try {
+                const wallet = createEncryptedWalletRecord();
+                await Registry.update('universities', { userId: req.user.id }, {
+                    publicWalletAddress: wallet.publicWalletAddress,
+                    encryptedPrivateKey: wallet.encryptedPrivateKey,
+                });
+                uni.publicWalletAddress = wallet.publicWalletAddress;
+            } catch { /* non-fatal */ }
+        }
+
         const { encryptedPrivateKey, ...safe } = uni.dataValues || uni;
         const userRecord = await Registry.findById('users', req.user.id).catch(() => null);
         res.json({ ...safe, profileImageUrl: userRecord?.profileImageUrl || null });

@@ -92,6 +92,8 @@ export default function StudentDashboard() {
   const [copiedId, setCopiedId] = useState(null);
   const [selectedCert, setSelectedCert] = useState(null);
   const [showTooltip, setShowTooltip] = useState(false);
+  const [downloadingId, setDownloadingId] = useState(null);
+  const [downloadError, setDownloadError] = useState(null);
 
   useEffect(() => {
     fetchCertificates();
@@ -229,6 +231,17 @@ export default function StudentDashboard() {
           ))}
         </motion.div>
 
+        {/* Download error banner */}
+        <AnimatePresence>
+          {downloadError && (
+            <motion.div initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }}
+              className="flex items-center gap-3 px-5 py-3 bg-[#ea2804]/10 border border-[#ea2804]/20 rounded-2xl">
+              <AlertCircle size={14} className="text-[#ea2804] shrink-0" />
+              <p className="text-[#ea2804] text-[10px] font-black uppercase tracking-widest">{downloadError}</p>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
         {/* Certificate list */}
         <motion.div {...vt} transition={{ delay: 0.2 }}>
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
@@ -334,23 +347,35 @@ export default function StudentDashboard() {
 
                             <div className="flex flex-wrap gap-3 pt-3 border-t border-[#e0e0e0]">
                               {cert.status === 'CONFIRMED' && (
-                                <button onClick={async (e) => {
+                                <button disabled={downloadingId === cert.id} onClick={async (e) => {
                                   e.stopPropagation();
-                                  if (cert.fileUrl?.startsWith('http')) {
-                                    window.open(cert.fileUrl, '_blank');
-                                  } else {
-                                    try {
-                                      const res = await api.get(`/api/certificates/${cert.id}/file`, { responseType: 'blob' });
-                                      const url = URL.createObjectURL(res.data);
-                                      const a = document.createElement('a');
-                                      a.href = url;
-                                      a.download = `Certificate_${cert.certificateId || cert.id}.pdf`;
-                                      a.click();
-                                      URL.revokeObjectURL(url);
-                                    } catch { /* silently fail */ }
+                                  setDownloadingId(cert.id);
+                                  setDownloadError(null);
+                                  try {
+                                    const response = await api.get(`/api/certificates/${cert.id}/file`, { responseType: 'blob' });
+                                    const url = URL.createObjectURL(response.data);
+                                    const a = document.createElement('a');
+                                    a.href = url;
+                                    a.download = `Certificate_${cert.certificateId || cert.id}.pdf`;
+                                    a.click();
+                                    URL.revokeObjectURL(url);
+                                  } catch (err) {
+                                    const status = err?.response?.status;
+                                    if (status === 404) {
+                                      setDownloadError('Certificate file is not available yet. It may still be processing.');
+                                      fetchCertificates();
+                                    } else {
+                                      setDownloadError('Download failed. Please try again.');
+                                    }
+                                    setTimeout(() => setDownloadError(null), 5000);
+                                  } finally {
+                                    setDownloadingId(null);
                                   }
-                                }} className="btn-primary text-xs">
-                                  <Download size={13} /> {cert.fileUrl ? 'Download Certificate PDF' : 'Re-Generate PDF'}
+                                }} className="btn-primary text-xs disabled:opacity-60 disabled:cursor-not-allowed">
+                                  {downloadingId === cert.id
+                                    ? <><Loader2 size={13} className="animate-spin" /> Generating…</>
+                                    : <><Download size={13} /> {cert.fileUrl ? 'Download Certificate PDF' : 'Re-Generate PDF'}</>
+                                  }
                                 </button>
                               )}
                               {cert.status === 'CONFIRMED' && (

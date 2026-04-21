@@ -8,17 +8,18 @@ import { Op } from 'sequelize';
  */
 
 export const getStudentCertificates = async (req, res) => {
+  res.setHeader('Cache-Control', 'no-store');
   try {
     const student = await Registry.findOne('students', { userId: req.user.id });
-    
+
     // We search by Student ID (linked record) OR by confirmed email for cross-institution mobility
-    const certs = await Registry.find('certificates', { 
+    const certs = await Registry.find('certificates', {
       [Op.or]: [
         student ? { studentId: student.id } : null,
-        { studentEmail: req.user.email } 
+        { studentEmail: req.user.email }
       ].filter(Boolean)
     });
-    
+
     res.json(certs);
   } catch (error) {
     console.error('[STUDENT] getStudentCertificates error:', error);

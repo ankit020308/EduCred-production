@@ -1306,21 +1306,81 @@ export const downloadCertificateFile = async (req, res) => {
       return res.status(403).json({ error: 'Access denied.' });
     }
 
-    if (!cert.fileUrl) {
-      return res.status(404).json({ error: 'Certificate file is unavailable.' });
-    }
-
     const filename = `Certificate_${cert.certificateId}.pdf`;
     res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('X-Certificate-ID', cert.certificateId);
     if (cert.certificateHash) res.setHeader('X-Certificate-Hash', cert.certificateHash);
 
-    if (cert.fileUrl.startsWith('http://') || cert.fileUrl.startsWith('https://')) {
+    // Remote IPFS URL — redirect
+    if (cert.fileUrl?.startsWith('http://') || cert.fileUrl?.startsWith('https://')) {
       return res.redirect(cert.fileUrl);
     }
 
-    const localPath = path.join(__dirname, '../..', cert.fileUrl.replace(/^\//, ''));
-    return res.sendFile(localPath);
+    // Local file path
+    if (cert.fileUrl) {
+      const localPath = path.join(__dirname, '../..', cert.fileUrl.replace(/^\//, ''));
+      return res.sendFile(localPath);
+    }
+
+    // No fileUrl — regenerate PDF on-the-fly for CONFIRMED certificates
+    if (cert.status !== 'CONFIRMED') {
+      return res.status(404).json({
+        error: 'Certificate file is not yet available.',
+        hint: `Certificate is in ${cert.status} status. PDF is generated after admin confirmation.`,
+      });
+    }
+
+    try {
+      let studentProfileImageUrl = null;
+      try {
+        if (cert.studentEmail) {
+          const studentUser = await Registry.findOne('users', { email: cert.studentEmail });
+          if (studentUser) studentProfileImageUrl = studentUser.profileImageUrl || null;
+        }
+      } catch { /* photo lookup is optional */ }
+
+      const { generateCertificatePDF } = await import('../utils/pdfService.js');
+      const result = await generateCertificatePDF({
+        universityName: cert.issuer,
+        studentName: cert.studentName,
+        programName: cert.course,
+        branch: cert.metadata?.branch || '',
+        cgpa: cert.metadata?.finalCGPA,
+        graduationYear: cert.metadata?.graduationYear,
+        certificateId: cert.certificateId,
+        certificateHash: cert.certificateHash,
+        txHash: cert.blockchainTxHash,
+        profileImageUrl: studentProfileImageUrl,
+      });
+
+      const pdfBuffer = result.buffer;
+      const pdfHash = result.pdfHash;
+
+      // Persist to IPFS asynchronously so future downloads hit the CDN
+      (async () => {
+        try {
+          if (isPinataConfigured()) {
+            const r = await uploadFileToPinata(pdfBuffer, `${cert.certificateId}.pdf`, { contentType: 'application/pdf' });
+            if (r?.cid) {
+              await Registry.update('certificates', { id: cert.id }, {
+                fileUrl: `https://gateway.pinata.cloud/ipfs/${r.cid}`,
+                pdfHash,
+              });
+            }
+          } else {
+            await Registry.update('certificates', { id: cert.id }, { pdfHash });
+          }
+        } catch (ipfsErr) {
+          console.error(`[PDF_PERSIST] IPFS upload failed for ${cert.certificateId}:`, ipfsErr.message);
+        }
+      })();
+
+      return res.send(pdfBuffer);
+    } catch (pdfErr) {
+      console.error(`[PDF_REGEN] Failed for ${cert.certificateId}:`, pdfErr.message);
+      return res.status(500).json({ error: 'Certificate file is unavailable and could not be regenerated.' });
+    }
   } catch (err) {
     return res.status(500).json({ error: 'Failed to download certificate file.' });
   }
