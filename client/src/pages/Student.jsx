@@ -1,18 +1,16 @@
 import { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
-import { ArrowLeft, Calendar, Fingerprint, GraduationCap, ShieldCheck } from 'lucide-react';
+import { ArrowLeft, Fingerprint, GraduationCap, ShieldCheck } from 'lucide-react';
 import { Link, useParams, useNavigate } from 'react-router-dom';
 import api from '../services/api';
-import BlockchainBackground from '../components/BlockchainBackground';
-import StatusBadge from '../components/StatusBadge';
 
 const transition = { duration: 0.55, ease: [0.22, 1, 0.36, 1] };
 
 function InfoCard({ label, value }) {
   return (
-    <div className="bg-slate-50 p-6 rounded-2xl border border-slate-100 transition-all hover:border-blue-100 group">
-      <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">{label}</p>
-      <p className="mt-3 text-sm font-black text-slate-900 uppercase tracking-widest truncate">{value || 'N/A'}</p>
+    <div className="bg-[#f6f6f6] p-6 rounded-full border border-[#e0e0e0] hover:border-[#ea2804]/30 transition-all">
+      <p className="text-[10px] font-black uppercase tracking-widest text-[#646464]">{label}</p>
+      <p className="mt-3 text-sm font-black text-[#202020] uppercase tracking-widest truncate">{value || 'N/A'}</p>
     </div>
   );
 }
@@ -40,10 +38,10 @@ export default function Student() {
 
   if (loading) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-[#F8FAFC]">
+      <div className="flex min-h-screen items-center justify-center bg-[#f6f6f6]">
         <div className="flex flex-col items-center gap-6">
-          <div className="w-16 h-16 border-[3px] border-t-blue-600 border-r-blue-600 border-b-transparent border-l-transparent rounded-full animate-spin" />
-          <div className="text-[10px] font-black tracking-widest text-slate-400 uppercase">Verifying Credential...</div>
+          <div className="w-16 h-16 border-[3px] border-t-[#ea2804] border-r-[#ea2804] border-b-transparent border-l-transparent rounded-full animate-spin" />
+          <div className="text-[10px] font-black tracking-widest text-[#646464] uppercase">Verifying Credential...</div>
         </div>
       </div>
     );
@@ -51,17 +49,14 @@ export default function Student() {
 
   if (error || !certificate) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-[#F8FAFC] px-6 text-center">
-        <div className="bg-white rounded-[2.5rem] p-12 border border-slate-100 max-w-md w-full shadow-2xl shadow-slate-900/10">
-          <div className="w-20 h-20 bg-rose-50 rounded-3xl mx-auto flex items-center justify-center text-rose-500 border border-rose-100 mb-8">
-            <Calendar size={36} />
+      <div className="flex min-h-screen items-center justify-center bg-[#f6f6f6] px-6 text-center">
+        <div className="bg-white rounded-full p-12 border border-[#202020] max-w-md w-full">
+          <div className="w-20 h-20 bg-[#ea2804]/5 rounded-full mx-auto flex items-center justify-center text-[#ea2804] border border-[#ea2804]/20 mb-8">
+            <ShieldCheck size={36} />
           </div>
-          <p className="text-[10px] font-black tracking-widest text-rose-500 uppercase mb-4">Error</p>
-          <p className="text-xl font-black tracking-tighter uppercase mb-10 text-slate-900">{error}</p>
-          <button
-            onClick={() => navigate('/verify')}
-            className="btn-primary w-full !py-4 shadow-blue-500/10"
-          >
+          <p className="text-[10px] font-black tracking-widest text-[#ea2804] uppercase mb-4">Error</p>
+          <p className="text-xl font-black tracking-tight uppercase mb-10 text-[#202020]">{error}</p>
+          <button onClick={() => navigate('/verify')} className="btn-primary w-full">
             <ArrowLeft size={16} /> Return to Verification
           </button>
         </div>
@@ -69,12 +64,34 @@ export default function Student() {
     );
   }
 
+  const status = certificate.isRevoked ? 'REVOKED' : certificate.status;
+  const statusStyle =
+    status === 'CONFIRMED' ? { bg: 'bg-[#2b9a66]', label: 'Verified' } :
+    status === 'REVOKED'   ? { bg: 'bg-[#ea2804]', label: 'Revoked' } :
+                             { bg: 'bg-[#646464]', label: 'Processing' };
+
   return (
-    <div className="relative min-h-screen overflow-x-hidden bg-[#F8FAFC] text-slate-800 font-sans selection:bg-blue-500/30">
-      
-      {/* 🌌 BACKGROUND GRADIENT */}
-      <div className="fixed inset-0 bg-[#0B132B] pointer-events-none z-0" />
-      <div className="fixed inset-0 hero-gradient pointer-events-none" />
+    <div className="relative min-h-screen overflow-x-hidden bg-[#f6f6f6] text-[#202020] font-sans">
+
+      {/* Dark hero strip */}
+      <div className="fixed top-0 inset-x-0 h-72 bg-[#202020] pointer-events-none z-0" />
+
+      {/* Header */}
+      <header className="fixed top-0 inset-x-0 z-50 border-b border-white/10 bg-[#202020]/80 backdrop-blur-xl">
+        <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
+          <Link to="/" className="flex items-center gap-3">
+            <div className="w-8 h-8 bg-[#ea2804] rounded-full flex items-center justify-center">
+              <ShieldCheck className="text-white" size={16} />
+            </div>
+            <span className="text-lg font-black text-white tracking-tight">
+              Edu<span className="text-[#ea2804]">Cred</span>
+            </span>
+          </Link>
+          <Link to="/verify" className="text-[10px] font-black uppercase tracking-widest text-[#646464] hover:text-white transition-colors">
+            Verify Another
+          </Link>
+        </div>
+      </header>
 
       <main className="relative z-10 px-6 pb-24 pt-32">
         <div className="mx-auto max-w-5xl">
@@ -82,36 +99,39 @@ export default function Student() {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={transition}
-            className="bg-white rounded-[2.5rem] border border-slate-100 p-10 md:p-14 shadow-2xl shadow-slate-900/20"
+            className="bg-white rounded-full border border-[#202020] p-10 md:p-14"
           >
-            <button 
+            <button
               onClick={() => navigate('/verify')}
-              className="inline-flex items-center gap-3 text-[10px] font-black uppercase tracking-widest text-slate-400 transition-all hover:text-blue-600 mb-12"
+              className="inline-flex items-center gap-3 text-[10px] font-black uppercase tracking-widest text-[#646464] hover:text-[#ea2804] transition-colors mb-12"
             >
               <ArrowLeft size={14} />
               Return to Verification
             </button>
 
-            <div className="flex flex-col gap-10 lg:flex-row lg:items-start lg:justify-between border-b border-slate-100 pb-12">
+            <div className="flex flex-col gap-10 lg:flex-row lg:items-start lg:justify-between border-b border-[#e0e0e0] pb-12">
               <div className="space-y-6">
-                <div className="inline-flex items-center gap-3 px-5 py-2.5 rounded-full border border-blue-100 bg-blue-50 text-[10px] font-black uppercase tracking-widest text-blue-600 shadow-sm">
+                <div className="inline-flex items-center gap-3 px-5 py-2.5 rounded-full border border-[#ea2804]/30 bg-[#ea2804]/10 text-[10px] font-black uppercase tracking-widest text-[#ea2804]">
                   <ShieldCheck size={14} className="animate-pulse" />
                   Verified Digital Credential
                 </div>
-                <h1 className="text-5xl md:text-6xl font-black tracking-tighter text-slate-900 uppercase leading-none">
+                <h1 className="text-5xl md:text-6xl font-black tracking-tight text-[#202020] uppercase leading-none">
                   {certificate.studentName}.
                 </h1>
                 <div className="space-y-3">
-                  <p className="text-xl font-black text-blue-600 uppercase tracking-widest">{certificate.course}</p>
-                  <p className="text-[11px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-3">
-                    <GraduationCap size={16} className="text-slate-300" /> Issued By: {certificate.issuer || 'Institutional Lead'}
+                  <p className="text-xl font-black text-[#ea2804] uppercase tracking-widest">{certificate.course}</p>
+                  <p className="text-[11px] font-black text-[#646464] uppercase tracking-widest flex items-center gap-3">
+                    <GraduationCap size={16} className="text-[#bbbbbb]" /> Issued By: {certificate.issuer || 'Institutional Lead'}
                   </p>
                 </div>
               </div>
 
-              <div className="bg-slate-50 rounded-3xl border border-slate-100 px-10 py-8 shadow-inner flex flex-col items-center">
-                <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-4 text-center">Status</p>
-                <StatusBadge status={certificate.isRevoked ? 'REVOKED' : certificate.status} />
+              <div className="bg-[#f6f6f6] rounded-full border border-[#e0e0e0] px-10 py-8 flex flex-col items-center">
+                <p className="text-[10px] font-black uppercase tracking-widest text-[#646464] mb-4 text-center">Status</p>
+                <span className={`inline-flex items-center gap-2 px-5 py-2 rounded-full text-[9px] font-black uppercase tracking-widest text-white ${statusStyle.bg}`}>
+                  <div className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" />
+                  {statusStyle.label}
+                </span>
               </div>
             </div>
 
@@ -125,35 +145,35 @@ export default function Student() {
               <InfoCard label="Year of Completion" value={certificate.metadata?.graduationYear || 'N/A'} />
             </div>
 
-            <div className="mt-12 rounded-3xl border border-slate-100 bg-slate-50 p-10 shadow-inner group transition-all hover:border-blue-100">
+            {/* Hash */}
+            <div className="mt-12 rounded-full border border-[#e0e0e0] bg-[#f6f6f6] p-10 group hover:border-[#ea2804]/30 transition-all">
               <div className="flex items-center gap-4 mb-6">
-                <Fingerprint className="text-blue-600" size={20} />
-                <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Blockchain Verification Hash</p>
+                <Fingerprint className="text-[#ea2804]" size={20} />
+                <p className="text-[10px] font-black uppercase tracking-widest text-[#646464]">Blockchain Verification Hash</p>
               </div>
-              <p className="break-all font-mono text-xs text-slate-500 bg-white p-6 rounded-2xl border border-slate-100 leading-relaxed tracking-tight group-hover:text-blue-600 transition-colors uppercase">
+              <p className="break-all font-mono text-xs text-[#646464] bg-white p-6 rounded-full border border-[#e0e0e0] leading-relaxed tracking-tight group-hover:text-[#ea2804] transition-colors uppercase">
                 {certificate.certificateHash}
               </p>
             </div>
 
+            {/* Trust badges */}
             <div className="mt-12 grid gap-8 md:grid-cols-3">
-              <div className="p-8 rounded-3xl bg-slate-50/50 border border-slate-100 hover:border-blue-100 transition-all">
-                <div className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center text-blue-600 border border-slate-100 mb-6 font-black uppercase tracking-widest text-[10px] shadow-sm">
-                  AUTH
+              {[
+                { label: 'AUTH', text: 'Issued by a verified authority', accent: false },
+                { label: 'LIVE', text: 'Public record live and accessible', accent: true },
+                { label: 'SECURE', text: 'Protected by blockchain immutability', accent: false },
+              ].map(({ label, text, accent }) => (
+                <div key={label} className="p-8 rounded-full bg-[#f6f6f6] border border-[#e0e0e0] hover:border-[#ea2804]/30 transition-all">
+                  <div className={`w-12 h-12 rounded-full flex items-center justify-center border font-black text-[10px] mb-6 ${
+                    accent
+                      ? 'bg-[#2b9a66]/10 border-[#2b9a66]/20 text-[#2b9a66]'
+                      : 'bg-white border-[#e0e0e0] text-[#202020]'
+                  }`}>
+                    {label}
+                  </div>
+                  <p className="text-[11px] font-black text-[#646464] uppercase tracking-widest leading-relaxed">{text}</p>
                 </div>
-                <p className="text-[11px] font-black text-slate-400 uppercase tracking-widest leading-relaxed">Issued by a verified authority</p>
-              </div>
-              <div className="p-8 rounded-3xl bg-slate-50/50 border border-slate-100 hover:border-blue-100 transition-all">
-                <div className="w-12 h-12 bg-emerald-50 rounded-2xl flex items-center justify-center text-emerald-600 border border-emerald-100 mb-6 font-black uppercase tracking-widest text-[10px] shadow-sm">
-                  LIVE
-                </div>
-                <p className="text-[11px] font-black text-slate-400 uppercase tracking-widest leading-relaxed">Public record live and accessible</p>
-              </div>
-              <div className="p-8 rounded-3xl bg-slate-50/50 border border-slate-100 hover:border-blue-100 transition-all">
-                <div className="w-12 h-12 bg-blue-50 rounded-2xl flex items-center justify-center text-blue-600 border border-blue-100 mb-6 font-black uppercase tracking-widest text-[10px] shadow-sm">
-                  SECURE
-                </div>
-                <p className="text-[11px] font-black text-slate-400 uppercase tracking-widest leading-relaxed">Protected by blockchain immutability</p>
-              </div>
+              ))}
             </div>
           </motion.div>
         </div>

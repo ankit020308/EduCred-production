@@ -7,11 +7,20 @@ export default {
   theme: {
     extend: {
       colors: {
-        'bg-dark': '#020817',
-        'text-secondary': '#94a3b8',
+        // DESIGN.md — Replicate-inspired system
+        'rep-dark':   '#202020',
+        'rep-red':    '#ea2804',
+        'rep-red-2':  '#dd4425',
+        'rep-green':  '#2b9a66',
+        'rep-code':   '#24292e',
+        'rep-gray':   '#646464',
+        'rep-silver': '#8d8d8d',
+        'rep-light':  '#bbbbbb',
       },
       fontFamily: {
-        sans: ['Inter', 'sans-serif'],
+        display: ['rb-freigeist-neue', 'Inter', 'ui-sans-serif', 'system-ui'],
+        sans:    ['basier-square', 'Inter', 'ui-sans-serif', 'system-ui'],
+        mono:    ['JetBrains Mono', 'ui-monospace', 'SFMono-Regular', 'Menlo', 'monospace'],
       },
     },
   },

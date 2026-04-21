@@ -1,116 +1,119 @@
 @import "tailwindcss";
 
-/* ──────────────────────────────────────────────────────────────────────────
-   🏛️ MASTER DESIGN SYSTEM: ENTERPRISE LAYER
-   ────────────────────────────────────────────────────────────────────────── */
+/* ─────────────────────────────────────────────────────────────────────────────
+   EDUCRED DESIGN SYSTEM — Replicate-inspired
+   Rules: pill (9999px) on everything · #ea2804 brand red · #202020 dark
+          no drop shadows — depth via borders · JetBrains Mono for code
+───────────────────────────────────────────────────────────────────────────── */
+
 @layer base {
   :root {
-    /* 🏛️ ABSOLUTE PALETTE: STEEL & ICY BLUE */
-    --color-bg-deep: #F9FAFB;      /* Strict Background */
-    --color-bg-canvas: #F3F4F6;    /* Secondary Background */
-    --color-bg-matte: #FFFFFF;     /* Pure Surface */
-    --color-bg-light: #E5E7EB;     /* Component Gray */
-    
-    --color-primary: #2C2F33;      /* Steel Gray */
-    --color-primary-hover: #1F2937;
-    --color-accent: #60A5FA;       /* Icy Blue */
-    
-    --color-border: #E5E7EB;
-    --color-border-dark: #D1D5DB;
-    --color-text-main: #111827;    /* Pure Text */
-    --color-text-muted: #4B5563;   /* Secondary Text */
-
-    /* 📄 PREMIUM TYPOGRAPHY */
-    --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
+    --color-dark:       #202020;
+    --color-red:        #ea2804;
+    --color-red-2:      #dd4425;
+    --color-green:      #2b9a66;
+    --color-code:       #24292e;
+    --color-gray:       #646464;
+    --color-silver:     #8d8d8d;
+    --color-light:      #bbbbbb;
+    --color-white:      #ffffff;
+    --color-near-white: #fcfcfc;
+    --color-surface:    #f6f6f6;
+    --color-border:     #e0e0e0;
   }
 
-  html {
-    scroll-behavior: smooth;
-    background-color: var(--color-bg-deep);
-  }
+  html { scroll-behavior: smooth; }
 
   body {
     margin: 0;
-    background-color: var(--color-bg-deep);
-    color: var(--color-text-main);
-    font-family: var(--font-sans);
+    background: var(--color-white);
+    color: var(--color-dark);
+    font-family: 'basier-square', 'Inter', ui-sans-serif, system-ui;
     -webkit-font-smoothing: antialiased;
-    letter-spacing: -0.01em;
   }
 }
 
-/* ──────────────────────────────────────────────────────────────────────────
-   🪄 UTILITIES: PROFESSIONAL SURFACE SYSTEMS
-   ────────────────────────────────────────────────────────────────────────── */
+/* ─── SCROLLBAR ─────────────────────────────────────────────────────────────── */
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: var(--color-surface); }
+::-webkit-scrollbar-thumb { background: var(--color-light); border-radius: 9999px; }
+::-webkit-scrollbar-thumb:hover { background: var(--color-silver); }
 
-@utility glass-pane {
-  background: rgba(255, 255, 255, 0.7);
-  backdrop-filter: blur(24px) saturate(180%);
-  border: 1px solid var(--color-border);
-  position: relative;
-  overflow: hidden;
-}
+/* ─── BUTTONS ───────────────────────────────────────────────────────────────── */
 
-@utility saas-card {
-  background: var(--color-bg-matte);
-  border: 1px solid var(--color-border);
-  border-radius: 1.5rem;
-  box-shadow: 
-    0 10px 40px -10px rgba(15, 23, 42, 0.1),
-    0 1px 2px rgba(15, 23, 42, 0.05);
-  transition: all 0.3s cubic-bezier(0.22, 1, 0.36, 1);
-}
-
+/* Dark solid pill — primary action */
 @utility btn-primary {
-  @apply bg-[#2C2F33] text-white font-bold px-8 py-3.5 rounded-xl 
-         hover:bg-[#1F2937] hover:scale-[1.02] active:scale-95 
-         transition-all duration-300 shadow-xl shadow-slate-900/10 
-         flex items-center justify-center gap-2;
+  @apply inline-flex items-center justify-center gap-2
+         font-bold text-[#fcfcfc] text-sm
+         px-7 py-3.5 rounded-full
+         bg-[#202020] border-2 border-[#202020]
+         hover:bg-[#111] hover:border-[#111]
+         active:scale-[0.97]
+         transition-all duration-200 cursor-pointer;
 }
 
+/* White outlined pill — secondary action */
 @utility btn-secondary {
-  @apply border border-slate-200 bg-white text-slate-700 font-semibold 
-         px-8 py-3.5 rounded-xl hover:bg-slate-50 hover:border-slate-300 
-         active:scale-95 transition-all duration-300 flex items-center justify-center gap-2;
+  @apply inline-flex items-center justify-center gap-2
+         font-bold text-[#202020] text-sm
+         px-7 py-3.5 rounded-full
+         bg-white border border-[#202020]
+         hover:bg-[#f6f6f6]
+         active:scale-[0.97]
+         transition-all duration-200 cursor-pointer;
 }
 
+/* Ghost pill — on dark surfaces */
+@utility btn-ghost {
+  @apply inline-flex items-center justify-center gap-2
+         font-bold text-white text-sm
+         px-7 py-3.5 rounded-full
+         border border-white/25 bg-white/10
+         hover:bg-white/20
+         active:scale-[0.97]
+         transition-all duration-200 cursor-pointer;
+}
+
+/* Red accent pill — brand action */
+@utility btn-red {
+  @apply inline-flex items-center justify-center gap-2
+         font-bold text-white text-sm
+         px-7 py-3.5 rounded-full
+         bg-[#ea2804] border-2 border-[#ea2804]
+         hover:bg-[#dd4425] hover:border-[#dd4425]
+         active:scale-[0.97]
+         transition-all duration-200 cursor-pointer;
+}
+
+/* ─── STATUS BADGE ──────────────────────────────────────────────────────────── */
+@utility badge-live {
+  @apply inline-flex items-center gap-1.5
+         px-3 py-1 rounded-full
+         text-xs font-bold text-white
+         bg-[#2b9a66];
+}
+
+/* ─── HERO GRADIENT ─────────────────────────────────────────────────────────── */
+/* Orange → red → magenta — the visual anchor of the site */
 @utility hero-gradient {
-  background: radial-gradient(circle at 50% 10%, rgba(96, 165, 250, 0.08) 0%, transparent 60%);
+  background: linear-gradient(135deg, #ea2804 0%, #c5133a 45%, #ff1b6b 75%, #ff6b9d 100%);
 }
 
-/* Removal of text-glow-blue as per absolute palette adherence */
-
-/* 🎨 SCROLLBAR THEME */
-::-webkit-scrollbar {
-  width: 8px;
+/* ─── ANIMATIONS ────────────────────────────────────────────────────────────── */
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(16px); }
+  to   { opacity: 1; transform: translateY(0); }
 }
 
-::-webkit-scrollbar-track {
-  background: var(--color-bg-deep);
+@utility animate-fade-up {
+  animation: fadeUp 0.6s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
-
-::-webkit-scrollbar-thumb {
-  background: #334155;
-  border-radius: 10px;
-  border: 2px solid var(--color-bg-deep);
-}
-
-::-webkit-scrollbar-thumb:hover {
-  background: #475569;
-}
-
-/* ──────────────────────────────────────────────────────────────────────────
-   💫 ANIMATIONS: PITCH-PERFECT FEEDBACK
-   ────────────────────────────────────────────────────────────────────────── */
 
 @keyframes verifiedPulse {
-  0% { transform: scale(1); opacity: 0.8; }
-  50% { transform: scale(1.05); opacity: 1; box-shadow: 0 0 50px rgba(96, 165, 250, 0.4); }
-  100% { transform: scale(1); opacity: 0.8; }
+  0%, 100% { opacity: 0.8; }
+  50%       { opacity: 1; }
 }
 
 @utility verified-card-pulse {
-  animation: verifiedPulse 3s cubic-bezier(0.4, 0, 0.2, 1) infinite;
-  border-color: rgba(96, 165, 250, 0.5);
-  background: radial-gradient(circle at 50% 0%, rgba(96, 165, 250, 0.05) 0%, transparent 70%);
+  animation: verifiedPulse 3s ease-in-out infinite;
 }
