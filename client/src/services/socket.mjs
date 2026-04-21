@@ -19,10 +19,7 @@ export const socket = io(SOCKET_URL, {
  * Convenience hooks for dashboard rooms
  */
 export const joinInstitutionalRoom = (universityId) => {
-    if (universityId) {
-        socket.emit('join:institution', universityId);
-        console.log(`📡 [SOCKET]: Requesting entrance to Institutional Node: ${universityId}`);
-    }
+    if (universityId) socket.emit('join:institution', universityId);
 };
 
 export default socket;

@@ -15,6 +15,12 @@ export function initSocket(httpServer) {
     socket.on('join:institution', (institutionId) => {
       if (institutionId) socket.join(`institution:${institutionId}`);
     });
+    socket.on('join_user_room', (userId) => {
+      if (userId) socket.join(`user:${userId}`);
+    });
+    socket.on('leave_user_room', (userId) => {
+      if (userId) socket.leave(`user:${userId}`);
+    });
   });
 
   return io;
@@ -27,4 +33,9 @@ export function getIO() {
 export function emitToInstitution(institutionId, event, data) {
   if (!io || !institutionId) return;
   io.to(`institution:${institutionId}`).emit(event, data);
+}
+
+export function emitToUser(userId, event, data) {
+  if (!io || !userId) return;
+  io.to(`user:${userId}`).emit(event, data);
 }

@@ -14,9 +14,6 @@ const api = axios.create({
     headers: { 'Content-Type': 'application/json' }
 });
 
-if (import.meta.env.PROD) {
-    console.log(`[NETWORK] EduCred Protocol target: ${api.defaults.baseURL || 'RELATIVE_PATH (Verify Proxy)'}`);
-}
 
 const refreshClient = axios.create({
     baseURL: import.meta.env.VITE_API_URL || (['educred.in', 'www.educred.in'].includes(window.location.hostname) ? PRODUCTION_BACKEND_URL : ''),
@@ -30,12 +27,7 @@ let refreshPromise = null;
 // Attach stored Bearer token to every outgoing request
 api.interceptors.request.use((config) => {
     const token = getToken();
-    if (token) {
-        config.headers['Authorization'] = `Bearer ${token}`;
-        console.log(`[AUTH_DEBUG] request: Bearer attached (${token.substring(0, 20)}...) → ${config.url}`);
-    } else {
-        console.log(`[AUTH_DEBUG] request: no token in storage → ${config.url}`);
-    }
+    if (token) config.headers['Authorization'] = `Bearer ${token}`;
     return config;
 }, (err) => Promise.reject(err));
 
@@ -63,10 +55,7 @@ api.interceptors.response.use(
                 refreshPromise ??= refreshClient.post('/api/auth/refresh');
                 const refreshRes = await refreshPromise;
 
-                if (refreshRes.data?.accessToken) {
-                    storeToken(refreshRes.data.accessToken);
-                    console.log(`[AUTH_DEBUG] token refreshed, new token stored`);
-                }
+                if (refreshRes.data?.accessToken) storeToken(refreshRes.data.accessToken);
 
                 return api(originalRequest);
             } catch (refreshError) {

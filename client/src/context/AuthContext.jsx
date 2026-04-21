@@ -56,17 +56,11 @@ export function AuthProvider({ children }) {
     setUser(optimisticUser);
 
     try {
-      console.log(`[🛰️ SESSION_HYDRATION] Establishing secure account connection...`);
-      // Note: Backend processGoogleCallback MUST set cookies for this to work
       const res = await api.get('/api/auth/me');
-      
       const fullUser = res.data;
       localStorage.setItem('user', JSON.stringify(fullUser));
       setUser(fullUser);
-      console.log(`[✅ SESSION_READY] Account synchronized for: ${fullUser.email}`);
-    } catch (err) {
-      console.error('[🚨 SESSION_AUGMENT_FAILED] Account sync failed. Falling back to optimistic profile.', err);
-    }
+    } catch { /* fall back to optimistic profile already set */ }
   }, []);
 
   // 🔹 LOGIN
@@ -75,7 +69,6 @@ export function AuthProvider({ children }) {
       const res = await api.post('/api/auth/login', { email, password });
       const { user: u, accessToken } = res.data;
       if (accessToken) storeToken(accessToken);
-      console.log(`[AUTH_DEBUG] login: token received=${!!accessToken}`);
       persistSession(u);
       return u;
     } catch (err) {
