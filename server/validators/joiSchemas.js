@@ -75,6 +75,8 @@ export const registrationSchema = Joi.object({
   description: Joi.string().optional().allow('', null),
   documents: Joi.array().items(Joi.string()).optional(),
   officialDomain: Joi.string().optional().allow('', null),
+  adminName: Joi.string().optional().allow('', null),
+  // legacy alias — keep both so old clients don't break
   adminContactName: Joi.string().optional().allow('', null)
 });
 
