@@ -8,7 +8,7 @@ import Registry from '../services/registryService.js';
 import { Certificate } from '../models/index.js';
 import { issueCertificateOnChain, revokeHashOnChain, verifyHashDetailsOnChain } from '../utils/blockchain.js';
 import { generateStructuralHash, generateBinaryHash, generateHash } from '../utils/hashing.js';
-import { emitToInstitution } from '../utils/socketService.js';
+import { emitToInstitution, emitToUser } from '../utils/socketService.js';
 import { logAudit } from '../utils/logger.js';
 import { certificateIssuanceSchema } from '../validators/joiSchemas.js';
 import { isPinataConfigured, uploadFileToPinata, uploadJSONToPinata, getIPFSUrl } from '../utils/ipfsService.js';
@@ -30,6 +30,7 @@ function buildPublicCertificatePayload(cert) {
     id: cert.id,
     certificateId: cert.certificateId,
     studentName: cert.studentName,
+    studentEmail: cert.studentEmail,
     course: cert.course,
     issuer: cert.issuer,
     issuedAt: cert.issuedAt,
@@ -41,6 +42,11 @@ function buildPublicCertificatePayload(cert) {
     metadata: {
       branch: cert.metadata?.branch,
       graduationYear: cert.metadata?.graduationYear,
+      studentEnrollmentNumber: cert.metadata?.studentEnrollmentNumber,
+      semester: cert.metadata?.semester,
+      sgpa: cert.metadata?.sgpa,
+      subjects: cert.metadata?.subjects,
+      finalCGPA: cert.metadata?.finalCGPA,
     },
   };
 }
@@ -136,13 +142,8 @@ async function recordFraudAlert(payload) {
 }
 
 export const issueCertificate = async (req, res) => {
-  // Temp file from optional upload — cleaned up in finally
-  let tempPath = req.file?.path;
-
   try {
-    console.log(`[UPLOAD] Certificate upload started: institutionId=${req.user?.id}`);
-
-    // semesters arrives as a JSON string when POSTed via multipart/form-data
+    // semesters may arrive as a JSON string from some clients
     if (typeof req.body.semesters === 'string') {
       try { req.body.semesters = JSON.parse(req.body.semesters); }
       catch { /* Joi will reject the malformed value */ }
@@ -260,6 +261,16 @@ export const issueCertificate = async (req, res) => {
       issuedCerts.push({ certificateId: cert.certificateId, semester: 'FINAL', hash: certHash });
     }
 
+    // Notify student's live dashboard if they're connected
+    if (studentId) {
+      try {
+        const studentUser = await Registry.findOne('students', { id: studentId });
+        if (studentUser?.userId) {
+          emitToUser(studentUser.userId, 'newCertificate', { count: issuedCerts.length });
+        }
+      } catch { /* student notification is best-effort */ }
+    }
+
     res.status(201).json({
       success: true,
       message: `${issuedCerts.length} certificate(s) issued. Blockchain anchoring in progress.`,
@@ -275,8 +286,6 @@ export const issueCertificate = async (req, res) => {
     }
     console.error('[ISSUANCE_CRASH]:', err);
     res.status(500).json({ error: 'Certificate issuance failed.', details: err.message });
-  } finally {
-    if (tempPath && fs.existsSync(tempPath)) fs.unlinkSync(tempPath);
   }
 };
 
@@ -537,12 +546,18 @@ export const verifyCertificate = async (req, res) => {
       if (metadata) extractedId = metadata.certificateId;
     } else if (certificateId) {
       const isUUID = /^[0-9a-fA-F-]{36}$/.test(certificateId);
-      const cert = isUUID
-        ? await Registry.findById('certificates', certificateId)
-        : await Registry.findOne('certificates', { certificateId });
+      const isSHA256 = /^[a-f0-9]{64}$/i.test(certificateId);
+      let cert;
+      if (isUUID) {
+        cert = await Registry.findById('certificates', certificateId);
+      } else if (isSHA256) {
+        cert = await Registry.findOne('certificates', { certificateHash: certificateId });
+      } else {
+        cert = await Registry.findOne('certificates', { certificateId });
+      }
 
       if (!cert) {
-        return res.status(404).json({ valid: false, message: 'Certificate ID not found on registry.' });
+        return res.status(404).json({ valid: false, message: 'Certificate not found on registry.' });
       }
 
       hashToVerify = cert.certificateHash;

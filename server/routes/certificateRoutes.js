@@ -25,7 +25,7 @@ const router = express.Router();
 router.get('/', protect, requireRole('university', 'UNIVERSITY'), getCertificates);
 router.get('/stats', protect, requireRole('university', 'UNIVERSITY'), getStats);
 
-router.post('/issue', protect, requireRole('university', 'UNIVERSITY'), upload.single('file'), issueCertificate);
+router.post('/issue', protect, requireRole('university', 'UNIVERSITY'), issueCertificate);
 router.post('/confirm-issuance', protect, requireRole('university', 'UNIVERSITY'), confirmIssuance);
 router.post('/batch', protect, requireRole('university', 'UNIVERSITY'), upload.single('file'), batchIssue);
 router.post('/revoke', protect, requireRole('university', 'UNIVERSITY'), revokeCertificate);

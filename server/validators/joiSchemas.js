@@ -11,22 +11,10 @@ export const certificateIssuanceSchema = Joi.object({
   email: Joi.string().email().required(),
   rollNumber: Joi.string().required(),
   program: Joi.string().required(),
+  branch: Joi.string().required(),
   finalCGPA: Joi.number().required(),
 
-  // Optional form fields
-  branch: Joi.string().allow('', null).optional(),
-  graduationYear: Joi.number().integer().min(1900).max(2100).allow('', null).optional(),
-  phone: Joi.string().allow('', null).optional(),
-  certificateType: Joi.string().valid(
-    'Degree Certificate',
-    'Provisional Certificate',
-    'Consolidated Marks Sheet',
-    'Migration Certificate',
-    'Transfer Certificate',
-    'Character Certificate'
-  ).optional().default('Degree Certificate'),
-
-  // Structured academic record
+  // Structured academic record — at least one semester required
   semesters: Joi.array().items(
     Joi.object({
       semester: Joi.number().integer().min(1).required(),
@@ -38,7 +26,7 @@ export const certificateIssuanceSchema = Joi.object({
       ).min(1).required(),
       sgpa: Joi.number().required(),
     })
-  ).optional(),
+  ).min(1).required(),
 });
 
 export const requestFulfillmentSchema = Joi.object({

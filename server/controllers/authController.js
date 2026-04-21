@@ -101,9 +101,7 @@ export const logout = async (req, res) => {
 // 🛡️ Google Auth Client (google-auth-library) disabled for stabilization.
 
 export const signToken = (id, role, extraPayload = {}) => {
-  const token = jwt.sign({ userId: id, role, ...extraPayload }, jwtSecret, { expiresIn: JWT_EXPIRES });
-  console.log(`[AUTH_DEBUG] token generated: userId=${id} role=${role} exp=${JWT_EXPIRES}`);
-  return token;
+  return jwt.sign({ userId: id, role, ...extraPayload }, jwtSecret, { expiresIn: JWT_EXPIRES });
 };
 export const signRefreshToken = (id) => jwt.sign({ id }, refreshSecret, { expiresIn: REFRESH_EXPIRES });
 
@@ -118,12 +116,6 @@ const hashOTP = (otp) => crypto.createHash('sha256').update(otp).digest('hex');
 
 export const register = async (req, res) => {
   try {
-    // 🔍 DIAGNOSTIC: Scrub payload for safe logging
-    const scrubbedPayload = { ...req.body };
-    if (scrubbedPayload.password) scrubbedPayload.password = '[REDACTED]';
-    console.log(`[DIAGNOSTIC] Starting registration protocol for: ${req.body.email || 'unknown'}`);
-    console.log(`[DIAGNOSTIC] Payload Summary:`, scrubbedPayload);
-
     const { error } = registrationSchema.validate(req.body);
     if (error) {
       console.warn(`[AUTH] [VALIDATION_FAILURE] Registration invalid: ${error.details[0].message}`);
@@ -136,11 +128,9 @@ export const register = async (req, res) => {
     const existing = await Registry.findOne('users', { email });
     if (existing) {
       if (existing.isEmailVerified) {
-        console.warn(`[DIAGNOSTIC] Registration aborted: Verified email ${email} already in use.`);
         return res.status(400).json({ error: 'An account with this email already exists and is verified.' });
       }
-      console.log(`[DIAGNOSTIC] Detected unverified legacy account for ${email}. Clearing for fresh protocol initiation.`);
-      // We don't delete yet; we do it inside the transaction for safety
+      // Unverified legacy account will be cleared inside the transaction
     }
 
     const otp = generateOTP();
@@ -187,7 +177,6 @@ export const register = async (req, res) => {
         const { documents, description } = req.body;
         const isInstitutional = email.endsWith('.edu') || email.endsWith('.ac.in');
         
-        console.log(`[DIAGNOSTIC] Provisioning University node for ${universityName}...`);
         await Registry.insert('universities', {
           name: universityName,
           email,
@@ -232,8 +221,6 @@ export const register = async (req, res) => {
     const isSmtpError = err.message.includes('SMTP_DISPATCH_FAILED');
     const details = err.errors ? err.errors.map(e => `${e.path}: ${e.message}`).join(', ') : err.message;
     
-    console.error(`[DIAGNOSTIC] [CRITICAL_FAILURE] Step failed. Details: ${details}`);
-    
     await logAudit(req, 'AUTH_REGISTRATION', 'FAILURE', 'Account provisioning failed.', { email: req.body.email, error: details });
     
     res.status(isSmtpError ? 502 : 500).json({ 
@@ -244,8 +231,6 @@ export const register = async (req, res) => {
 };
 
 export const login = async (req, res) => {
-  console.log(`[AUTH] Login attempt: ${req.body?.email || 'unknown'}, status: pending`);
-  console.log(`[AUTH_ENTRY] /login invoked for ${req.body?.email}`);
   try {
     const { error } = loginSchema.validate(req.body);
     if (error) {
@@ -327,7 +312,6 @@ export const login = async (req, res) => {
  * Validates the cryptographic hash and activates the user account.
  */
 export const verifyOTP = async (req, res) => {
-  console.log(`[AUTH_ENTRY] /verify-otp invoked for ${req.body?.email}`);
   try {
     // Basic validation for OTP
     const { email: rawEmail, otp } = req.body;
@@ -386,7 +370,6 @@ export const verifyOTP = async (req, res) => {
 
     setCookies(res, accessToken, refreshToken);
 
-    console.log(`[AUTH_POST_WRITE] OTP Verification completed for user ${user.id}`);
     const payload = await buildUserPayload(user.id);
     res.status(200).json({
       message: 'Account activated successfully.',
@@ -579,7 +562,6 @@ export const verifyPhoneOTP = async (req, res) => {
 };
 
 export const getMe = async (req, res) => {
-  console.log(`[AUTH_ENTRY] /me invoked for user ${req.user?.id}`);
   if (req.user.id === 'admin') {
     return res.json({ id: 'admin', name: 'Admin', email: req.user.email, role: 'admin', isVerified: true });
   }
@@ -592,7 +574,6 @@ export const getMe = async (req, res) => {
  * Restricted to existing administrators via RBAC middleware.
  */
 export const createAdmin = async (req, res) => {
-  console.log(`[AUTH_ENTRY] /admins invoked to provision ${req.body?.role} by ${req.user?.email}`);
   try {
     // SECURITY CHECK: Only SUPER_ADMIN can create other admins
     if (!req.user || req.user.role !== 'super_admin') {
@@ -624,7 +605,6 @@ export const createAdmin = async (req, res) => {
       isEmailVerified: true // Admins are provisioned by existing admins — no OTP required
     });
 
-    console.log(`[AUTH_POST_WRITE] Admin node successfully provisioned for ${email}`);
     const payload = await buildUserPayload(admin.id);
     res.status(201).json({
       message: 'Administrative node provisioned successfully.',
@@ -642,11 +622,6 @@ export const createAdmin = async (req, res) => {
  */
 export const completeOnboarding = async (req, res) => {
   try {
-    // 🔍 DIAGNOSTIC: Scrub payload for safe logging
-    const scrubbedPayload = { ...req.body };
-    console.log(`[DIAGNOSTIC] Starting onboarding completion for User ID: ${req.user.id}`);
-    console.log(`[DIAGNOSTIC] Payload Summary:`, scrubbedPayload);
-
     const { error } = onboardingSchema.validate(req.body);
     if (error) {
       console.warn(`[AUTH] [ONBOARDING_VALIDATION_FAILURE]: ${error.details[0].message}`);
@@ -662,7 +637,6 @@ export const completeOnboarding = async (req, res) => {
     const user = req.user;
 
     if (user.role !== 'pending') {
-      console.warn(`[DIAGNOSTIC] Onboarding aborted: Identity already established (role: ${user.role})`);
       return res.status(400).json({ error: 'Identity protocol already established.' });
     }
 
@@ -673,7 +647,6 @@ export const completeOnboarding = async (req, res) => {
           throw new Error('Onboarding failed: Missing institution name.');
         }
 
-        console.log(`[DIAGNOSTIC] Finalizing University protocol for: ${resolvedUniversityName}`);
         update.universityName = resolvedUniversityName;
 
         const isInstitutional = user.email.endsWith('.edu') || user.email.endsWith('.ac.in');
@@ -688,7 +661,6 @@ export const completeOnboarding = async (req, res) => {
           status: 'PENDING'
         }, { transaction: t });
       } else {
-        console.log(`[DIAGNOSTIC] Finalizing Student protocol for user...`);
         await Registry.insert('students', { name: user.name, userId: user.id }, { transaction: t });
       }
 
@@ -698,14 +670,12 @@ export const completeOnboarding = async (req, res) => {
 
     await logAudit(req, 'PROTOCOL_ONBOARDING', 'SUCCESS', `Account configured as ${role}.`, { userId: user.id, role });
     
-    console.log(`[AUTH_POST_WRITE] Onboarding finalized for user ${user.id}`);
     res.status(200).json({
       message: 'Identity protocol successfully established.',
       user: updatedUser
     });
   } catch (err) {
     const details = err.errors ? err.errors.map(e => `${e.path}: ${e.message}`).join(', ') : err.message;
-    console.error(`[DIAGNOSTIC] [CRITICAL_FAILURE] Onboarding failed. Details: ${details}`);
     res.status(500).json({ error: 'Onboarding failed.', details });
   }
 };

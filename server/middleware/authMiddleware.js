@@ -10,14 +10,9 @@ import { jwtSecret } from '../utils/runtimeConfig.js';
 export const protect = async (req, res, next) => {
   try {
     let token = req.cookies?.accessToken;
-    let tokenSource = 'cookie';
-
     if (!token && req.headers.authorization?.startsWith('Bearer ')) {
       token = req.headers.authorization.split(' ')[1];
-      tokenSource = 'header';
     }
-
-    console.log(`[AUTH_DEBUG] protect: token=${token ? 'present' : 'missing'} source=${tokenSource} url=${req.path}`);
 
     if (!token) {
       return res.status(401).json({ error: 'Identity proof required. No token provided.' });
@@ -25,7 +20,6 @@ export const protect = async (req, res, next) => {
 
     const decoded = jwt.verify(token, jwtSecret);
     const userId = decoded.userId || decoded.id;
-    console.log(`[AUTH_DEBUG] protect: decoded userId=${userId} role=${decoded.role}`);
 
     // Admin token: not in DB, bypass DB lookup
     if (userId === 'admin' && decoded.role === 'admin') {
@@ -54,7 +48,6 @@ export const protect = async (req, res, next) => {
     if (decoded.walletAddress) req.user.walletAddress = decoded.walletAddress;
     next();
   } catch (err) {
-    console.log(`[AUTH_DEBUG] protect error: ${err.name} - ${err.message}`);
     if (err.name === 'TokenExpiredError') {
       return res.status(401).json({ error: 'Security token expired. Refresh required.', code: 'TOKEN_EXPIRED' });
     }
