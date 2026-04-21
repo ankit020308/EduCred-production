@@ -2,19 +2,83 @@ import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   GraduationCap, ShieldCheck, Clock, Loader2,
-  ExternalLink, Copy, Check, Shield, LogOut, Download
+  ExternalLink, Copy, Check, Shield, LogOut, Download,
+  ChevronRight, Info, User, AlertCircle,
 } from 'lucide-react';
 import api from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import socket from '../services/socket.mjs';
 
-const vt = { initial: { opacity: 0, y: 20 }, animate: { opacity: 1, y: 0 }, transition: { duration: 0.55, ease: [0.22, 1, 0.36, 1] } };
+const vt = { initial: { opacity: 0, y: 20 }, animate: { opacity: 1, y: 0 }, transition: { duration: 0.45, ease: [0.22, 1, 0.36, 1] } };
 
-const STATUS_STYLES = {
-  CONFIRMED: { bg: 'bg-[#2b9a66]', dot: 'bg-[#2b9a66]', label: 'Verified' },
-  FAILED:    { bg: 'bg-[#ea2804]', dot: 'bg-[#ea2804]', label: 'Revoked' },
-  default:   { bg: 'bg-[#646464]', dot: 'bg-[#646464]', label: 'Processing' },
+// Stepper pipeline: maps status → step index
+const PIPELINE = [
+  { label: 'Submitted',    statuses: ['PENDING_REVIEW'] },
+  { label: 'Under Review', statuses: ['PROCESSING'] },
+  { label: 'Anchoring',    statuses: ['CONFIRMED'] },
+  { label: 'Verified',     statuses: ['CONFIRMED'] },
+];
+
+function getPipelineStep(status) {
+  if (status === 'PENDING_REVIEW') return 0;
+  if (status === 'PROCESSING')     return 1;
+  if (status === 'CONFIRMED')      return 3;
+  if (status === 'ANCHOR_FAILED')  return 2;
+  if (status === 'REJECTED')       return -1;
+  return 0;
+}
+
+function CertStepper({ status }) {
+  const step = getPipelineStep(status);
+  if (status === 'REJECTED') {
+    return (
+      <div className="flex items-center gap-2 px-3 py-2 bg-[#ea2804]/10 border border-[#ea2804]/20 rounded-xl">
+        <AlertCircle size={12} className="text-[#ea2804]" />
+        <span className="text-[9px] font-black text-[#ea2804] uppercase tracking-widest">Rejected by Admin</span>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex items-center gap-1">
+      {PIPELINE.map((s, i) => {
+        const isActive  = i === step;
+        const isDone    = i < step || (status === 'CONFIRMED' && i <= 3);
+        const isFailed  = status === 'ANCHOR_FAILED' && i === 2;
+        return (
+          <div key={i} className="flex items-center gap-1">
+            <div className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[8px] font-black uppercase tracking-widest border transition-all ${
+              isFailed
+                ? 'bg-[#ea2804]/10 border-[#ea2804]/20 text-[#ea2804]'
+                : isDone
+                  ? 'bg-[#2b9a66]/10 border-[#2b9a66]/20 text-[#2b9a66]'
+                  : isActive
+                    ? 'bg-amber-50 border-amber-200 text-amber-600'
+                    : 'bg-[#f6f6f6] border-[#e0e0e0] text-[#bbbbbb]'
+            }`}>
+              {isDone && !isFailed && <Check size={8} />}
+              {isActive && !isDone && <div className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />}
+              {isFailed && <AlertCircle size={8} />}
+              {s.label}
+            </div>
+            {i < PIPELINE.length - 1 && (
+              <ChevronRight size={9} className={isDone ? 'text-[#2b9a66]' : 'text-[#e0e0e0]'} />
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+const STATUS_BADGE = {
+  CONFIRMED:      { bg: 'bg-[#2b9a66]',  label: 'Verified On-Chain' },
+  PENDING_REVIEW: { bg: 'bg-amber-500',   label: 'Pending Review' },
+  PROCESSING:     { bg: 'bg-blue-500',    label: 'Under Review' },
+  ANCHOR_FAILED:  { bg: 'bg-[#ea2804]',  label: 'Anchor Failed' },
+  REJECTED:       { bg: 'bg-[#ea2804]',  label: 'Rejected' },
+  default:        { bg: 'bg-[#646464]',  label: 'Processing' },
 };
 
 export default function StudentDashboard() {
@@ -25,6 +89,7 @@ export default function StudentDashboard() {
   const [loading, setLoading] = useState(true);
   const [copiedId, setCopiedId] = useState(null);
   const [selectedCert, setSelectedCert] = useState(null);
+  const [showTooltip, setShowTooltip] = useState(false);
 
   useEffect(() => {
     fetchCertificates();
@@ -60,171 +125,230 @@ export default function StudentDashboard() {
   };
 
   const confirmed = certificates.filter(c => c.status === 'CONFIRMED').length;
-  const pending   = certificates.filter(c => c.status === 'PENDING').length;
+  const pending   = certificates.filter(c => ['PENDING_REVIEW', 'PROCESSING'].includes(c.status)).length;
 
   return (
     <div className="relative min-h-screen bg-[#f6f6f6] text-[#202020] font-sans overflow-x-hidden">
 
       {/* Dark hero strip */}
-      <div className="fixed top-0 inset-x-0 h-72 bg-[#202020] pointer-events-none z-0" />
+      <div className="fixed top-0 inset-x-0 h-64 bg-[#202020] pointer-events-none z-0" />
 
-      {/* ── Header ── */}
+      {/* Header */}
       <header className="fixed top-0 inset-x-0 z-50 border-b border-white/10 bg-[#202020]/80 backdrop-blur-xl">
-        <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
+        <div className="max-w-7xl mx-auto px-6 h-14 flex items-center justify-between">
           <div className="flex items-center gap-3 cursor-pointer" onClick={() => navigate('/')}>
-            <div className="w-8 h-8 bg-[#ea2804] rounded-full flex items-center justify-center">
-              <ShieldCheck className="text-white" size={16} />
+            <div className="w-7 h-7 bg-[#ea2804] rounded-lg flex items-center justify-center">
+              <ShieldCheck className="text-white" size={14} />
             </div>
-            <span className="text-lg font-black text-white tracking-tight">
+            <span className="text-base font-black text-white tracking-tight">
               Edu<span className="text-[#ea2804]">Cred</span>
             </span>
           </div>
 
-          <div className="flex items-center gap-5">
-            <div className="hidden sm:flex items-center gap-3 px-4 py-2 bg-white/8 border border-white/15 rounded-full">
-              <div className="w-7 h-7 bg-[#ea2804]/20 border border-[#ea2804]/30 rounded-full flex items-center justify-center text-[#ea2804] font-black text-xs">
+          <div className="flex items-center gap-4">
+            {/* User chip */}
+            <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 bg-white/8 border border-white/15 rounded-full">
+              <div className="w-6 h-6 bg-[#ea2804]/20 border border-[#ea2804]/30 rounded-full flex items-center justify-center text-[#ea2804] font-black text-[9px]">
                 {user?.name?.charAt(0)?.toUpperCase() || 'S'}
               </div>
               <div className="hidden lg:block">
-                <p className="text-white text-[10px] font-black uppercase tracking-widest leading-none">{user?.name || 'Student'}</p>
+                <p className="text-white text-[9px] font-black uppercase tracking-widest leading-none">{user?.name || 'Student'}</p>
                 <p className="text-[#646464] text-[8px] font-black uppercase tracking-widest mt-0.5">Verified Account</p>
               </div>
+              <span className="ml-1 px-2 py-0.5 rounded-full bg-[#ea2804]/20 border border-[#ea2804]/30 text-[#ea2804] text-[8px] font-black uppercase tracking-widest">
+                STUDENT
+              </span>
             </div>
+            <button onClick={() => navigate('/profile')}
+              className="w-7 h-7 rounded-lg bg-white/10 border border-white/20 flex items-center justify-center hover:bg-white/20 transition-all">
+              <User size={13} className="text-white/70" />
+            </button>
             <button onClick={() => { logout(); navigate('/'); }}
-              className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-[#646464] hover:text-[#ea2804] transition-colors">
-              <LogOut size={15} />
+              className="flex items-center gap-1.5 text-[9px] font-black uppercase tracking-widest text-white/60 hover:text-[#ea2804] transition-colors">
+              <LogOut size={13} />
               <span className="hidden sm:inline">Sign Out</span>
             </button>
           </div>
         </div>
       </header>
 
-      {/* ── Content ── */}
-      <div className="max-w-6xl mx-auto px-6 pt-32 pb-24 relative z-10 space-y-10">
+      {/* Content */}
+      <div className="max-w-6xl mx-auto px-6 pt-28 pb-20 relative z-10 space-y-8">
+
+        {/* Breadcrumb */}
+        <p className="text-[9px] font-black uppercase tracking-widest text-white/40">
+          Student Portal › My Certificates
+        </p>
 
         {/* Welcome */}
-        <motion.div {...vt} className="space-y-4">
-          <div className="inline-flex items-center gap-2 px-4 py-1.5 bg-[#ea2804]/20 border border-[#ea2804]/30 rounded-full">
+        <motion.div {...vt} className="space-y-3">
+          <div className="inline-flex items-center gap-2 px-3 py-1 bg-[#ea2804]/20 border border-[#ea2804]/30 rounded-full">
             <div className="w-1.5 h-1.5 rounded-full bg-[#ea2804] animate-pulse" />
             <span className="text-[9px] font-black text-[#ea2804] uppercase tracking-widest">Account Verified</span>
           </div>
-          <h1 className="text-5xl md:text-7xl font-black text-white tracking-tight leading-none">
+          <h1 className="text-5xl md:text-6xl font-black text-white tracking-tight leading-none">
             Welcome, <span className="text-[#ea2804]">{user?.name?.split(' ')[0] || 'User'}.</span>
           </h1>
-          <p className="text-[#646464] text-xs font-bold uppercase tracking-widest max-w-lg leading-loose">
+          <p className="text-white/40 text-[10px] font-bold uppercase tracking-widest max-w-md leading-relaxed">
             Your academic records are verified and securely stored within our enterprise network.
           </p>
         </motion.div>
 
         {/* Stats */}
-        <motion.div {...vt} transition={{ delay: 0.1 }} className="grid grid-cols-1 sm:grid-cols-3 gap-5">
+        <motion.div {...vt} transition={{ delay: 0.1 }} className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           {[
             { label: 'Total Certificates', val: certificates.length, icon: GraduationCap },
-            { label: 'Verified On-Chain', val: confirmed, icon: ShieldCheck },
+            {
+              label: 'Verified On-Chain', val: confirmed, icon: ShieldCheck,
+              tooltip: 'Certificates anchored to the Sepolia blockchain. Newly issued certs go through admin review → anchoring pipeline (typically 1-24 hrs).',
+            },
             { label: 'In Review', val: pending, icon: Clock },
           ].map((s, i) => (
-            <div key={i} className="bg-white border border-[#202020] rounded-full p-8 hover:-translate-y-1 transition-all duration-300 group">
-              <div className="w-10 h-10 rounded-full bg-[#ea2804]/10 border border-[#ea2804]/20 mb-6 flex items-center justify-center group-hover:bg-[#ea2804] group-hover:border-[#ea2804] transition-all duration-300">
-                <s.icon className="text-[#ea2804] group-hover:text-white transition-colors" size={20} />
+            <div key={i} className="bg-white border border-[#202020] rounded-3xl p-6 hover:-translate-y-0.5 transition-all duration-300 group relative">
+              <div className="w-9 h-9 rounded-full bg-[#ea2804]/10 border border-[#ea2804]/20 mb-5 flex items-center justify-center group-hover:bg-[#ea2804] group-hover:border-[#ea2804] transition-all duration-300">
+                <s.icon className="text-[#ea2804] group-hover:text-white transition-colors" size={17} />
               </div>
-              <span className="text-4xl font-black text-[#202020] tracking-tight block">{s.val}</span>
-              <span className="text-[9px] font-black text-[#646464] uppercase tracking-widest mt-2 block">{s.label}</span>
+              <div className="flex items-center gap-2">
+                <span className="text-4xl font-black text-[#202020] tracking-tight block">{s.val}</span>
+                {s.tooltip && (
+                  <button onClick={() => setShowTooltip(p => !p)} className="text-[#bbbbbb] hover:text-[#646464] transition-colors">
+                    <Info size={13} />
+                  </button>
+                )}
+              </div>
+              <span className="text-[9px] font-black text-[#646464] uppercase tracking-widest mt-1 block">{s.label}</span>
+              {s.tooltip && showTooltip && (
+                <motion.div initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }}
+                  className="absolute z-20 top-full left-0 mt-2 w-72 bg-[#202020] text-white text-[9px] font-bold leading-relaxed px-4 py-3 rounded-xl shadow-xl">
+                  {s.tooltip}
+                </motion.div>
+              )}
             </div>
           ))}
         </motion.div>
 
         {/* Certificate list */}
         <motion.div {...vt} transition={{ delay: 0.2 }}>
-          <div className="flex flex-col md:flex-row md:items-center justify-between gap-5 mb-8">
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
             <div>
               <h2 className="text-2xl font-black text-[#202020] tracking-tight">Your Certificates</h2>
-              <p className="text-[#646464] text-[10px] font-black uppercase tracking-widest mt-1">{certificates.length} verified records</p>
+              <p className="text-[#646464] text-[9px] font-black uppercase tracking-widest mt-1">{certificates.length} verified records</p>
             </div>
-            <button onClick={() => navigate('/verify')}
-              className="btn-primary text-xs">
-              Verify a Document <ExternalLink size={13} />
+            <button onClick={() => navigate('/verify')} className="btn-primary text-xs self-start md:self-auto">
+              Verify a Document <ExternalLink size={12} />
             </button>
           </div>
 
           {loading ? (
-            <div className="flex flex-col items-center justify-center py-24 gap-5 bg-white border border-[#202020] rounded-full">
-              <Loader2 className="animate-spin text-[#ea2804]" size={36} />
-              <p className="text-[10px] font-black uppercase tracking-widest text-[#646464]">Loading records...</p>
+            <div className="flex flex-col items-center justify-center py-20 gap-4 bg-white border border-[#e0e0e0] rounded-3xl">
+              <Loader2 className="animate-spin text-[#ea2804]" size={28} />
+              <p className="text-[9px] font-black uppercase tracking-widest text-[#646464]">Loading records…</p>
             </div>
           ) : certificates.length === 0 ? (
-            <div className="bg-white border border-[#202020] rounded-full p-20 text-center space-y-6">
-              <div className="w-20 h-20 bg-[#f6f6f6] border border-[#e0e0e0] rounded-full mx-auto flex items-center justify-center">
-                <GraduationCap className="text-[#bbbbbb]" size={36} />
+            <div className="bg-white border border-[#e0e0e0] rounded-3xl p-16 text-center space-y-5">
+              <div className="w-16 h-16 bg-[#f6f6f6] border border-[#e0e0e0] rounded-full mx-auto flex items-center justify-center">
+                <GraduationCap className="text-[#bbbbbb]" size={28} />
               </div>
-              <div className="space-y-3">
+              <div className="space-y-2">
                 <p className="text-xl font-black text-[#202020] tracking-tight">No certificates yet</p>
-                <p className="text-[#646464] text-xs font-bold uppercase tracking-widest max-w-xs mx-auto leading-relaxed">
-                  Your official certificates will appear here once issued by your institution.
+                <p className="text-[#646464] text-[10px] font-bold uppercase tracking-widest max-w-xs mx-auto leading-relaxed">
+                  Your institution hasn't issued any records yet. They'll appear here once issued and approved.
                 </p>
               </div>
+              <button onClick={() => navigate('/verify')} className="btn-primary text-xs mx-auto">
+                Verify a Document <ExternalLink size={12} />
+              </button>
             </div>
           ) : (
-            <div className="space-y-4">
+            <div className="space-y-3">
               {certificates.map((cert) => {
-                const ss = STATUS_STYLES[cert.status] || STATUS_STYLES.default;
+                const ss = STATUS_BADGE[cert.status] || STATUS_BADGE.default;
                 const isOpen = selectedCert?.id === cert.id;
                 return (
-                  <motion.div key={cert.id} layout initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
-                    className="bg-white border border-[#202020] rounded-full overflow-hidden hover:border-[#ea2804] transition-all duration-300 cursor-pointer group"
+                  <motion.div key={cert.id} layout initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}
+                    className="bg-white border border-[#e0e0e0] rounded-3xl overflow-hidden hover:border-[#202020] transition-all duration-300 cursor-pointer"
                     onClick={() => setSelectedCert(isOpen ? null : cert)}>
 
-                    <div className="px-10 py-7 flex flex-col md:flex-row md:items-center justify-between gap-6">
-                      <div className="flex items-center gap-6">
-                        <div className="w-14 h-14 bg-[#ea2804]/10 border border-[#ea2804]/20 rounded-full flex items-center justify-center text-[#ea2804] font-black text-xl shrink-0 group-hover:bg-[#ea2804] group-hover:text-white transition-all duration-300">
+                    <div className="px-8 py-6 flex flex-col md:flex-row md:items-center justify-between gap-4">
+                      <div className="flex items-center gap-5">
+                        <div className="w-12 h-12 bg-[#ea2804]/10 border border-[#ea2804]/20 rounded-full flex items-center justify-center text-[#ea2804] font-black text-lg shrink-0">
                           {cert.studentName?.charAt(0) || '?'}
                         </div>
                         <div>
                           <p className="text-[#202020] font-black text-sm tracking-wide uppercase">{cert.course || cert.certificateType || 'Academic Certificate'}</p>
-                          <p className="text-[#646464] text-[10px] font-black uppercase tracking-widest mt-1.5">
+                          <p className="text-[#646464] text-[9px] font-black uppercase tracking-widest mt-1">
                             {cert.issuer} · {new Date(cert.issuedAt || cert.createdAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
                           </p>
                         </div>
                       </div>
 
-                      <span className={`inline-flex items-center gap-2 px-5 py-2 rounded-full text-[9px] font-black uppercase tracking-widest text-white ${ss.bg}`}>
-                        <div className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" />
-                        {ss.label}
-                      </span>
+                      <div className="flex flex-col items-end gap-2">
+                        <span className={`inline-flex items-center gap-1.5 px-4 py-1.5 rounded-full text-[9px] font-black uppercase tracking-widest text-white ${ss.bg}`}>
+                          <div className="w-1.5 h-1.5 rounded-full bg-white/70 animate-pulse" />
+                          {ss.label}
+                        </span>
+                        {/* Status stepper — only show for non-confirmed/non-revoked */}
+                        {!['CONFIRMED', 'REVOKED'].includes(cert.status) && (
+                          <div className="hidden md:block">
+                            <CertStepper status={cert.status} />
+                          </div>
+                        )}
+                      </div>
                     </div>
+
+                    {/* Mobile stepper */}
+                    {!['CONFIRMED', 'REVOKED'].includes(cert.status) && (
+                      <div className="md:hidden px-8 pb-4 overflow-x-auto">
+                        <CertStepper status={cert.status} />
+                      </div>
+                    )}
 
                     <AnimatePresence>
                       {isOpen && (
                         <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }}
                           className="border-t border-[#e0e0e0] overflow-hidden bg-[#f6f6f6]">
-                          <div className="px-10 py-8 space-y-6">
-                            <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+                          <div className="px-8 py-6 space-y-5">
+                            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                               {[
-                                { label: 'Certificate ID', value: cert.certificateId || cert.id, copyKey: cert.id + 'id' },
-                                { label: 'Digital Fingerprint', value: cert.certificateHash?.slice(0, 24) + '...', copyKey: cert.id + 'hash', full: cert.certificateHash },
+                                { label: 'Certificate ID', value: cert.certificateId || cert.id, copyKey: cert.id + 'id', full: cert.certificateId || cert.id },
+                                { label: 'Digital Fingerprint', value: cert.certificateHash?.slice(0, 24) + '…', copyKey: cert.id + 'hash', full: cert.certificateHash },
+                                { label: 'Program', value: cert.course || '—' },
+                                { label: 'Branch', value: cert.metadata?.branch || '—' },
                               ].map(({ label, value, copyKey, full }) => (
-                                <div key={label} className="space-y-2">
+                                <div key={label} className="space-y-1.5">
                                   <p className="text-[9px] font-black uppercase tracking-widest text-[#646464]">{label}</p>
-                                  <div className="flex items-center gap-3 bg-white px-5 py-3 rounded-full border border-[#e0e0e0]">
+                                  <div className="flex items-center gap-3 bg-white px-4 py-2.5 rounded-xl border border-[#e0e0e0]">
                                     <p className="text-[#ea2804] font-mono text-xs truncate flex-1">{value}</p>
-                                    <button onClick={(e) => { e.stopPropagation(); copy(full || value, copyKey); }}
-                                      className="text-[#bbbbbb] hover:text-[#ea2804] transition-colors shrink-0">
-                                      {copiedId === copyKey ? <Check size={14} className="text-[#2b9a66]" /> : <Copy size={14} />}
-                                    </button>
+                                    {copyKey && (
+                                      <button onClick={(e) => { e.stopPropagation(); copy(full || value, copyKey); }}
+                                        className="text-[#bbbbbb] hover:text-[#ea2804] transition-colors shrink-0">
+                                        {copiedId === copyKey ? <Check size={12} className="text-[#2b9a66]" /> : <Copy size={12} />}
+                                      </button>
+                                    )}
                                   </div>
                                 </div>
                               ))}
                             </div>
-                            <div className="flex flex-wrap gap-3 pt-2 border-t border-[#e0e0e0]">
-                              {cert.fileUrl && (
+
+                            <div className="flex flex-wrap gap-3 pt-3 border-t border-[#e0e0e0]">
+                              {cert.fileUrl && cert.status === 'CONFIRMED' && (
                                 <button onClick={(e) => { e.stopPropagation(); window.open(`/api/certificates/${cert.id}/file`, '_blank'); }}
                                   className="btn-primary text-xs">
-                                  <Download size={14} /> Download
+                                  <Download size={13} /> Download Certificate PDF
                                 </button>
                               )}
-                              <button onClick={(e) => { e.stopPropagation(); navigate('/verify'); }}
-                                className="btn-secondary text-xs">
-                                <Shield size={14} /> Verification Centre
-                              </button>
+                              {cert.status === 'CONFIRMED' && (
+                                <button onClick={(e) => { e.stopPropagation(); navigate(`/verify/${cert.certificateId || cert.id}`); }}
+                                  className="btn-secondary text-xs">
+                                  <Shield size={13} /> Verify on Blockchain
+                                </button>
+                              )}
+                              {['PENDING_REVIEW', 'PROCESSING'].includes(cert.status) && (
+                                <div className="flex items-center gap-2 px-4 py-2 bg-amber-50 border border-amber-200 rounded-xl text-[9px] font-black text-amber-700 uppercase tracking-widest">
+                                  <Clock size={11} />
+                                  Awaiting admin review — PDF available after verification
+                                </div>
+                              )}
                             </div>
                           </div>
                         </motion.div>
@@ -237,7 +361,7 @@ export default function StudentDashboard() {
           )}
         </motion.div>
 
-        <motion.div {...vt} transition={{ delay: 0.3 }} className="text-center pt-6">
+        <motion.div {...vt} transition={{ delay: 0.3 }} className="text-center pt-4">
           <p className="text-[#bbbbbb] text-[9px] font-black uppercase tracking-widest">
             All certificates are cryptographically verified and anchored to the EduCred network.
           </p>
