@@ -70,13 +70,15 @@ app.use(helmet({
       scriptSrc: ["'self'", "'unsafe-inline'", ...(isProduction ? [] : ["'unsafe-eval'"]), "https://accounts.google.com"],
       frameSrc: ["'self'", "https://accounts.google.com"],
       styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com", "https://accounts.google.com"],
-      imgSrc: ["'self'", "data:", "https://res.cloudinary.com", "blob:"],
+      imgSrc: ["'self'", "data:", "https://res.cloudinary.com", "https://*.pinata.cloud", "https://gateway.pinata.cloud", "blob:"],
       fontSrc: ["'self'", "https://fonts.gstatic.com"],
       connectSrc: [
         "'self'", 
         ...allowedOrigins, 
         ...(isProduction ? [] : ["http://localhost:5001", "http://127.0.0.1:8545"]),
-        "https://accounts.google.com"
+        "https://accounts.google.com",
+        "https://*.pinata.cloud",
+        "https://gateway.pinata.cloud"
       ],
     },
   },

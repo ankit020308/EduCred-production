@@ -1315,8 +1315,28 @@ export const downloadCertificateFile = async (req, res) => {
     res.setHeader('X-Certificate-ID', cert.certificateId);
     if (cert.certificateHash) res.setHeader('X-Certificate-Hash', cert.certificateHash);
 
-    // Remote IPFS URL — redirect
+    // Remote IPFS URL — Proxy (bypasses CSP and CORS issues)
     if (cert.fileUrl?.startsWith('http://') || cert.fileUrl?.startsWith('https://')) {
+      try {
+        console.log(`[📦 DOWNLOAD_PROXY] Fetching from IPFS: ${cert.fileUrl}`);
+        const { default: fetch } = await import('node-fetch');
+        const ipfsResponse = await fetch(cert.fileUrl, {
+          timeout: 10000,
+          headers: { 'User-Agent': 'EduCred-Node-Proxy' }
+        });
+
+        if (ipfsResponse.ok) {
+          const contentType = ipfsResponse.headers.get('content-type') || 'application/pdf';
+          res.setHeader('Content-Type', contentType);
+          const arrayBuffer = await ipfsResponse.arrayBuffer();
+          return res.send(Buffer.from(arrayBuffer));
+        }
+
+        console.warn(`[⚠️ DOWNLOAD_PROXY] Gateway returned ${ipfsResponse.status}.`);
+      } catch (proxyErr) {
+        console.error(`[❌ DOWNLOAD_PROXY_FAIL]: ${proxyErr.message}`);
+      }
+      // Fallback: Redirect if proxy fails
       return res.redirect(cert.fileUrl);
     }
 
