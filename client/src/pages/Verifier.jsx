@@ -61,14 +61,34 @@ export default function Verifier() {
     setError('');
 
     try {
-      const response = mode === 'UPLOAD'
-        ? await (() => {
-            const data = new FormData();
-            data.append('file', file);
-            return api.post('/api/certificates/verify', data);
-          })()
-        : await api.post('/api/certificates/verify', { certificateId: certificateId.trim() });
-
+      let response;
+      if (mode === 'UPLOAD') {
+        const formData = new FormData();
+        formData.append('certificate', file);
+        // Clear the default JSON Content-Type so browser sets multipart/form-data with boundary
+        response = await api.post('/api/certificates/verify/pdf', formData, {
+          headers: { 'Content-Type': undefined },
+        });
+        // Normalise verifyPDFCertificate response shape → { valid, metadata }
+        const d = response.data;
+        setResult({
+          valid: d.verified === true,
+          onChainConsensus: false,
+          verificationSource: 'pdf_integrity',
+          message: d.message,
+          hash: null,
+          metadata: d.cert ? {
+            certificateId: d.cert.certId,
+            studentName: d.cert.studentName,
+            course: d.cert.degree,
+            issuer: d.cert.university,
+            createdAt: d.cert.issuedAt,
+          } : null,
+        });
+        return;
+      } else {
+        response = await api.post('/api/certificates/verify', { certificateId: certificateId.trim() });
+      }
       setResult(response.data);
     } catch (requestError) {
       setError(
@@ -188,7 +208,7 @@ export default function Verifier() {
                     <input
                       type="file"
                       className="hidden"
-                      accept=".pdf,.png,.jpg,.jpeg"
+                      accept=".pdf,application/pdf"
                       onChange={(event) => {
                         setFile(event.target.files?.[0] || null);
                         setError('');
@@ -201,7 +221,7 @@ export default function Verifier() {
                     <p className="text-[11px] font-black text-[#202020] uppercase tracking-widest truncate max-w-[200px] mx-auto">
                       {file ? file.name : 'Select Certificate'}
                     </p>
-                    <p className="mt-1.5 text-[9px] font-black text-[#bbbbbb] uppercase tracking-widest">PDF, PNG, JPG supported</p>
+                    <p className="mt-1.5 text-[9px] font-black text-[#bbbbbb] uppercase tracking-widest">EduCred-issued PDF certificates only</p>
                   </label>
                 ) : (
                   <div className="space-y-2">
