@@ -5,6 +5,7 @@ import cors from 'cors';
 import helmet from 'helmet';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { Op } from 'sequelize';
 
 // ─── Enterprise Packages ──────────────────────────────
 import morgan from 'morgan';
@@ -26,6 +27,7 @@ import supportRoutes from './routes/supportRoutes.js';
 import healthRoutes from './routes/health.js';
 import Registry from './services/registryService.js';
 import { initSocket } from './utils/socketService.js';
+import { BlacklistedToken } from './models/index.js';
 import fs from 'fs';
 
 import { getAllowedOrigins, isProduction, sessionSecret, validateServerEnv, requireEnv } from './utils/runtimeConfig.js';
@@ -67,33 +69,52 @@ app.use(helmet({
   contentSecurityPolicy: {
     directives: {
       defaultSrc: ["'self'"],
-      scriptSrc: ["'self'", "'unsafe-inline'", ...(isProduction ? [] : ["'unsafe-eval'"]), "https://accounts.google.com"],
+      // unsafe-inline only needed in dev for Vite HMR; production build uses external JS files only
+      scriptSrc: [
+        "'self'",
+        ...(isProduction ? [] : ["'unsafe-inline'", "'unsafe-eval'"]),
+        "https://accounts.google.com",
+      ],
       frameSrc: ["'self'", "https://accounts.google.com"],
       styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com", "https://accounts.google.com"],
       imgSrc: ["'self'", "data:", "https://res.cloudinary.com", "https://*.pinata.cloud", "https://gateway.pinata.cloud", "blob:"],
       fontSrc: ["'self'", "https://fonts.gstatic.com"],
       connectSrc: [
-        "'self'", 
-        ...allowedOrigins, 
+        "'self'",
+        ...allowedOrigins,
         ...(isProduction ? [] : ["http://localhost:5001", "http://127.0.0.1:8545"]),
         "https://accounts.google.com",
         "https://*.pinata.cloud",
-        "https://gateway.pinata.cloud"
+        "https://gateway.pinata.cloud",
       ],
     },
   },
 }));
 app.use(compression());
-app.use(morgan('dev'));
+app.use(morgan(isProduction ? 'combined' : 'dev'));
 
 // ─── STRICT CORS PROTOCOL ────────────────────────────
 const corsOptions = {
   origin: allowedOrigins,
-  methods: ['GET', 'POST', 'PUT', 'DELETE'],
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'],
   credentials: true
 };
 app.use(cors(corsOptions));
 app.options('*', cors(corsOptions)); // Enable preflight for all routes
+
+// ─── CSRF ORIGIN VALIDATION ───────────────────────────
+// Browsers always send the Origin header on cross-site requests. If Origin
+// is present but not in our allowlist, reject the request — this blocks
+// CSRF attacks that exploit sameSite:none cookies in production.
+app.use((req, res, next) => {
+  if (['POST', 'PUT', 'PATCH', 'DELETE'].includes(req.method)) {
+    const origin = req.headers.origin;
+    if (origin && !allowedOrigins.includes(origin)) {
+      return res.status(403).json({ error: 'CSRF validation failed.' });
+    }
+  }
+  next();
+});
 
 const apiLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
@@ -116,8 +137,8 @@ const otpLimiter = rateLimit({
   message: { success: false, message: 'Too many OTP attempts. Please wait before requesting another.' },
 });
 
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+app.use(express.json({ limit: '50kb' }));
+app.use(express.urlencoded({ extended: true, limit: '50kb' }));
 app.use(cookieParser());
 
 // JWT strictly used for authentication.
@@ -131,7 +152,6 @@ if (!isProduction) {
 app.use('/api', apiLimiter);
 app.use('/api/auth', authLimiter, authRoutes); // Apply strict auth limits
 
-app.use('/auth', authRoutes);
 app.use('/api/certificates', certificateRoutes);
 app.use('/api/universities', universityRoutes);
 app.use('/api/user', userRoutes);
@@ -151,6 +171,11 @@ app.get('/', (req, res) => {
 });
 
 // ─── Health check legacy handler removed - replaced by healthRoutes ───
+
+// ─── Catch-All 404 ───────────────────────────────────────
+app.use((req, res) => {
+  res.status(404).json({ error: 'Route not found.' });
+});
 
 // ─── GLOBAL ERROR HANDLER ─────────────────────────────
 app.use((err, req, res, next) => {
@@ -202,10 +227,6 @@ async function seedSystem() {
   }
 }
 
-// ─── Catch-All 404 ───────────────────────────────────────
-app.use((req, res, next) => {
-  res.status(404).json({ error: 'Route not found.' });
-});
 
 let server;
 
@@ -235,6 +256,13 @@ if (process.env.NODE_ENV !== 'test') {
         console.log(`[LEDGER]  Ledger:  ${getBlockchainRuntimeInfo().mode === 'LIVE' ? 'SEP-LIVE' : 'OFFLINE'}`);
         console.log(`[ASSETS]  Assets:  ${isPinataConfigured() ? 'DECENTRALIZED (PINATA)' : 'LOCAL (UPLOADS)'}`);
         console.log(`-------------------------------------------------\n`);
+
+        // Purge expired blacklisted tokens every 6 hours to keep auth lookups fast
+        setInterval(async () => {
+          try {
+            await BlacklistedToken.destroy({ where: { expiresAt: { [Op.lt]: new Date() } } });
+          } catch { /* non-fatal */ }
+        }, 6 * 60 * 60 * 1000);
 
         // Background Connectivity Check
         if (isPinataConfigured()) {

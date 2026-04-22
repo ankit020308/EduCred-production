@@ -2,6 +2,8 @@ import express from 'express';
 import Registry from '../services/registryService.js';
 import { getTransporter } from '../utils/emailService.js';
 import { ethers } from 'ethers';
+import { protect, requireRole } from '../middleware/authMiddleware.js';
+import { isEncryptedSecret, decryptSecret } from '../utils/keyVault.js';
 
 const router = express.Router();
 
@@ -11,10 +13,17 @@ function maskValue(val) {
   return val.slice(0, 6) + '...' + val.slice(-4);
 }
 
-router.get('/', async (req, res) => {
+router.get('/', protect, requireRole('admin', 'super_admin'), async (req, res) => {
   const rpcUrl   = process.env.RPC_URL || process.env.SEPOLIA_RPC_URL;
   const contract = process.env.CONTRACT_ADDRESS;
-  const privKey  = process.env.PRIVATE_KEY;
+  const rawPrivKey = process.env.PRIVATE_KEY;
+  // Resolve encrypted key the same way blockchain.js does
+  let privKey = null;
+  try {
+    privKey = rawPrivKey && isEncryptedSecret(rawPrivKey) ? decryptSecret(rawPrivKey) : rawPrivKey;
+  } catch {
+    privKey = null;
+  }
 
   const diagnostic = {
     status: 'OPTIMAL',

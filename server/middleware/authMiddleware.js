@@ -21,8 +21,13 @@ export const protect = async (req, res, next) => {
     const decoded = jwt.verify(token, jwtSecret);
     const userId = decoded.userId || decoded.id;
 
-    // Admin token: not in DB, bypass DB lookup
+    // Admin token: not in DB, but still check the blacklist so revoked admin
+    // sessions cannot be reused.
     if (userId === 'admin' && decoded.role === 'admin') {
+      const isBlacklisted = await Registry.findOne('blacklistedTokens', { token });
+      if (isBlacklisted) {
+        return res.status(401).json({ error: 'Security token revoked. Please login again.' });
+      }
       req.user = { id: 'admin', role: 'admin', email: process.env.ADMIN_EMAIL || 'admin', isEmailVerified: true };
       return next();
     }

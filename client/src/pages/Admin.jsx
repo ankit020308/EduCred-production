@@ -20,7 +20,7 @@ const vt = {
   transition: { duration: 0.45, ease: [0.22, 1, 0.36, 1] },
 };
 
-const emptySubject = () => ({ code: '', marks: '' });
+const emptySubject = () => ({ code: '', name: '', marks: '' });
 const emptySemester = (n) => ({ semester: n, sgpa: '', subjects: [emptySubject()] });
 const INPUT = 'w-full h-11 bg-[#f6f6f6] border border-[#e0e0e0] rounded-xl px-4 text-sm text-[#202020] font-medium outline-none focus:bg-white focus:border-[#ea2804] transition-all placeholder:text-[#bbbbbb]';
 
@@ -138,7 +138,7 @@ function AdminDashboard() {
         program: form.program, branch: form.branch, finalCGPA: parseFloat(form.finalCGPA),
         semesters: form.semesters.map(s => ({
           semester: s.semester, sgpa: parseFloat(s.sgpa),
-          subjects: s.subjects.map(sub => ({ code: sub.code.trim(), marks: parseFloat(sub.marks) })),
+          subjects: s.subjects.map(sub => ({ code: sub.code.trim(), name: sub.name?.trim() || '', marks: parseFloat(sub.marks) })),
         })),
       };
       const res = await api.post('/api/certificates/issue', payload);
@@ -164,6 +164,17 @@ function AdminDashboard() {
 
   const openEdit = (cert) => {
     setEditingCert(cert);
+    const existingSemesters = cert.metadata?.semester != null
+      ? [{
+          semester: cert.metadata.semester,
+          sgpa: cert.metadata.sgpa ?? '',
+          subjects: (cert.metadata.subjects || []).map(s => ({
+            code: s.code || '',
+            name: s.name || '',
+            marks: s.marks ?? '',
+          })),
+        }]
+      : [emptySemester(1)];
     setForm({
       studentName: cert.studentName || '',
       email: cert.studentEmail || '',
@@ -171,7 +182,7 @@ function AdminDashboard() {
       program: cert.course || '',
       branch: cert.metadata?.branch || '',
       finalCGPA: cert.metadata?.finalCGPA || '',
-      semesters: [emptySemester(1)],
+      semesters: existingSemesters.length > 0 ? existingSemesters : [emptySemester(1)],
     });
     setShowModal(true);
     setIssuedResult(null);
@@ -187,7 +198,7 @@ function AdminDashboard() {
         branch: form.branch, finalCGPA: parseFloat(form.finalCGPA),
         semesters: form.semesters.map(s => ({
           semester: s.semester, sgpa: parseFloat(s.sgpa),
-          subjects: s.subjects.map(sub => ({ code: sub.code.trim(), marks: parseFloat(sub.marks) })),
+          subjects: s.subjects.map(sub => ({ code: sub.code.trim(), name: sub.name?.trim() || '', marks: parseFloat(sub.marks) })),
         })),
       });
       toast.success('Record updated. Awaiting admin review.');
@@ -666,7 +677,10 @@ function AdminDashboard() {
                               <div key={xi} className="flex items-center gap-2">
                                 <input required placeholder="Code (e.g. CS101)" value={sub.code}
                                   onChange={e => setSub(si, xi, 'code', e.target.value)}
-                                  className="flex-1 h-8 bg-white border border-[#e0e0e0] rounded-xl px-3 text-sm text-[#202020] outline-none focus:border-[#ea2804] transition-all uppercase" />
+                                  className="w-28 h-8 bg-white border border-[#e0e0e0] rounded-xl px-3 text-sm text-[#202020] outline-none focus:border-[#ea2804] transition-all uppercase" />
+                                <input placeholder="Subject Name" value={sub.name}
+                                  onChange={e => setSub(si, xi, 'name', e.target.value)}
+                                  className="flex-1 h-8 bg-white border border-[#e0e0e0] rounded-xl px-3 text-sm text-[#202020] outline-none focus:border-[#ea2804] transition-all" />
                                 <input required type="number" min="0" max="100" placeholder="Marks"
                                   value={sub.marks} onChange={e => setSub(si, xi, 'marks', e.target.value)}
                                   className="w-20 h-8 bg-white border border-[#e0e0e0] rounded-xl px-3 text-sm text-[#202020] outline-none focus:border-[#ea2804] transition-all" />

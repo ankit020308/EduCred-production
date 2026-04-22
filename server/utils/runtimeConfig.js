@@ -47,7 +47,9 @@ const OPTIONAL_PROD_ENV = [
   'GOOGLE_CLIENT_SECRET',
   'GOOGLE_CALLBACK_URL',
   'PINATA_JWT',
-  'CLOUDINARY_URL',
+  'CLOUDINARY_NAME',
+  'CLOUDINARY_API_KEY',
+  'CLOUDINARY_API_SECRET',
 ];
 
 export const isProduction = process.env.NODE_ENV === 'production';

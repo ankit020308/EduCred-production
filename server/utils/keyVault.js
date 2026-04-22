@@ -66,6 +66,5 @@ export function decryptSecret(payload) {
     decipher.final(),
   ]);
 
-  console.log('[SUCCESS] Institutional secret decrypted successfully.');
   return decrypted.toString('utf8');
 }

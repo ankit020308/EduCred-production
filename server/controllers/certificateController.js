@@ -8,11 +8,11 @@ import sequelize from '../config/database.js';
 import Registry from '../services/registryService.js';
 import { Certificate } from '../models/index.js';
 import { issueCertificateOnChain, revokeHashOnChain, verifyHashDetailsOnChain, checkUniversityWalletFunds, getServerWalletInfo } from '../utils/blockchain.js';
-import { generateStructuralHash, generateBinaryHash, generateHash } from '../utils/hashing.js';
+import { generateBinaryHash, generateHash } from '../utils/hashing.js';
 import { emitToInstitution, emitToUser } from '../utils/socketService.js';
 import { logAudit } from '../utils/logger.js';
 import { certificateIssuanceSchema } from '../validators/joiSchemas.js';
-import { isPinataConfigured, uploadFileToPinata, uploadJSONToPinata, getIPFSUrl } from '../utils/ipfsService.js';
+import { isPinataConfigured, uploadFileToPinata, uploadJSONToPinata } from '../utils/ipfsService.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -60,11 +60,19 @@ function createCertificateId(programName, prefix = 'EDUCRED') {
     .slice(0, 3)
     .toUpperCase() || 'GEN';
 
-  return `${prefix}-${currentYear}-${progCode}-${crypto.randomInt(10000, 100000)}`;
+  // 4 random bytes → 8 hex chars → ~4 billion values (vs prior 90k)
+  return `${prefix}-${currentYear}-${progCode}-${crypto.randomBytes(4).toString('hex').toUpperCase()}`;
 }
 
 function isLockToken(value) {
   return typeof value === 'string' && value.startsWith('LOCK:');
+}
+
+// Strip leading formula-injection characters from CSV string fields.
+// Prevents =CMD(), @SUM(), +, - prefixes from executing in spreadsheet exports.
+function sanitizeCsvField(value) {
+  if (typeof value !== 'string') return value;
+  return value.replace(/^[=+\-@\t\r]/, '').trim();
 }
 
 function getUniqueConstraintFields(error) {
@@ -508,9 +516,16 @@ export const batchIssue = async (req, res) => {
       const row = rows[i];
       const rowNum = i + 2;
       try {
-        const { studentName, email, rollNumber, program, branch, finalCGPA, graduationYear, phone } = row;
+        const studentName  = sanitizeCsvField(row.studentName);
+        const email        = sanitizeCsvField(row.email);
+        const rollNumber   = sanitizeCsvField(row.rollNumber);
+        const program      = sanitizeCsvField(row.program);
+        const branch       = sanitizeCsvField(row.branch);
+        const finalCGPA    = sanitizeCsvField(row.finalCGPA);
+        const graduationYear = sanitizeCsvField(row.graduationYear);
+        const phone        = sanitizeCsvField(row.phone);
 
-        if (!studentName?.trim() || !email?.trim() || !rollNumber?.trim() || !program?.trim() || !branch?.trim() || !finalCGPA?.trim()) {
+        if (!studentName || !email || !rollNumber || !program || !branch || !finalCGPA) {
           failed.push({ row: rowNum, error: 'Missing required field(s): studentName, email, rollNumber, program, branch, finalCGPA.' });
           continue;
         }
@@ -521,11 +536,11 @@ export const batchIssue = async (req, res) => {
           continue;
         }
 
-        const certHash = generateHash({ rollNumber: rollNumber.trim(), semester: 'FINAL', finalCGPA: cgpa });
+        const certHash = generateHash({ rollNumber, semester: 'FINAL', finalCGPA: cgpa });
 
         let studentId = null;
         try {
-          const studentUser = await Registry.findOne('users', { email: email.trim() });
+          const studentUser = await Registry.findOne('users', { email });
           if (studentUser) {
             const studentRecord = await Registry.findOne('students', { userId: studentUser.id });
             if (studentRecord) studentId = studentRecord.id;
@@ -533,11 +548,11 @@ export const batchIssue = async (req, res) => {
         } catch { /* student linkage is optional */ }
 
         const cert = await createCertificateRecord({
-          studentName: studentName.trim(),
-          studentEmail: email.trim(),
-          studentPhone: phone?.trim() || '0000000000',
+          studentName,
+          studentEmail: email,
+          studentPhone: phone || '0000000000',
           studentId,
-          course: program.trim(),
+          course: program,
           issuer: university.name,
           certificateHash: certHash,
           status: 'PENDING_REVIEW',
@@ -546,9 +561,9 @@ export const batchIssue = async (req, res) => {
           universityId: university.id,
           certificateType: 'Degree Certificate',
           metadata: {
-            studentEnrollmentNumber: rollNumber.trim(),
-            branch: branch.trim(),
-            graduationYear: graduationYear?.trim() || String(new Date().getFullYear()),
+            studentEnrollmentNumber: rollNumber,
+            branch,
+            graduationYear: graduationYear || String(new Date().getFullYear()),
             finalCGPA: cgpa,
           },
           workflowLog: [{
@@ -559,7 +574,7 @@ export const batchIssue = async (req, res) => {
           }],
         });
 
-        succeeded.push({ row: rowNum, studentName: studentName.trim(), email: email.trim(), certificateId: cert.certificateId });
+        succeeded.push({ row: rowNum, studentName, email, certificateId: cert.certificateId });
       } catch (err) {
         failed.push({ row: rowNum, error: err.message });
       }
@@ -1014,7 +1029,7 @@ export const editCertificate = async (req, res) => {
       return res.status(400).json({ error: 'Certificate can only be edited while in PENDING_REVIEW status. Once approved it is immutable.' });
     }
 
-    const { studentName, email, rollNumber, program, branch, graduationYear, finalCGPA, semesters } = req.body;
+    const { studentName, email, rollNumber, branch, graduationYear, finalCGPA, semesters } = req.body;
 
     const newHash = generateHash({ rollNumber, semester: semesters?.[0]?.semester || 'FINAL', sgpa: semesters?.[0]?.sgpa, subjects: semesters?.[0]?.subjects, finalCGPA });
 
@@ -1042,7 +1057,7 @@ export const editCertificate = async (req, res) => {
   }
 };
 
-export const getAllCertificatesForAdmin = async (req, res) => {
+export const getAllCertificatesForAdmin = async (_req, res) => {
   try {
     const certs = await Registry.find('certificates');
     const universities = await Registry.find('universities');
@@ -1113,16 +1128,17 @@ export const verifyPDFCertificate = async (req, res) => {
 
     // Validate PDF magic bytes (%PDF-)
     const fileBuffer = fs.readFileSync(tempPath);
-    if (!fileBuffer.slice(0, 5).toString('ascii').startsWith('%PDF')) {
+    if (!fileBuffer.subarray(0, 5).toString('ascii').startsWith('%PDF')) {
       return res.status(400).json({ verified: false, error: 'File is not a valid PDF.' });
     }
 
-    // Extract certId from PDF Info.Subject via pdf-parse
+    // Extract certId from PDF Info.Subject via pdf-parse v2 class API
     let certId;
     try {
-      const { default: pdfParse } = await import('pdf-parse');
-      const parsed = await pdfParse(fileBuffer);
-      certId = parsed.info?.Subject;
+      const { PDFParse } = await import('pdf-parse');
+      const parser = new PDFParse({ data: fileBuffer });
+      const infoResult = await parser.getInfo();
+      certId = infoResult.info?.Subject;
     } catch (parseErr) {
       console.error('[PDF_VERIFY] Parse error:', parseErr.message);
     }
@@ -1158,8 +1174,11 @@ export const verifyPDFCertificate = async (req, res) => {
       // PDF was generated before pdfHash tracking was added — fall back to info-field comparison
       const embeddedHash = cert.certificateHash;
       const pdfInfoHash = await import('pdf-parse')
-        .then(m => m.default(fileBuffer))
-        .then(p => p.info?.Keywords)
+        .then(async ({ PDFParse }) => {
+          const p = new PDFParse({ data: fileBuffer });
+          const r = await p.getInfo();
+          return r.info?.Keywords ?? null;
+        })
         .catch(() => null);
       if (pdfInfoHash && pdfInfoHash === embeddedHash) {
         return res.json({
@@ -1208,7 +1227,7 @@ export const verifyPDFCertificate = async (req, res) => {
   }
 };
 
-export const getAdminWalletStatus = async (req, res) => {
+export const getAdminWalletStatus = async (_req, res) => {
   try {
     const serverInfo = await getServerWalletInfo();
     // Also collect all certs stuck in ANCHOR_PENDING_FUNDS so admin can see which institutions need funding

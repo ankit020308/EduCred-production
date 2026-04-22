@@ -3,14 +3,15 @@ import fs from 'fs';
 import dotenv from 'dotenv';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { decryptSecret } from './keyVault.js';
+import { decryptSecret, isEncryptedSecret } from './keyVault.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 dotenv.config({ path: path.join(__dirname, '../../.env') });
 
-const CONFIRMATION_TIMEOUT_MS = 60000;
+// Configurable via BLOCKCHAIN_CONFIRMATION_TIMEOUT_MS env var (default 60s)
+const CONFIRMATION_TIMEOUT_MS = parseInt(process.env.BLOCKCHAIN_CONFIRMATION_TIMEOUT_MS) || 60000;
 // 400k gas × 50 gwei = minimum viable balance for one anchor tx
 const MIN_GAS_WEI = BigInt(400000) * BigInt(50e9);
 
@@ -127,7 +128,10 @@ async function initializeContract() {
     readOnlyContract = new ethers.Contract(CONTRACT_ADDRESS, CONTRACT_ABI, provider);
 
     if (PRIVATE_KEY) {
-      wallet = new ethers.Wallet(PRIVATE_KEY, provider);
+      // Support both plaintext and AES-256-GCM encrypted private keys.
+      // Store an encrypted key in .env as: PRIVATE_KEY=v1:<iv>:<tag>:<ciphertext>
+      const resolvedKey = isEncryptedSecret(PRIVATE_KEY) ? decryptSecret(PRIVATE_KEY) : PRIVATE_KEY;
+      wallet = new ethers.Wallet(resolvedKey, provider);
       serverSignerContract = new ethers.Contract(CONTRACT_ADDRESS, CONTRACT_ABI, wallet);
       console.log('[BLOCKCHAIN] [SUCCESS] Authoritative ledger connected (RW Mode)');
     } else {

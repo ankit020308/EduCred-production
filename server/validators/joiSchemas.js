@@ -21,6 +21,7 @@ export const certificateIssuanceSchema = Joi.object({
       subjects: Joi.array().items(
         Joi.object({
           code: Joi.string().required(),
+          name: Joi.string().optional().allow('', null),
           marks: Joi.number().required(),
         })
       ).min(1).required(),
@@ -73,7 +74,9 @@ export const registrationSchema = Joi.object({
     otherwise: Joi.optional().allow('', null)
   }),
   description: Joi.string().optional().allow('', null),
-  documents: Joi.array().items(Joi.string()).optional(),
+  documents: Joi.array().items(
+    Joi.string().uri({ scheme: ['http', 'https'] }).max(500)
+  ).max(10).optional(),
   officialDomain: Joi.string().optional().allow('', null),
   adminName: Joi.string().optional().allow('', null),
   // legacy alias — keep both so old clients don't break
