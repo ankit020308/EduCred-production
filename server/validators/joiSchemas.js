@@ -8,7 +8,7 @@ import Joi from 'joi';
 export const certificateIssuanceSchema = Joi.object({
   // Frontend contract fields
   studentName: Joi.string().required().min(1).max(100),
-  email: Joi.string().email().required(),
+  email: Joi.string().email().lowercase().required(),
   rollNumber: Joi.string().required(),
   program: Joi.string().required(),
   branch: Joi.string().required(),
@@ -24,7 +24,13 @@ export const certificateIssuanceSchema = Joi.object({
           name: Joi.string().optional().allow('', null),
           marks: Joi.number().required(),
         })
-      ).min(1).required(),
+      ).min(1).required().custom((subjects, helpers) => {
+        const codes = subjects.map(s => s.code?.trim().toUpperCase());
+        if (new Set(codes).size !== codes.length) {
+          return helpers.error('array.unique');
+        }
+        return subjects;
+      }).messages({ 'array.unique': 'Duplicate subject codes are not allowed within a semester.' }),
       sgpa: Joi.number().required(),
     })
   ).min(1).required(),

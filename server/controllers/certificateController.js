@@ -517,7 +517,7 @@ export const batchIssue = async (req, res) => {
       const rowNum = i + 2;
       try {
         const studentName  = sanitizeCsvField(row.studentName);
-        const email        = sanitizeCsvField(row.email);
+        const email        = sanitizeCsvField(row.email)?.toLowerCase();
         const rollNumber   = sanitizeCsvField(row.rollNumber);
         const program      = sanitizeCsvField(row.program);
         const branch       = sanitizeCsvField(row.branch);
@@ -1324,7 +1324,7 @@ export const downloadCertificateFile = async (req, res) => {
       req.user?.role === 'super_admin' ||
       String(cert.issuedBy) === String(req.user?.id) ||
       String(cert.studentId) === String(req.user?.id) ||
-      cert.studentEmail === req.user?.email;
+      cert.studentEmail?.toLowerCase() === req.user?.email?.toLowerCase();
 
     if (!canAccess) {
       return res.status(403).json({ error: 'Access denied.' });

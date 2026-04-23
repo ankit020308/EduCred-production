@@ -122,16 +122,53 @@ function AdminDashboard() {
   }, [user, fetchUniStatus, fetchCerts, fetchStats]);
 
   // Semester helpers
+  const calcSgpa = (subs) => {
+    const valid = subs.map(s => parseFloat(s.marks)).filter(v => !isNaN(v));
+    return valid.length > 0 ? (valid.reduce((a, b) => a + b, 0) / valid.length / 10).toFixed(2) : '';
+  };
+  const calcCgpa = (semesters) => {
+    const valid = semesters.map(s => parseFloat(s.sgpa)).filter(v => !isNaN(v));
+    return valid.length > 0 ? (valid.reduce((a, b) => a + b, 0) / valid.length).toFixed(2) : '';
+  };
+
   const addSemester = () => setForm(p => ({ ...p, semesters: [...p.semesters, emptySemester(p.semesters.length + 1)] }));
-  const removeSemester = (i) => setForm(p => ({ ...p, semesters: p.semesters.filter((_, j) => j !== i) }));
+  const removeSemester = (i) => setForm(p => {
+    const semesters = p.semesters.filter((_, j) => j !== i);
+    return { ...p, semesters, finalCGPA: calcCgpa(semesters) };
+  });
   const setSem = (i, field, val) => setForm(p => { const s = [...p.semesters]; s[i] = { ...s[i], [field]: val }; return { ...p, semesters: s }; });
   const addSubject = (si) => setForm(p => { const s = [...p.semesters]; s[si] = { ...s[si], subjects: [...s[si].subjects, emptySubject()] }; return { ...p, semesters: s }; });
-  const removeSubject = (si, xi) => setForm(p => { const s = [...p.semesters]; s[si] = { ...s[si], subjects: s[si].subjects.filter((_, j) => j !== xi) }; return { ...p, semesters: s }; });
-  const setSub = (si, xi, field, val) => setForm(p => { const s = [...p.semesters]; const subs = [...s[si].subjects]; subs[xi] = { ...subs[xi], [field]: val }; s[si] = { ...s[si], subjects: subs }; return { ...p, semesters: s }; });
+  const removeSubject = (si, xi) => setForm(p => {
+    const s = [...p.semesters];
+    const subs = s[si].subjects.filter((_, j) => j !== xi);
+    s[si] = { ...s[si], subjects: subs, sgpa: calcSgpa(subs) };
+    return { ...p, semesters: s, finalCGPA: calcCgpa(s) };
+  });
+  const setSub = (si, xi, field, val) => setForm(p => {
+    const s = [...p.semesters];
+    const subs = [...s[si].subjects];
+    subs[xi] = { ...subs[xi], [field]: val };
+    s[si] = { ...s[si], subjects: subs };
+    if (field === 'marks') {
+      s[si] = { ...s[si], subjects: subs, sgpa: calcSgpa(subs) };
+      return { ...p, semesters: s, finalCGPA: calcCgpa(s) };
+    }
+    return { ...p, semesters: s };
+  });
+  const isDuplicateCode = (si, xi) => {
+    const code = form.semesters[si]?.subjects[xi]?.code?.trim().toUpperCase();
+    if (!code) return false;
+    return form.semesters[si].subjects.some((sub, j) => j !== xi && sub.code.trim().toUpperCase() === code);
+  };
 
   const handleIssue = async (e) => {
     e.preventDefault();
     setIssuing(true); setIssuedResult(null);
+    const hasDupCodes = form.semesters.some(sem => {
+      const codes = sem.subjects.map(s => s.code.trim().toUpperCase()).filter(Boolean);
+      return new Set(codes).size !== codes.length;
+    });
+    if (hasDupCodes) { toast.error('Duplicate subject codes detected within a semester.'); setIssuing(false); return; }
     try {
       const payload = {
         studentName: form.studentName, email: form.email, rollNumber: form.rollNumber,
@@ -191,6 +228,11 @@ function AdminDashboard() {
   const handleEdit = async (e) => {
     e.preventDefault();
     setIssuing(true);
+    const hasDupCodes = form.semesters.some(sem => {
+      const codes = sem.subjects.map(s => s.code.trim().toUpperCase()).filter(Boolean);
+      return new Set(codes).size !== codes.length;
+    });
+    if (hasDupCodes) { toast.error('Duplicate subject codes detected within a semester.'); setIssuing(false); return; }
     try {
       await api.put(`/api/certificates/${editingCert.id}/edit`, {
         studentName: form.studentName, email: form.email,
@@ -641,8 +683,13 @@ function AdminDashboard() {
                         <input required placeholder="Branch (e.g. CSE)" value={form.branch}
                           onChange={e => setForm(p => ({ ...p, branch: e.target.value }))} className={INPUT} />
                       </div>
-                      <input required type="number" step="0.01" min="0" max="10" placeholder="Final CGPA (e.g. 8.90)"
-                        value={form.finalCGPA} onChange={e => setForm(p => ({ ...p, finalCGPA: e.target.value }))} className={INPUT} />
+                      <div className={`${INPUT} flex items-center justify-between cursor-default select-none`}>
+                        <span className="text-[#bbbbbb] text-sm font-medium">Final CGPA</span>
+                        <div className="flex items-center gap-2">
+                          <span className="text-[#202020] font-bold">{form.finalCGPA || '—'}</span>
+                          <span className="text-[9px] font-black text-[#ea2804] uppercase tracking-widest bg-[#ea2804]/10 px-1.5 py-0.5 rounded-full">Auto</span>
+                        </div>
+                      </div>
                     </div>
 
                     {/* Semesters */}
@@ -660,9 +707,10 @@ function AdminDashboard() {
                           <div className="flex items-center justify-between">
                             <p className="text-[9px] font-black text-[#202020] uppercase tracking-widest">Semester {sem.semester}</p>
                             <div className="flex items-center gap-2">
-                              <input required type="number" step="0.01" min="0" max="10" placeholder="SGPA"
-                                value={sem.sgpa} onChange={e => setSem(si, 'sgpa', e.target.value)}
-                                className="w-20 h-8 bg-white border border-[#e0e0e0] rounded-xl px-3 text-sm text-[#202020] outline-none focus:border-[#ea2804] transition-all" />
+                              <div className="flex items-center gap-1.5 h-8 bg-white border border-[#e0e0e0] rounded-xl px-3 min-w-[88px] cursor-default select-none">
+                                <span className="text-sm font-bold text-[#202020]">{sem.sgpa || '—'}</span>
+                                <span className="text-[9px] font-black text-[#ea2804] uppercase tracking-widest">SGPA</span>
+                              </div>
                               {form.semesters.length > 1 && (
                                 <button type="button" onClick={() => removeSemester(si)}
                                   className="w-6 h-6 rounded-full bg-[#ea2804]/10 border border-[#ea2804]/20 text-[#ea2804] hover:bg-[#ea2804]/20 flex items-center justify-center transition-all">
@@ -673,25 +721,31 @@ function AdminDashboard() {
                           </div>
                           <div className="space-y-2">
                             <p className="text-[9px] font-black text-[#646464] uppercase tracking-widest">Subjects</p>
-                            {sem.subjects.map((sub, xi) => (
-                              <div key={xi} className="flex items-center gap-2">
-                                <input required placeholder="Code (e.g. CS101)" value={sub.code}
-                                  onChange={e => setSub(si, xi, 'code', e.target.value)}
-                                  className="w-28 h-8 bg-white border border-[#e0e0e0] rounded-xl px-3 text-sm text-[#202020] outline-none focus:border-[#ea2804] transition-all uppercase" />
-                                <input placeholder="Subject Name" value={sub.name}
-                                  onChange={e => setSub(si, xi, 'name', e.target.value)}
-                                  className="flex-1 h-8 bg-white border border-[#e0e0e0] rounded-xl px-3 text-sm text-[#202020] outline-none focus:border-[#ea2804] transition-all" />
-                                <input required type="number" min="0" max="100" placeholder="Marks"
-                                  value={sub.marks} onChange={e => setSub(si, xi, 'marks', e.target.value)}
-                                  className="w-20 h-8 bg-white border border-[#e0e0e0] rounded-xl px-3 text-sm text-[#202020] outline-none focus:border-[#ea2804] transition-all" />
-                                {sem.subjects.length > 1 && (
-                                  <button type="button" onClick={() => removeSubject(si, xi)}
-                                    className="w-6 h-6 rounded-full border border-[#e0e0e0] bg-white text-[#bbbbbb] hover:text-[#ea2804] hover:border-[#ea2804] flex items-center justify-center transition-all shrink-0">
-                                    <X size={10} />
-                                  </button>
-                                )}
-                              </div>
-                            ))}
+                            {sem.subjects.map((sub, xi) => {
+                              const dupCode = isDuplicateCode(si, xi);
+                              return (
+                                <div key={xi} className="flex items-start gap-2">
+                                  <div className="flex flex-col gap-0.5 w-28 shrink-0">
+                                    <input required placeholder="Code (e.g. CS101)" value={sub.code}
+                                      onChange={e => setSub(si, xi, 'code', e.target.value.toUpperCase())}
+                                      className={`w-full h-8 bg-white border rounded-xl px-3 text-sm text-[#202020] outline-none transition-all uppercase ${dupCode ? 'border-[#ea2804] bg-[#ea2804]/5' : 'border-[#e0e0e0] focus:border-[#ea2804]'}`} />
+                                    {dupCode && <p className="text-[8px] font-black text-[#ea2804] uppercase tracking-widest px-1">Duplicate</p>}
+                                  </div>
+                                  <input placeholder="Subject Name" value={sub.name}
+                                    onChange={e => setSub(si, xi, 'name', e.target.value)}
+                                    className="flex-1 h-8 bg-white border border-[#e0e0e0] rounded-xl px-3 text-sm text-[#202020] outline-none focus:border-[#ea2804] transition-all" />
+                                  <input required type="number" min="0" max="100" placeholder="Marks"
+                                    value={sub.marks} onChange={e => setSub(si, xi, 'marks', e.target.value)}
+                                    className="w-20 h-8 bg-white border border-[#e0e0e0] rounded-xl px-3 text-sm text-[#202020] outline-none focus:border-[#ea2804] transition-all" />
+                                  {sem.subjects.length > 1 && (
+                                    <button type="button" onClick={() => removeSubject(si, xi)}
+                                      className="w-6 h-6 mt-1 rounded-full border border-[#e0e0e0] bg-white text-[#bbbbbb] hover:text-[#ea2804] hover:border-[#ea2804] flex items-center justify-center transition-all shrink-0">
+                                      <X size={10} />
+                                    </button>
+                                  )}
+                                </div>
+                              );
+                            })}
                             <button type="button" onClick={() => addSubject(si)}
                               className="text-[9px] font-black text-[#ea2804] uppercase tracking-widest hover:opacity-70 transition-opacity">
                               + Add Subject
