@@ -88,13 +88,35 @@ export const generateCertificatePDF = async (certData) => {
       // ── 4. STUDENT PHOTO (top-right, if available) ──────────────────────────
       if (certData.profileImageUrl) {
         try {
-          const photoRes = await fetch(certData.profileImageUrl);
+          // Force Cloudinary to serve JPEG — pdfkit cannot handle WebP
+          let photoUrl = certData.profileImageUrl;
+          if (photoUrl.includes('res.cloudinary.com') && photoUrl.includes('/upload/')) {
+            photoUrl = photoUrl.replace('/upload/', '/upload/f_jpg,q_85,w_200,h_200,c_fill/');
+          }
+
+          const controller = new AbortController();
+          const fetchTimeout = setTimeout(() => controller.abort(), 8000);
+          let photoRes;
+          try {
+            photoRes = await fetch(photoUrl, { signal: controller.signal });
+          } finally {
+            clearTimeout(fetchTimeout);
+          }
+
           if (photoRes.ok) {
-            const photoBuffer = Buffer.from(await photoRes.arrayBuffer());
-            const PX = W - 110;
-            const PY = STRIPE_H + 16;
-            doc.rect(PX, PY, 90, 90).lineWidth(1).strokeColor(NAVY).stroke();
-            doc.image(photoBuffer, PX + 1, PY + 1, { width: 88, height: 88 });
+            const contentType = photoRes.headers.get('content-type') || '';
+            const supported = contentType.includes('jpeg') || contentType.includes('png') || contentType.includes('gif');
+            if (supported) {
+              const photoBuffer = Buffer.from(await photoRes.arrayBuffer());
+              const PX = W - 110;
+              const PY = STRIPE_H + 16;
+              doc.rect(PX, PY, 90, 90).lineWidth(1).strokeColor(NAVY).stroke();
+              doc.image(photoBuffer, PX + 1, PY + 1, { width: 88, height: 88 });
+            } else {
+              console.warn('[PDF] Photo skipped — unsupported format:', contentType);
+            }
+          } else {
+            console.warn('[PDF] Photo fetch failed — HTTP', photoRes.status);
           }
         } catch (photoErr) {
           console.warn('[PDF] Photo embed skipped:', photoErr.message);

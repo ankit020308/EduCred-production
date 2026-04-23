@@ -887,8 +887,17 @@ async function runAnchor(cert, university, actorUser) {
       // Fetch student's profile photo for PDF embedding
       let studentProfileImageUrl = null;
       try {
-        if (cert.studentEmail) {
-          const studentUser = await Registry.findOne('users', { email: cert.studentEmail });
+        // Prefer studentId lookup — bypasses email case-mismatch issues
+        if (cert.studentId) {
+          const student = await Registry.findById('students', cert.studentId);
+          if (student?.userId) {
+            const studentUser = await Registry.findById('users', student.userId);
+            if (studentUser) studentProfileImageUrl = studentUser.profileImageUrl || null;
+          }
+        }
+        // Fallback: case-normalised email lookup
+        if (!studentProfileImageUrl && cert.studentEmail) {
+          const studentUser = await Registry.findOne('users', { email: cert.studentEmail.toLowerCase() });
           if (studentUser) studentProfileImageUrl = studentUser.profileImageUrl || null;
         }
       } catch { /* photo lookup is optional */ }
@@ -1378,8 +1387,15 @@ export const downloadCertificateFile = async (req, res) => {
     try {
       let studentProfileImageUrl = null;
       try {
-        if (cert.studentEmail) {
-          const studentUser = await Registry.findOne('users', { email: cert.studentEmail });
+        if (cert.studentId) {
+          const student = await Registry.findById('students', cert.studentId);
+          if (student?.userId) {
+            const studentUser = await Registry.findById('users', student.userId);
+            if (studentUser) studentProfileImageUrl = studentUser.profileImageUrl || null;
+          }
+        }
+        if (!studentProfileImageUrl && cert.studentEmail) {
+          const studentUser = await Registry.findOne('users', { email: cert.studentEmail.toLowerCase() });
           if (studentUser) studentProfileImageUrl = studentUser.profileImageUrl || null;
         }
       } catch { /* photo lookup is optional */ }
