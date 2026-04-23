@@ -4,11 +4,13 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   ShieldCheck, User, Mail, Phone, Building2, MapPin, BookOpen,
   Hash, Layers, Save, Edit3, ArrowLeft, Loader2, CheckCircle2,
-  AlertCircle, Lock, Globe, FileText, Calendar,
-  Camera, Wallet, UserCheck,
+  AlertCircle, Globe, FileText, Calendar,
+  Camera, Wallet, UserCheck, Zap, GraduationCap, Activity,
 } from 'lucide-react';
+import { ethers } from 'ethers';
 import api from '../services/api';
 import { useAuth } from '../context/AuthContext';
+import { useBlockchain } from '../context/BlockchainContext';
 
 function Field({ label, icon: Icon, value, editKey, isEditing, onChange, placeholder, type = 'text', readOnly = false }) {
   return (
@@ -48,7 +50,7 @@ function TextArea({ label, icon: Icon, value, editKey, isEditing, onChange, plac
           className="ds-input resize-none"
         />
       ) : (
-        <div className="ds-input bg-[#f6f6f6] text-[#646464] cursor-default min-h-[72px]">
+        <div className="ds-input bg-[#f6f6f6] text-[#646464] cursor-default min-h-[72px] break-words whitespace-pre-wrap overflow-wrap-anywhere leading-relaxed">
           {value || <span className="text-[#bbbbbb] italic">Not set</span>}
         </div>
       )}
@@ -58,6 +60,7 @@ function TextArea({ label, icon: Icon, value, editKey, isEditing, onChange, plac
 
 export default function Profile() {
   const { user, updateUser, logout } = useAuth();
+  const { provider, isReady: blockchainReady } = useBlockchain();
   const navigate = useNavigate();
 
   const [userProfile, setUserProfile] = useState(null);
@@ -69,6 +72,7 @@ export default function Profile() {
   const [draft, setDraft] = useState({});
   const [roleDraft, setRoleDraft] = useState({});
   const [toast, setToast] = useState(null);
+  const [blockchainStats, setBlockchainStats] = useState({ eth: null, certs: null, loading: false });
 
   const role = (user?.role || '').toLowerCase();
   const isUniversity = role === 'university';
@@ -142,6 +146,27 @@ export default function Profile() {
       setSaving(false);
     }
   };
+
+  useEffect(() => {
+    if (!isUniversity || !roleProfile?.publicWalletAddress) return;
+    const fetch = async () => {
+      setBlockchainStats(s => ({ ...s, loading: true }));
+      let eth = null;
+      let certs = null;
+      try {
+        if (blockchainReady && provider) {
+          const raw = await provider.getBalance(roleProfile.publicWalletAddress);
+          eth = parseFloat(ethers.formatEther(raw));
+        }
+      } catch { /* blockchain optional */ }
+      try {
+        const r = await api.get('/api/certificates');
+        certs = Array.isArray(r.data) ? r.data.length : null;
+      } catch { /* non-fatal */ }
+      setBlockchainStats({ eth, certs, loading: false });
+    };
+    fetch();
+  }, [isUniversity, roleProfile?.publicWalletAddress, blockchainReady, provider]);
 
   const setField = (key, val) => setDraft(d => ({ ...d, [key]: val }));
   const setRoleField = (key, val) => setRoleDraft(d => ({ ...d, [key]: val }));
@@ -362,48 +387,157 @@ export default function Profile() {
 
         {/* Institution-specific section */}
         {isUniversity && (
-          <motion.div initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}
-            className="bg-white border border-[#e0e0e0] rounded-3xl p-6 space-y-5">
-            <div className="flex items-center justify-between">
-              <p className="text-[9px] font-black text-[#646464] uppercase tracking-widest">Institution Details</p>
-              {roleProfile?.status && (
-                <span className={`px-2 py-0.5 rounded-full text-[8px] font-black uppercase tracking-widest border ${
-                  roleProfile.status === 'APPROVED' ? 'bg-emerald-50 border-emerald-200 text-emerald-700' :
-                  roleProfile.status === 'PENDING' ? 'bg-amber-50 border-amber-200 text-amber-700' :
-                  'bg-red-50 border-red-200 text-red-700'
-                }`}>{roleProfile.status}</span>
-              )}
-            </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <Field label="Institution Name" icon={Building2} value={roleProfile?.name}
-                editKey="name" isEditing={false} onChange={() => {}} readOnly />
-              <Field label="Official Email" icon={Mail} value={roleProfile?.email}
-                editKey="email" isEditing={false} onChange={() => {}} readOnly />
-              <Field label="City" icon={MapPin} value={isEditing ? roleDraft.city : roleProfile?.city}
-                editKey="city" isEditing={isEditing} onChange={setRoleField} placeholder="e.g. Chennai" />
-              {/* University wallet with copy */}
-              <div className="col-span-full space-y-1.5">
-                <label className="text-[9px] font-black text-[#646464] uppercase tracking-widest flex items-center justify-between">
-                  <span className="flex items-center gap-1.5"><Wallet size={10} /> Wallet Address</span>
-                  {roleProfile?.publicWalletAddress && (
-                    <button
-                      onClick={() => { navigator.clipboard.writeText(roleProfile.publicWalletAddress); showToast('success', 'Address copied!'); }}
-                      className="flex items-center gap-1 text-[8px] font-black text-[#646464] hover:text-[#ea2804] uppercase tracking-widest transition-colors"
-                    >
-                      <Wallet size={9} /> Copy
-                    </button>
-                  )}
-                </label>
-                <div className="ds-input bg-[#f6f6f6] text-[#646464] cursor-default select-all font-mono text-[10px] break-all leading-relaxed">
-                  {roleProfile?.publicWalletAddress || <span className="text-[#bbbbbb] italic">Not assigned</span>}
+          <>
+            <motion.div initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}
+              className="bg-white border border-[#e0e0e0] rounded-3xl p-6 space-y-5">
+
+              {/* Institution name header — read-only, prominent */}
+              <div className="flex items-start justify-between gap-4">
+                <div className="flex-1 min-w-0">
+                  <p className="text-[9px] font-black text-[#646464] uppercase tracking-widest mb-1">Institution Details</p>
+                  <h2 className="text-2xl font-black text-[#202020] tracking-tight truncate">
+                    {roleProfile?.name || 'Your Institution'}
+                  </h2>
+                  <div className="flex items-center gap-1.5 mt-1">
+                    <Building2 size={10} className="text-[#bbbbbb]" />
+                    <p className="text-[9px] font-bold text-[#bbbbbb] uppercase tracking-widest">Registered Institution · Read-only</p>
+                  </div>
+                </div>
+                {roleProfile?.status && (
+                  <span className={`shrink-0 px-2 py-0.5 rounded-full text-[8px] font-black uppercase tracking-widest border ${
+                    roleProfile.status === 'APPROVED' ? 'bg-emerald-50 border-emerald-200 text-emerald-700' :
+                    roleProfile.status === 'PENDING'  ? 'bg-amber-50 border-amber-200 text-amber-700' :
+                    'bg-red-50 border-red-200 text-red-700'
+                  }`}>{roleProfile.status}</span>
+                )}
+              </div>
+
+              <div className="h-px bg-[#f0f0f0]" />
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <Field label="Institution Name" icon={Building2} value={roleProfile?.name}
+                  editKey="name" isEditing={false} onChange={() => {}} readOnly />
+                <Field label="Official Email" icon={Mail} value={roleProfile?.email}
+                  editKey="email" isEditing={false} onChange={() => {}} readOnly />
+                <Field label="City" icon={MapPin} value={isEditing ? roleDraft.city : roleProfile?.city}
+                  editKey="city" isEditing={isEditing} onChange={setRoleField} placeholder="e.g. Chennai" />
+                <div className="col-span-full space-y-1.5">
+                  <label className="text-[9px] font-black text-[#646464] uppercase tracking-widest flex items-center justify-between">
+                    <span className="flex items-center gap-1.5"><Wallet size={10} /> Wallet Address</span>
+                    {roleProfile?.publicWalletAddress && (
+                      <button
+                        onClick={() => { navigator.clipboard.writeText(roleProfile.publicWalletAddress); showToast('success', 'Address copied!'); }}
+                        className="flex items-center gap-1 text-[8px] font-black text-[#646464] hover:text-[#ea2804] uppercase tracking-widest transition-colors"
+                      >
+                        <Wallet size={9} /> Copy
+                      </button>
+                    )}
+                  </label>
+                  <div className="ds-input bg-[#f6f6f6] text-[#646464] cursor-default select-all font-mono text-[10px] break-all leading-relaxed">
+                    {roleProfile?.publicWalletAddress || <span className="text-[#bbbbbb] italic">Not assigned</span>}
+                  </div>
                 </div>
               </div>
-            </div>
-            <TextArea label="About the Institution" icon={Globe}
-              value={isEditing ? roleDraft.description : roleProfile?.description}
-              editKey="description" isEditing={isEditing} onChange={setRoleField}
-              placeholder="Brief description of your institution..." />
-          </motion.div>
+              <TextArea label="About the Institution" icon={Globe}
+                value={isEditing ? roleDraft.description : roleProfile?.description}
+                editKey="description" isEditing={isEditing} onChange={setRoleField}
+                placeholder="Brief description of your institution..." />
+            </motion.div>
+
+            {/* Blockchain Resource Dashboard */}
+            <motion.div initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15 }}
+              className="bg-white border border-[#e0e0e0] rounded-3xl p-6 space-y-5">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-[9px] font-black text-[#646464] uppercase tracking-widest">Blockchain Resources</p>
+                  <p className="text-[8px] text-[#bbbbbb] font-bold uppercase tracking-widest mt-0.5">Sepolia Testnet · Live Data</p>
+                </div>
+                <div className="w-8 h-8 bg-[#ea2804]/10 border border-[#ea2804]/20 rounded-xl flex items-center justify-center">
+                  <Activity size={14} className="text-[#ea2804]" />
+                </div>
+              </div>
+
+              {blockchainStats.loading ? (
+                <div className="flex items-center gap-3 py-4">
+                  <Loader2 className="animate-spin text-[#ea2804]" size={16} />
+                  <span className="text-[9px] font-black text-[#646464] uppercase tracking-widest">Fetching blockchain data...</span>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                  {/* ETH Balance */}
+                  <div className="bg-[#f6f6f6] border border-[#e0e0e0] rounded-2xl p-4 space-y-3">
+                    <div className="flex items-center gap-2">
+                      <Zap size={12} className="text-[#ea2804]" />
+                      <p className="text-[8px] font-black text-[#646464] uppercase tracking-widest">Wallet Balance</p>
+                    </div>
+                    {blockchainStats.eth !== null ? (
+                      <>
+                        <p className="text-xl font-black text-[#202020] tracking-tight">
+                          {blockchainStats.eth.toFixed(4)}
+                          <span className="text-[10px] font-black text-[#646464] ml-1">ETH</span>
+                        </p>
+                        <div className={`flex items-center gap-1.5 px-2 py-1 rounded-full text-[8px] font-black uppercase tracking-widest w-fit ${
+                          blockchainStats.eth >= 0.01
+                            ? 'bg-emerald-50 border border-emerald-200 text-emerald-700'
+                            : 'bg-[#ea2804]/10 border border-[#ea2804]/20 text-[#ea2804]'
+                        }`}>
+                          <div className={`w-1.5 h-1.5 rounded-full ${blockchainStats.eth >= 0.01 ? 'bg-emerald-500' : 'bg-[#ea2804]'} animate-pulse`} />
+                          {blockchainStats.eth >= 0.01 ? 'Sufficient' : 'Low — top up needed'}
+                        </div>
+                      </>
+                    ) : (
+                      <p className="text-[10px] font-bold text-[#bbbbbb]">Blockchain offline</p>
+                    )}
+                  </div>
+
+                  {/* Certificates issued */}
+                  <div className="bg-[#f6f6f6] border border-[#e0e0e0] rounded-2xl p-4 space-y-3">
+                    <div className="flex items-center gap-2">
+                      <GraduationCap size={12} className="text-[#ea2804]" />
+                      <p className="text-[8px] font-black text-[#646464] uppercase tracking-widest">Issued</p>
+                    </div>
+                    <p className="text-xl font-black text-[#202020] tracking-tight">
+                      {blockchainStats.certs ?? '—'}
+                      <span className="text-[10px] font-black text-[#646464] ml-1">certificates</span>
+                    </p>
+                    <p className="text-[8px] font-bold text-[#bbbbbb] uppercase tracking-widest">
+                      Total on-chain anchored
+                    </p>
+                  </div>
+
+                  {/* Capacity estimation */}
+                  <div className="bg-[#f6f6f6] border border-[#e0e0e0] rounded-2xl p-4 space-y-3">
+                    <div className="flex items-center gap-2">
+                      <ShieldCheck size={12} className="text-[#ea2804]" />
+                      <p className="text-[8px] font-black text-[#646464] uppercase tracking-widest">Capacity</p>
+                    </div>
+                    {blockchainStats.eth !== null ? (
+                      <>
+                        <p className="text-xl font-black text-[#202020] tracking-tight">
+                          ~{Math.floor(blockchainStats.eth / 0.001)}
+                          <span className="text-[10px] font-black text-[#646464] ml-1">more</span>
+                        </p>
+                        <p className="text-[8px] font-bold text-[#bbbbbb] uppercase tracking-widest">
+                          Est. at ~0.001 ETH / cert
+                        </p>
+                      </>
+                    ) : (
+                      <p className="text-[10px] font-bold text-[#bbbbbb]">Connect blockchain</p>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {blockchainStats.eth !== null && blockchainStats.eth < 0.01 && (
+                <div className="flex items-start gap-3 px-4 py-3 bg-amber-50 border border-amber-200 rounded-xl">
+                  <AlertCircle size={13} className="text-amber-600 shrink-0 mt-0.5" />
+                  <p className="text-[9px] font-bold text-amber-700 uppercase tracking-widest leading-relaxed">
+                    Low ETH balance. Certificate anchoring may fail. Get free Sepolia ETH from sepoliafaucet.com
+                  </p>
+                </div>
+              )}
+            </motion.div>
+          </>
         )}
 
         {/* Admin note */}

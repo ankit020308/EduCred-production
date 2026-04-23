@@ -268,7 +268,7 @@ function InstitutionsTab({ toast }) {
                   Cancel
                 </button>
                 <button onClick={executeAction} disabled={processingId === confirm.id}
-                  className={`flex-1 h-11 rounded-xl text-[10px] font-black uppercase tracking-widest text-white transition-all ${
+                  className={`flex-1 h-11 rounded-xl text-[10px] font-black uppercase tracking-widest text-white transition-all flex items-center justify-center ${
                     confirm.action === 'approve' ? 'bg-[#202020] hover:bg-[#ea2804]' : 'bg-[#ea2804] hover:bg-[#dd4425]'
                   }`}>
                   {processingId === confirm.id ? <Loader2 size={16} className="animate-spin" /> : (confirm.action === 'approve' ? 'Yes, Approve' : 'Yes, Reject')}
@@ -624,7 +624,7 @@ function CertificatesTab({ toast }) {
                   Cancel
                 </button>
                 <button onClick={handleReject} disabled={processingId === rejectModal.id}
-                  className="flex-1 h-11 rounded-xl bg-[#ea2804] text-white text-[10px] font-black uppercase tracking-widest hover:bg-[#dd4425] transition-all">
+                  className="flex-1 h-11 rounded-xl bg-[#ea2804] text-white text-[10px] font-black uppercase tracking-widest hover:bg-[#dd4425] transition-all flex items-center justify-center">
                   {processingId === rejectModal.id ? <Loader2 size={16} className="animate-spin" /> : 'Yes, Reject'}
                 </button>
               </div>

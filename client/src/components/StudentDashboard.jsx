@@ -111,14 +111,17 @@ export default function StudentDashboard() {
     }
   }, [user?.id]);
 
+  const ownedOnly = (list) =>
+    Array.isArray(list) ? list.filter(c => !c.studentEmail || c.studentEmail === user?.email) : [];
+
   const fetchCertificates = async () => {
     try {
       const res = await api.get('/api/student/certificates');
-      setCertificates(res.data);
+      setCertificates(ownedOnly(res.data));
     } catch {
       try {
         const res2 = await api.get('/api/user/certificates');
-        setCertificates(Array.isArray(res2.data) ? res2.data : []);
+        setCertificates(ownedOnly(res2.data));
       } catch { setCertificates([]); }
     } finally { setLoading(false); }
   };

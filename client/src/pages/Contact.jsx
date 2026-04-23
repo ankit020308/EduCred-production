@@ -147,7 +147,7 @@ export default function Contact() {
           {/* SIDE PANEL */}
           <motion.div {...viewTransition} transition={{ delay: 0.2 }} className="lg:col-span-12 xl:col-span-4 space-y-8">
             <div className="bg-white p-10 rounded-[2.5rem] border border-slate-100 shadow-2xl shadow-slate-900/10 space-y-10">
-              <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest">limited reach right now ! </h3>
+              <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Institutional Contact</h3>
               <div className="space-y-8">
                 {[
                   { label: "Email Support", val: "support@educred.com", color: "bg-blue-600" },

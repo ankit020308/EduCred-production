@@ -8,7 +8,7 @@ const transition = { duration: 0.55, ease: [0.22, 1, 0.36, 1] };
 
 function InfoCard({ label, value }) {
   return (
-    <div className="bg-[#f6f6f6] p-6 rounded-full border border-[#e0e0e0] hover:border-[#ea2804]/30 transition-all">
+    <div className="bg-[#f6f6f6] p-6 rounded-2xl border border-[#e0e0e0] hover:border-[#ea2804]/30 transition-all">
       <p className="text-[10px] font-black uppercase tracking-widest text-[#646464]">{label}</p>
       <p className="mt-3 text-sm font-black text-[#202020] uppercase tracking-widest truncate">{value || 'N/A'}</p>
     </div>
@@ -50,7 +50,7 @@ export default function Student() {
   if (error || !certificate) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-[#f6f6f6] px-6 text-center">
-        <div className="bg-white rounded-full p-12 border border-[#202020] max-w-md w-full">
+        <div className="bg-white rounded-3xl p-12 border border-[#202020] max-w-md w-full">
           <div className="w-20 h-20 bg-[#ea2804]/5 rounded-full mx-auto flex items-center justify-center text-[#ea2804] border border-[#ea2804]/20 mb-8">
             <ShieldCheck size={36} />
           </div>
@@ -99,7 +99,7 @@ export default function Student() {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={transition}
-            className="bg-white rounded-full border border-[#202020] p-10 md:p-14"
+            className="bg-white rounded-3xl border border-[#202020] p-10 md:p-14"
           >
             <button
               onClick={() => navigate('/verify')}
@@ -126,7 +126,7 @@ export default function Student() {
                 </div>
               </div>
 
-              <div className="bg-[#f6f6f6] rounded-full border border-[#e0e0e0] px-10 py-8 flex flex-col items-center">
+              <div className="bg-[#f6f6f6] rounded-2xl border border-[#e0e0e0] px-10 py-8 flex flex-col items-center">
                 <p className="text-[10px] font-black uppercase tracking-widest text-[#646464] mb-4 text-center">Status</p>
                 <span className={`inline-flex items-center gap-2 px-5 py-2 rounded-full text-[9px] font-black uppercase tracking-widest text-white ${statusStyle.bg}`}>
                   <div className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" />
@@ -156,7 +156,7 @@ export default function Student() {
 
             {/* Subjects table */}
             {certificate.metadata?.subjects?.length > 0 && (
-              <div className="mt-10 border border-[#e0e0e0] rounded-full overflow-hidden">
+              <div className="mt-10 border border-[#e0e0e0] rounded-3xl overflow-hidden">
                 <div className="bg-[#202020] px-8 py-5 flex items-center justify-between">
                   <p className="text-[10px] font-black uppercase tracking-widest text-white">
                     {certificate.metadata.semester != null
@@ -192,12 +192,12 @@ export default function Student() {
             )}
 
             {/* Hash */}
-            <div className="mt-12 rounded-full border border-[#e0e0e0] bg-[#f6f6f6] p-10 group hover:border-[#ea2804]/30 transition-all">
+            <div className="mt-12 rounded-3xl border border-[#e0e0e0] bg-[#f6f6f6] p-10 group hover:border-[#ea2804]/30 transition-all">
               <div className="flex items-center gap-4 mb-6">
                 <Fingerprint className="text-[#ea2804]" size={20} />
                 <p className="text-[10px] font-black uppercase tracking-widest text-[#646464]">Blockchain Verification Hash</p>
               </div>
-              <p className="break-all font-mono text-xs text-[#646464] bg-white p-6 rounded-full border border-[#e0e0e0] leading-relaxed tracking-tight group-hover:text-[#ea2804] transition-colors uppercase">
+              <p className="break-all font-mono text-xs text-[#646464] bg-white p-6 rounded-xl border border-[#e0e0e0] leading-relaxed tracking-tight group-hover:text-[#ea2804] transition-colors uppercase">
                 {certificate.certificateHash}
               </p>
             </div>
@@ -223,7 +223,7 @@ export default function Student() {
                 { label: 'LIVE', text: 'Public record live and accessible', accent: true },
                 { label: 'SECURE', text: 'Protected by blockchain immutability', accent: false },
               ].map(({ label, text, accent }) => (
-                <div key={label} className="p-8 rounded-full bg-[#f6f6f6] border border-[#e0e0e0] hover:border-[#ea2804]/30 transition-all">
+                <div key={label} className="p-8 rounded-2xl bg-[#f6f6f6] border border-[#e0e0e0] hover:border-[#ea2804]/30 transition-all">
                   <div className={`w-12 h-12 rounded-full flex items-center justify-center border font-black text-[10px] mb-6 ${
                     accent
                       ? 'bg-[#2b9a66]/10 border-[#2b9a66]/20 text-[#2b9a66]'

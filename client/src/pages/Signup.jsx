@@ -92,7 +92,7 @@ export default function Signup() {
             <div className="flex -space-x-2">
               {[1,2,3].map(i => <div key={i} className="w-6 h-6 rounded-full border-2 border-white/30 bg-white/20" />)}
             </div>
-            <span className="text-[10px] font-bold uppercase tracking-widest text-white/60">Trusted by 1,200+ institutions</span>
+            <span className="text-[10px] font-bold uppercase tracking-widest text-white/60">Ready for institutional integration</span>
           </div>
         </div>
       </div>

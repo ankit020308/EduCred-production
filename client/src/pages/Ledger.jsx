@@ -36,17 +36,29 @@ const typeConfig = {
   TAMPER:  { icon: FileWarning, color: 'text-rose-400',  bg: 'bg-rose-400/10',  border: 'border-rose-400/20' },
 };
 
+const maskName = (name) => {
+  if (!name) return 'Confidential';
+  return name.split(' ').map(part =>
+    part.length <= 1 ? part : part[0] + '*'.repeat(part.length - 1)
+  ).join(' ');
+};
+
 export default function Ledger() {
   const [events, setEvents] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
   const [search, setSearch] = useState('');
 
-  useEffect(() => {
+  const loadLedger = () => {
+    setLoading(true);
+    setError(null);
     api.get('/api/ledger')
       .then(r => setEvents(r.data))
-      .catch(() => {})
+      .catch(() => setError('Failed to load audit history. Please try again.'))
       .finally(() => setLoading(false));
-  }, []);
+  };
+
+  useEffect(() => { loadLedger(); }, []);
 
   const filtered = events.filter(e =>
     (e.studentName || '').toLowerCase().includes(search.toLowerCase()) ||
@@ -94,7 +106,18 @@ export default function Ledger() {
           {/* Vertical Line */}
           <div className="absolute left-10 top-0 bottom-0 w-px bg-slate-200 hidden md:block" />
 
-          {loading ? (
+          {error ? (
+            <div className="flex flex-col items-center justify-center py-48 space-y-10">
+              <History className="text-rose-400/40" size={64} />
+              <p className="text-rose-400 font-black uppercase tracking-[0.3em] text-[10px]">{error}</p>
+              <button
+                onClick={loadLedger}
+                className="btn-primary !bg-white/10 !border-white/10 !text-white hover:!bg-white/20"
+              >
+                Retry
+              </button>
+            </div>
+          ) : loading ? (
             <div className="flex flex-col items-center justify-center py-48 space-y-10">
               <Loader2 className="animate-spin text-blue-600" size={48} />
               <p className="text-slate-400 font-black uppercase tracking-[0.5em] text-[10px]">Updating Audit Logs</p>
@@ -151,7 +174,7 @@ export default function Ledger() {
                          <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-10 relative z-10">
                             <div className="space-y-4">
                                <h3 className="text-4xl font-black text-slate-900 tracking-tighter uppercase leading-none">
-                                  {ev.studentName || 'Confidential'}
+                                  {maskName(ev.studentName)}
                                 </h3>
                                <div className="flex items-center gap-4">
                                   <span className="text-[10px] font-black uppercase tracking-widest text-slate-300">Issuing Institution</span>
