@@ -17,7 +17,11 @@ export function BlockchainProvider({ children }) {
           return;
         }
 
-        const rpcUrl = import.meta.env.VITE_BLOCKCHAIN_RPC_URL || contractData.rpcUrl || 'http://127.0.0.1:8545';
+        const rpcUrl = import.meta.env.VITE_BLOCKCHAIN_RPC_URL || contractData.rpcUrl;
+        if (!rpcUrl) {
+          setIsReady(false);
+          return;
+        }
         const newProvider = new ethers.JsonRpcProvider(rpcUrl);
         const newContract = new ethers.Contract(
           contractData.contractAddress,

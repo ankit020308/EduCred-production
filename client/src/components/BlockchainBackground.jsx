@@ -13,7 +13,7 @@ export default function BlockchainBackground({ isSurging = false }) {
   // Configuration Matrices
   const CONFIG = {
     node: {
-      count: 75, // Moderate density for "Hyper-Neural" feel
+      count: 40,
       baseSize: 0.8,
       baseSpeed: 0.25,
       color: "rgba(34, 211, 238, ", // Hyper-Cyan
@@ -131,47 +131,61 @@ export default function BlockchainBackground({ isSurging = false }) {
       }
     }
 
+    let connectionPairs = [];
+
+    const buildConnectionPairs = () => {
+      connectionPairs = [];
+      for (let i = 0; i < nodes.length; i++) {
+        for (let j = i + 1; j < nodes.length; j++) {
+          const dx = nodes[i].x - nodes[j].x;
+          const dy = nodes[i].y - nodes[j].y;
+          if (Math.sqrt(dx * dx + dy * dy) < CONFIG.links.radius * 1.65) {
+            connectionPairs.push([i, j]);
+          }
+        }
+      }
+    };
+
     const initializeNodes = () => {
       nodes = [];
       for (let i = 0; i < CONFIG.node.count; i++) {
         nodes.push(new QuantumNode());
       }
+      buildConnectionPairs();
     };
 
     const drawConnections = (surge) => {
       const connectionRadius = CONFIG.links.radius * (1 + surge * 0.65);
-      for (let i = 0; i < nodes.length; i++) {
-        const p1 = nodes[i];
-        for (let j = i + 1; j < nodes.length; j++) {
-          const p2 = nodes[j];
-          const dx = p1.x - p2.x;
-          const dy = p1.y - p2.y;
-          const distance = Math.sqrt(dx * dx + dy * dy);
+      for (let k = 0; k < connectionPairs.length; k++) {
+        const p1 = nodes[connectionPairs[k][0]];
+        const p2 = nodes[connectionPairs[k][1]];
+        const dx = p1.x - p2.x;
+        const dy = p1.y - p2.y;
+        const distance = Math.sqrt(dx * dx + dy * dy);
 
-          if (distance < connectionRadius) {
-            const proximityFactor = 1 - (distance / connectionRadius);
-            const baseOpacity = proximityFactor * (0.22 + surge * 0.45);
-            const lineWidth = (CONFIG.links.baseWidth + (proximityFactor * 0.6)) * (1 + surge * 1.5);
-            ctx.lineWidth = lineWidth;
+        if (distance < connectionRadius) {
+          const proximityFactor = 1 - (distance / connectionRadius);
+          const baseOpacity = proximityFactor * (0.22 + surge * 0.45);
+          const lineWidth = (CONFIG.links.baseWidth + (proximityFactor * 0.6)) * (1 + surge * 1.5);
+          ctx.lineWidth = lineWidth;
 
+          ctx.beginPath();
+          ctx.strokeStyle = `${CONFIG.links.color}${baseOpacity})`;
+          ctx.moveTo(p1.x, p1.y);
+          ctx.lineTo(p2.x, p2.y);
+          ctx.stroke();
+
+          if (surge > 0.4) {
+            const surgeOpacity = (surge - 0.4) * proximityFactor;
             ctx.beginPath();
-            ctx.strokeStyle = `${CONFIG.links.color}${baseOpacity})`;
-            ctx.moveTo(p1.x, p1.y);
-            ctx.lineTo(p2.x, p2.y);
+            const offset = (surge - 0.4) * 2.5;
+            ctx.strokeStyle = `rgba(255, 255, 255, ${surgeOpacity * 0.6})`;
+            ctx.moveTo(p1.x + offset, p1.y + offset);
+            ctx.lineTo(p2.x + offset, p2.y + offset);
+            ctx.shadowBlur = 2 * surge;
+            ctx.shadowColor = "rgba(255, 255, 255, 0.4)";
             ctx.stroke();
-
-            if (surge > 0.4) {
-              const surgeOpacity = (surge - 0.4) * proximityFactor;
-              ctx.beginPath();
-              const offset = (surge - 0.4) * 2.5;
-              ctx.strokeStyle = `rgba(255, 255, 255, ${surgeOpacity * 0.6})`;
-              ctx.moveTo(p1.x + offset, p1.y + offset);
-              ctx.lineTo(p2.x + offset, p2.y + offset);
-              ctx.shadowBlur = 2 * surge; // Performance optimization
-              ctx.shadowColor = "rgba(255, 255, 255, 0.4)";
-              ctx.stroke();
-              ctx.shadowBlur = 0;
-            }
+            ctx.shadowBlur = 0;
           }
         }
       }
