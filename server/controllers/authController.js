@@ -345,7 +345,7 @@ export const login = async (req, res) => {
   } catch (err) {
     console.error('[AUTH] [ERROR] Login failure:', err);
     await logAudit(req, 'AUTH_LOGIN', 'FAILURE', 'Account session establishment failed.', { email: req.body.email });
-    res.status(500).json({ error: 'Login failed.', details: err.message });
+    res.status(500).json({ error: 'Login failed.' });
   }
 };
 
@@ -717,7 +717,6 @@ export const completeOnboarding = async (req, res) => {
       user: updatedUser
     });
   } catch (err) {
-    const details = err.errors ? err.errors.map(e => `${e.path}: ${e.message}`).join(', ') : err.message;
-    res.status(500).json({ error: 'Onboarding failed.', details });
+    res.status(500).json({ error: 'Onboarding failed.' });
   }
 };

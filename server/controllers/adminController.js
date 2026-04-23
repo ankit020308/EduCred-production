@@ -2,17 +2,18 @@ import Registry from '../services/registryService.js';
 import { authorizeUniversityOnChain } from '../utils/blockchain.js';
 import { createEncryptedWalletRecord } from '../utils/keyVault.js';
 
-/**
- * 👑 Admin Controller
- * High-privilege identity and node management.
- */
+const isProd = process.env.NODE_ENV === 'production';
+const serverErr = (res, err, msg = 'Operation failed.') => {
+  console.error('[ADMIN]', err);
+  res.status(500).json({ error: msg, ...(isProd ? {} : { details: err.message }) });
+};
 
 export const getPendingUniversities = async (req, res) => {
   try {
     const pending = await Registry.find('universities', { status: 'PENDING' });
     res.json(pending);
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    serverErr(res, error, 'Failed to fetch pending universities.');
   }
 };
 
@@ -23,10 +24,8 @@ export const approveUniversity = async (req, res) => {
     if (!university) return res.status(404).json({ error: 'University not found.' });
     if (university.status === 'APPROVED') return res.status(400).json({ error: 'University node is already active.' });
 
-    // 🏥 Security Check: Institutional Integrity
     const isInstitutional = university.email.endsWith('.edu') || university.email.endsWith('.ac.in');
 
-    // Provide a "Pitch Override" for admins during demos
     if (university.isFlagged && !isInstitutional && !overrideRisk) {
       return res.status(403).json({
         error: 'High Risk Node Detected',
@@ -34,7 +33,6 @@ export const approveUniversity = async (req, res) => {
       });
     }
 
-    // Reuse wallet allocated at registration; only generate a new one if missing
     let { publicWalletAddress, encryptedPrivateKey } = university;
     if (!publicWalletAddress || !encryptedPrivateKey) {
       const newWallet = createEncryptedWalletRecord();
@@ -60,21 +58,18 @@ export const approveUniversity = async (req, res) => {
       encryptedPrivateKey,
     });
 
-    // Update the associated User node status
-    await Registry.update('users', { id: university.userId }, {
-      'isEmailVerified': true
-    });
+    await Registry.update('users', { id: university.userId }, { 'isEmailVerified': true });
 
     const updatedUni = await Registry.findById('universities', universityId);
     res.json({ message: 'University identity node authorized.', university: updatedUni });
   } catch (error) {
-    res.status(500).json({ error: 'Authorization operation failed.', details: error.message });
+    serverErr(res, error, 'Authorization operation failed.');
   }
 };
 
 export const rejectUniversity = async (req, res) => {
   try {
-    const { universityId, reason } = req.body;
+    const { universityId } = req.body;
     const university = await Registry.findById('universities', universityId);
     if (!university) return res.status(404).json({ error: 'University not found' });
 
@@ -83,7 +78,7 @@ export const rejectUniversity = async (req, res) => {
     const updatedUni = await Registry.findById('universities', universityId);
     res.json({ message: 'University rejected successfully', university: updatedUni });
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    serverErr(res, error, 'Failed to reject university.');
   }
 };
 
@@ -92,7 +87,7 @@ export const getAllUniversities = async (req, res) => {
     const universities = await Registry.find('universities');
     res.json(universities);
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    serverErr(res, error, 'Failed to fetch universities.');
   }
 };
 
@@ -110,14 +105,13 @@ export const suspendUniversity = async (req, res) => {
     const updatedUni = await Registry.findById('universities', universityId);
     res.json({ message: 'University suspended successfully', university: updatedUni });
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    serverErr(res, error, 'Failed to suspend university.');
   }
 };
 
 export const getAdminStats = async (req, res) => {
   try {
     const totalCertificates = await Registry.count('certificates');
-    // Note: verificationLogs and fraudAlerts might need dedicated SQL models if used heavily
     const totalVerifications = await Registry.count('verificationLogs');
     const unreviewedAlerts = await Registry.count('fraudAlerts', { isReviewed: false });
     const approvedUniversities = await Registry.count('universities', { status: 'APPROVED' });
@@ -131,7 +125,7 @@ export const getAdminStats = async (req, res) => {
       pendingUniversities
     });
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    serverErr(res, error, 'Failed to fetch admin stats.');
   }
 };
 
@@ -140,7 +134,7 @@ export const getFraudAlerts = async (req, res) => {
     const alerts = await Registry.find('fraudAlerts');
     res.json(alerts);
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    serverErr(res, error, 'Failed to fetch fraud alerts.');
   }
 };
 
@@ -160,7 +154,7 @@ export const updateFraudAlert = async (req, res) => {
     const updatedAlert = await Registry.findById('fraudAlerts', req.params.id);
     res.json({ message: 'Alert updated', alert: updatedAlert });
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    serverErr(res, error, 'Failed to update fraud alert.');
   }
 };
 
@@ -168,16 +162,14 @@ export const getUniversitiesGeo = async (req, res) => {
   try {
     res.json([]);
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    serverErr(res, error, 'Failed to fetch university geo data.');
   }
 };
 
 export const updateUniversityGeo = async (req, res) => {
   try {
-    const { isActive } = req.body;
-    // Note: If Geo is a separate model, handle accordingly.
     res.json({ message: 'Geo record updated functionality pending SQL model migration' });
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    serverErr(res, error, 'Failed to update geo record.');
   }
 };

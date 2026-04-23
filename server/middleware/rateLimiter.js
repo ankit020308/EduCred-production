@@ -5,13 +5,13 @@ import rateLimit from 'express-rate-limit';
  * Prevents brute-force attacks on sensitive endpoints.
  */
 export const authLimiter = rateLimit({
-    windowMs: 15 * 60 * 1000, // 15 minutes
-    max: 1000, // Increased for dev resilience
+    windowMs: 15 * 60 * 1000,
+    max: process.env.NODE_ENV === 'production' ? 20 : 100,
     message: {
         error: 'Too many authentication attempts from this IP. Please try again after 15 minutes.'
     },
-    standardHeaders: true, 
-    legacyHeaders: false, 
+    standardHeaders: true,
+    legacyHeaders: false,
 });
 
 /**

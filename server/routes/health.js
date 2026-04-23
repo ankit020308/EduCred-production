@@ -7,6 +7,11 @@ import { isEncryptedSecret, decryptSecret } from '../utils/keyVault.js';
 
 const router = express.Router();
 
+// Public ping — used by Render health check and cron-job.org keep-alive
+router.get('/ping', (req, res) => {
+  res.status(200).json({ status: 'ok', timestamp: new Date().toISOString() });
+});
+
 function maskValue(val) {
   if (!val) return null;
   if (val.length <= 8) return '****';
