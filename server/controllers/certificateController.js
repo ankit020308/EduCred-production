@@ -193,7 +193,6 @@ export const issueCertificate = async (req, res) => {
 
         // Deterministic tamper-evident hash per semester
         const certHash = generateHash({ rollNumber, semester, sgpa, subjects, finalCGPA });
-        console.log(`[HASH] Semester ${semester} SHA-256: ${certHash.substring(0, 16)}...`);
 
         const cert = await createCertificateRecord({
           studentName,
@@ -211,14 +210,11 @@ export const issueCertificate = async (req, res) => {
           metadata: { studentEnrollmentNumber: rollNumber, branch, graduationYear, semester, sgpa, subjects, finalCGPA },
           workflowLog: [baseWorkflowEntry],
         });
-        console.log(`[DB] Semester ${semester} cert saved (PENDING_REVIEW): ${cert.certificateId}`);
-
         issuedCerts.push({ certificateId: cert.certificateId, semester, hash: certHash });
       }
     } else {
       // ── No semesters provided — single summary certificate ────────────────
       const certHash = generateHash({ rollNumber, semester: 'FINAL', finalCGPA });
-      console.log(`[HASH] Final SHA-256: ${certHash.substring(0, 16)}...`);
 
       const cert = await createCertificateRecord({
         studentName,
@@ -236,8 +232,6 @@ export const issueCertificate = async (req, res) => {
         metadata: { studentEnrollmentNumber: rollNumber, branch, graduationYear, finalCGPA },
         workflowLog: [baseWorkflowEntry],
       });
-      console.log(`[DB] Final cert saved (PENDING_REVIEW): ${cert.certificateId}`);
-
       issuedCerts.push({ certificateId: cert.certificateId, semester: 'FINAL', hash: certHash });
     }
 
@@ -592,7 +586,6 @@ export const verifyCertificate = async (req, res) => {
   try {
     const { certificateId } = req.body;
     const file = req.file;
-    console.log(`[VERIFY] Verify request: certificateId=${certificateId || 'file-upload'}, method=${file ? 'upload' : 'id'}`);
     let verificationMethod = file ? 'upload' : 'id';
     let hashToVerify = '';
     let metadata = null;
@@ -604,9 +597,13 @@ export const verifyCertificate = async (req, res) => {
       }
 
       const fileBuffer = fs.readFileSync(tempPath);
-      hashToVerify = generateBinaryHash(fileBuffer);
-      metadata = await Registry.findOne('certificates', { certificateHash: hashToVerify });
-      if (metadata) extractedId = metadata.certificateId;
+      const binaryHash = generateBinaryHash(fileBuffer);
+      metadata = await Registry.findOne('certificates', { pdfHash: binaryHash });
+      if (!metadata) {
+        return res.status(404).json({ valid: false, message: 'Certificate not found. Upload the original EduCred-issued PDF.' });
+      }
+      hashToVerify = metadata.certificateHash;
+      extractedId = metadata.certificateId;
     } else if (certificateId) {
       const isUUID = /^[0-9a-fA-F-]{36}$/.test(certificateId);
       const isSHA256 = /^[a-f0-9]{64}$/i.test(certificateId);
@@ -755,7 +752,18 @@ export const verifyByFileHash = async (req, res) => {
     }
 
     const fileBuffer = fs.readFileSync(tempPath);
-    const hashToVerify = generateBinaryHash(fileBuffer);
+    const binaryHash = generateBinaryHash(fileBuffer);
+
+    // Resolve the logical certificate hash via the stored PDF binary hash (pdfHash populated post-anchoring)
+    const cert = await Registry.findOne('certificates', { pdfHash: binaryHash });
+    if (!cert) {
+      return res.status(404).json({
+        valid: false,
+        message: 'No certificate found matching this file. Upload the original EduCred-issued PDF.',
+        submittedHash: binaryHash,
+      });
+    }
+    const hashToVerify = cert.certificateHash;
 
     let onChainDetails;
     try {
@@ -773,12 +781,12 @@ export const verifyByFileHash = async (req, res) => {
         alertType: 'HASH_MISMATCH',
         severity: 'HIGH',
         description: 'Trustless file verification: hash not found on chain.',
-        context: { submittedHash: hashToVerify },
+        context: { submittedHash: binaryHash },
       });
       return res.status(404).json({
         valid: false,
         message: 'No on-chain anchor found for this file. It has not been issued through EduCred.',
-        submittedHash: hashToVerify,
+        submittedHash: binaryHash,
       });
     }
 
@@ -787,11 +795,11 @@ export const verifyByFileHash = async (req, res) => {
         valid: false,
         isRevoked: true,
         message: '⚠️ REVOKED: This certificate has been revoked on-chain.',
-        submittedHash: hashToVerify,
+        submittedHash: binaryHash,
       });
     }
 
-    const metadata = await Registry.findOne('certificates', { certificateHash: hashToVerify });
+    const metadata = cert;
 
     res.json({
       valid: true,
@@ -1348,10 +1356,9 @@ export const downloadCertificateFile = async (req, res) => {
     // Remote IPFS URL — Proxy (bypasses CSP and CORS issues)
     if (cert.fileUrl?.startsWith('http://') || cert.fileUrl?.startsWith('https://')) {
       try {
-        console.log(`[📦 DOWNLOAD_PROXY] Fetching from IPFS: ${cert.fileUrl}`);
         const { default: fetch } = await import('node-fetch');
         const ipfsResponse = await fetch(cert.fileUrl, {
-          timeout: 10000,
+          signal: AbortSignal.timeout(10000),
           headers: { 'User-Agent': 'EduCred-Node-Proxy' }
         });
 

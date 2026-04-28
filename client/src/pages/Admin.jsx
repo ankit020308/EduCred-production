@@ -29,6 +29,7 @@ const STATUS_CONFIG = {
   PENDING_REVIEW: { label: 'Pending Review', bg: 'bg-amber-50', text: 'text-amber-600', border: 'border-amber-200', dot: 'bg-amber-500' },
   PROCESSING: { label: 'Under Review', bg: 'bg-blue-50', text: 'text-blue-600', border: 'border-blue-200', dot: 'bg-blue-500' },
   ANCHOR_FAILED: { label: 'Anchor Failed', bg: 'bg-[#ea2804]/10', text: 'text-[#ea2804]', border: 'border-[#ea2804]/20', dot: 'bg-[#ea2804]' },
+  ANCHOR_PENDING_FUNDS: { label: 'Pending Funds', bg: 'bg-orange-50', text: 'text-orange-600', border: 'border-orange-200', dot: 'bg-orange-500' },
   REVOKED: { label: 'Revoked', bg: 'bg-[#202020]/5', text: 'text-[#202020]', border: 'border-[#202020]/10', dot: 'bg-[#202020]' },
   REJECTED: { label: 'Rejected', bg: 'bg-[#ea2804]/10', text: 'text-[#ea2804]', border: 'border-[#ea2804]/20', dot: 'bg-[#ea2804]' },
 };

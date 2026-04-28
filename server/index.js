@@ -131,12 +131,6 @@ const authLimiter = rateLimit({
   message: { success: false, message: 'Too many authentication attempts. Please try again in 15 minutes.' },
 });
 
-const otpLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 5,
-  message: { success: false, message: 'Too many OTP attempts. Please wait before requesting another.' },
-});
-
 app.use(express.json({ limit: '50kb' }));
 app.use(express.urlencoded({ extended: true, limit: '50kb' }));
 app.use(cookieParser());

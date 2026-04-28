@@ -38,7 +38,7 @@ router.post('/confirm-issuance', protect, requireRole('university', 'UNIVERSITY'
 router.post('/batch', protect, requireRole('university', 'UNIVERSITY'), csvUpload.single('file'), batchIssue);
 router.post('/revoke', protect, requireRole('university', 'UNIVERSITY'), revokeCertificate);
 router.put('/:id/edit', protect, requireRole('university', 'UNIVERSITY'), editCertificate);
-router.post('/:id/retry-anchor', protect, retryAnchor);
+router.post('/:id/retry-anchor', protect, requireRole('university', 'UNIVERSITY'), retryAnchor);
 router.get('/:id/file', protect, downloadCertificateFile);
 
 /**

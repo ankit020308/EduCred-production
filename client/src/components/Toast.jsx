@@ -15,10 +15,10 @@ const ICONS = {
 
 const STYLES = {
   success: {
-    border: 'border-blue-500/20',
-    iconColor: 'text-blue-400',
-    bg: 'bg-blue-500/[0.04]',
-    bar: 'bg-blue-500',
+    border: 'border-[#2b9a66]/20',
+    iconColor: 'text-[#2b9a66]',
+    bg: 'bg-[#2b9a66]/[0.04]',
+    bar: 'bg-[#2b9a66]',
   },
   error: {
     border: 'border-rose-500/20',

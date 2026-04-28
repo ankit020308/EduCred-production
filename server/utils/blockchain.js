@@ -8,7 +8,6 @@ import { decryptSecret, isEncryptedSecret } from './keyVault.js';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-dotenv.config({ path: path.join(__dirname, '../../.env') });
 
 // Configurable via BLOCKCHAIN_CONFIRMATION_TIMEOUT_MS env var (default 60s)
 const CONFIRMATION_TIMEOUT_MS = parseInt(process.env.BLOCKCHAIN_CONFIRMATION_TIMEOUT_MS) || 60000;

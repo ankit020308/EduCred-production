@@ -604,11 +604,15 @@ export const verifyPhoneOTP = async (req, res) => {
 };
 
 export const getMe = async (req, res) => {
-  if (req.user.id === 'admin') {
-    return res.json({ id: 'admin', name: 'Admin', email: req.user.email, role: 'admin', isVerified: true });
+  try {
+    if (req.user.id === 'admin') {
+      return res.json({ id: 'admin', name: 'Admin', email: req.user.email, role: 'admin', isVerified: true });
+    }
+    const payload = await buildUserPayload(req.user.id);
+    res.json(payload);
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to retrieve user profile.' });
   }
-  const payload = await buildUserPayload(req.user.id);
-  res.json(payload);
 };
 
 /**
