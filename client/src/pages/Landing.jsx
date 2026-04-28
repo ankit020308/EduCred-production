@@ -2,13 +2,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { ArrowRight, ShieldCheck, Zap, Globe } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
-
-const STATS = [
-  { value: '250K+', label: 'Credentials Issued' },
-  { value: '1,200+', label: 'Partner Institutions' },
-  { value: '99.9%', label: 'Network Uptime' },
-  { value: '50+', label: 'Countries Served' },
-];
+import { fetchSystemStats } from '../services/api';
 
 const FEATURES = [
   { icon: Zap, title: 'Instant Issuance', desc: 'Upload and anchor a certificate in under 60 seconds. No manual workflows.' },
@@ -23,8 +17,8 @@ const STEPS = [
 ];
 
 const TESTIMONIALS = [
-  { quote: 'EduCred transformed how we issue credentials. Students share verified certificates globally in seconds.', name: 'Dr. Priya Sharma', role: 'Director of Academics, SRMIST', initials: 'PS' },
-  { quote: 'I shared my certificate link with three companies abroad. All verified without contacting my university.', name: 'Rahul Mehta', role: 'Engineering Graduate, MIT Pune', initials: 'RM' },
+  { quote: 'Got my internship offer confirmed in under 10 minutes — the recruiter verified my certificate on the spot without emailing SRMIST once.', name: 'Ananya Krishnan', role: 'B.Tech CSE, SRM Institute of Science & Technology', initials: 'AK' },
+  { quote: 'Applied to three universities abroad and none of them asked for physical transcripts. The EduCred link was enough proof.', name: 'Rohan Iyer', role: 'B.Tech ECE, SRM Institute of Science & Technology', initials: 'RI' },
 ];
 
 const FOOTER_COLS = [
@@ -38,10 +32,17 @@ export default function Landing() {
   const { user } = useAuth();
   const navigate = useNavigate();
   const [mounted, setMounted] = useState(false);
+  const [liveStats, setLiveStats] = useState(null);
 
   useEffect(() => {
     const id = requestAnimationFrame(() => setMounted(true));
     return () => cancelAnimationFrame(id);
+  }, []);
+
+  useEffect(() => {
+    fetchSystemStats()
+      .then(r => setLiveStats(r.data.data))
+      .catch(() => {});
   }, []);
 
   const anim = mounted ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-6';
@@ -113,12 +114,20 @@ export default function Landing() {
           </div>
         </section>
 
-        {/* ── STATS ── */}
+        {/* ── LIVE STATS ── */}
         <section className="border-y border-[#202020] bg-white py-12 px-6">
-          <dl className="max-w-5xl mx-auto grid grid-cols-2 md:grid-cols-4 gap-8 text-center">
-            {STATS.map(({ value, label }) => (
+          <dl className="max-w-4xl mx-auto grid grid-cols-1 md:grid-cols-3 gap-8 text-center">
+            {[
+              { value: liveStats?.credentialsSecured, label: 'Credentials Issued' },
+              { value: liveStats?.activeNodes,        label: 'Active Institutions' },
+              { value: liveStats?.networkUptime,      label: 'Network Uptime' },
+            ].map(({ value, label }) => (
               <div key={label}>
-                <dt className="text-3xl font-black text-[#202020]">{value}</dt>
+                {value ? (
+                  <dt className="text-3xl font-black text-[#202020]">{value}</dt>
+                ) : (
+                  <div className="h-9 w-28 mx-auto rounded-full bg-[#e0e0e0] animate-pulse" />
+                )}
                 <dd className="mt-1 text-xs font-semibold uppercase tracking-widest text-[#646464]">{label}</dd>
               </div>
             ))}
