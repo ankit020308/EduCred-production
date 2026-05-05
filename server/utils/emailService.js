@@ -2,11 +2,21 @@ import nodemailer from 'nodemailer';
 import { isProduction } from './runtimeConfig.js';
 
 /**
- * Lazily creates the SMTP transporter so that missing env vars
- * throw at call-time (with a clear error) rather than crashing
- * the server on import.
+ * Render free web services block outbound SMTP ports, so production can use an
+ * HTTPS email provider such as Resend while preserving SMTP for local/dev.
  */
 let _transporter = null;
+
+const EMAIL_TIMEOUT_MS = Number(process.env.EMAIL_TIMEOUT_MS || 10000);
+
+const hasResend = () => Boolean(process.env.RESEND_API_KEY);
+
+export function getEmailProvider() {
+  const configured = process.env.EMAIL_PROVIDER?.toLowerCase();
+  if (configured) return configured;
+  if (hasResend()) return 'resend';
+  return 'smtp';
+}
 
 export function getTransporter() {
   if (_transporter) return _transporter;
@@ -19,9 +29,7 @@ export function getTransporter() {
   const fromAddr = process.env.EMAIL_FROM;
 
   if (!host || !port || !user || !pass || !fromAddr) {
-    throw new Error(
-      'Email service not configured. Set EMAIL_HOST, EMAIL_PORT, EMAIL_SECURE, EMAIL_USER, EMAIL_PASS, EMAIL_FROM.'
-    );
+    throw new Error('SMTP email service not configured. Set EMAIL_HOST, EMAIL_PORT, EMAIL_SECURE, EMAIL_USER, EMAIL_PASS, EMAIL_FROM.');
   }
 
   _transporter = nodemailer.createTransport({ 
@@ -32,13 +40,11 @@ export function getTransporter() {
     tls: {
       rejectUnauthorized: false
     },
-    // 🛡️ [NETWORK_FIX]: Force IPv4 to prevent ENETUNREACH on platforms like Render
+    // Prefer IPv4 where available to avoid IPv6-only route failures.
     family: 4,
-    localAddress: '0.0.0.0',
-    // 🛡️ RESILIENCE: Prevent long hangs on flaky SMTP connections
-    connectionTimeout: 10000, // 10s
-    greetingTimeout: 10000, 
-    socketTimeout: 20000 
+    connectionTimeout: EMAIL_TIMEOUT_MS,
+    greetingTimeout: EMAIL_TIMEOUT_MS,
+    socketTimeout: EMAIL_TIMEOUT_MS * 2,
   });
   return _transporter;
 }
@@ -49,6 +55,10 @@ if (isProduction) {
 } else if (process.env.NODE_ENV !== 'test') {
   Promise.resolve().then(async () => {
     try {
+      if (getEmailProvider() !== 'smtp') {
+        console.log(`[EMAIL] ${getEmailProvider()} configured`);
+        return;
+      }
       const t = getTransporter();
       await t.verify();
       console.log('[EMAIL] SMTP ready');
@@ -58,8 +68,68 @@ if (isProduction) {
   });
 }
 
+function getFromAddress() {
+  const from = process.env.EMAIL_FROM;
+  if (!from) {
+    throw new Error('Email sender not configured. Set EMAIL_FROM.');
+  }
+  return from;
+}
+
 function baseMailOptions(to, subject, html) {
-  return { from: process.env.EMAIL_FROM, to, subject, html };
+  return { from: getFromAddress(), to, subject, html };
+}
+
+async function sendWithResend({ from, to, subject, html }) {
+  if (!process.env.RESEND_API_KEY) {
+    throw new Error('Resend email service not configured. Set RESEND_API_KEY and EMAIL_FROM.');
+  }
+
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), EMAIL_TIMEOUT_MS);
+
+  try {
+    const response = await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      signal: controller.signal,
+      headers: {
+        Authorization: `Bearer ${process.env.RESEND_API_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ from, to, subject, html }),
+    });
+
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      const message = payload?.message || payload?.error || `HTTP ${response.status}`;
+      throw new Error(`Resend delivery failed: ${message}`);
+    }
+
+    return payload;
+  } catch (error) {
+    if (error.name === 'AbortError') {
+      throw new Error(`Resend delivery timed out after ${EMAIL_TIMEOUT_MS}ms`);
+    }
+    throw error;
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+async function sendMail(mailOptions) {
+  const provider = getEmailProvider();
+
+  if (provider === 'resend') {
+    const info = await sendWithResend(mailOptions);
+    return { provider, messageId: info.id };
+  }
+
+  if (provider !== 'smtp') {
+    throw new Error(`Unsupported EMAIL_PROVIDER "${provider}". Supported providers: resend, smtp.`);
+  }
+
+  const info = await getTransporter().sendMail(mailOptions);
+  return { provider, messageId: info.messageId };
 }
 
 export const sendCertificateEmail = async (to, cert) => {
@@ -81,8 +151,8 @@ export const sendCertificateEmail = async (to, cert) => {
     `,
   );
 
-  const info = await getTransporter().sendMail(mailOptions);
-  if (!isProduction) console.log(`[EMAIL] Certificate sent to ${to} (${info.messageId})`);
+  const info = await sendMail(mailOptions);
+  if (!isProduction) console.log(`[EMAIL] Certificate sent to ${to} via ${info.provider} (${info.messageId})`);
 };
 
 export const sendOTP = async (to, otp) => {
@@ -99,6 +169,6 @@ export const sendOTP = async (to, otp) => {
     `,
   );
 
-  const info = await getTransporter().sendMail(mailOptions);
-  if (!isProduction) console.log(`[OTP] Sent to ${to} (${info.messageId})`);
+  const info = await sendMail(mailOptions);
+  if (!isProduction) console.log(`[OTP] Sent to ${to} via ${info.provider} (${info.messageId})`);
 };

@@ -1,6 +1,6 @@
 import express from 'express';
 import Registry from '../services/registryService.js';
-import { getTransporter } from '../utils/emailService.js';
+import { getEmailProvider, getTransporter } from '../utils/emailService.js';
 import { ethers } from 'ethers';
 import { protect, requireRole } from '../middleware/authMiddleware.js';
 import { isEncryptedSecret, decryptSecret } from '../utils/keyVault.js';
@@ -52,13 +52,18 @@ router.get('/', protect, requireRole('admin', 'super_admin'), async (req, res) =
     diagnostic.layers.database = { status: 'DISCONNECTED', error: err.message };
   }
 
-  // 2. SMTP
+  // 2. Email
   try {
-    const transporter = getTransporter();
-    await transporter.verify();
-    diagnostic.layers.smtp = { status: 'READY', provider: process.env.EMAIL_HOST };
+    const provider = getEmailProvider();
+    if (provider === 'smtp') {
+      const transporter = getTransporter();
+      await transporter.verify();
+      diagnostic.layers.email = { status: 'READY', provider: 'smtp', host: process.env.EMAIL_HOST };
+    } else {
+      diagnostic.layers.email = { status: 'CONFIGURED', provider };
+    }
   } catch (err) {
-    diagnostic.layers.smtp = { status: 'FAILED', error: err.message };
+    diagnostic.layers.email = { status: 'FAILED', error: err.message };
   }
 
   // 3. Blockchain
