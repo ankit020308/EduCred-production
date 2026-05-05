@@ -29,6 +29,8 @@ export function getTransporter() {
     port, 
     secure, 
     auth: { user, pass },
+    // 🛡️ [NETWORK_FIX]: Force IPv4 to prevent ENETUNREACH on platforms like Render
+    family: 4,
     // 🛡️ RESILIENCE: Prevent long hangs on flaky SMTP connections
     connectionTimeout: 10000, // 10s
     greetingTimeout: 10000, 
