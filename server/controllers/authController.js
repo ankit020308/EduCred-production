@@ -239,13 +239,13 @@ export const register = async (req, res) => {
         await sendOTP(email, otp);
         console.log(`[AUTH] Protocol activation code dispatched to ${email}`);
       } catch (error) {
-        console.warn(`[⚠️ SMTP_FAILURE] Could not deliver OTP to ${email}:`, error.message);
+        console.warn(`[⚠️ EMAIL_FAILURE] Could not deliver OTP to ${email}:`, error.message);
 
         if (process.env.NODE_ENV === 'production') {
-          // In production, SMTP failure aborts the transaction
-          throw new Error(`SMTP_DISPATCH_FAILED: ${error.message}`);
+          // In production, email failure aborts the transaction.
+          throw new Error(`EMAIL_DISPATCH_FAILED: ${error.message}`);
         } else {
-          console.log(`[DEV_AUTH] [BYPASS] SMTP delivery failed but registration allowed. OTP: ${otp}`);
+          console.log(`[DEV_AUTH] [BYPASS] Email delivery failed but registration allowed. OTP: ${otp}`);
         }
       }
 
@@ -260,14 +260,14 @@ export const register = async (req, res) => {
       requiresVerification
     });
   } catch (err) {
-    const isSmtpError = err.message.includes('SMTP_DISPATCH_FAILED');
+    const isEmailError = err.message.includes('EMAIL_DISPATCH_FAILED') || err.message.includes('SMTP_DISPATCH_FAILED');
     const details = err.errors ? err.errors.map(e => `${e.path}: ${e.message}`).join(', ') : err.message;
 
     await logAudit(req, 'AUTH_REGISTRATION', 'FAILURE', 'Account provisioning failed.', { email: req.body.email, error: details });
 
-    res.status(isSmtpError ? 502 : 500).json({
-      error: isSmtpError ? 'Email delivery failed.' : 'Registration failed.',
-      details: isSmtpError ? 'The verification system could not reach your inbox. Check SMTP settings.' : details
+    res.status(isEmailError ? 502 : 500).json({
+      error: isEmailError ? 'Email delivery failed.' : 'Registration failed.',
+      details: isEmailError ? 'The verification system could not deliver your security key. Check email provider settings.' : details
     });
   }
 };
@@ -458,7 +458,7 @@ export const resendOTP = async (req, res) => {
     } catch (emailErr) {
       console.error('Resend OTP email failure:', emailErr);
       await logAudit(req, 'OTP_RESEND', 'FAILURE', 'Email delivery failed on resend.', { email, error: emailErr.message });
-      return res.status(502).json({ error: 'Failed to deliver security key via email. Check SMTP settings.' });
+      return res.status(502).json({ error: 'Failed to deliver security key via email. Check email provider settings.' });
     }
     await logAudit(req, 'OTP_RESEND', 'SUCCESS', 'New security key dispatched.', { email });
 

@@ -32,11 +32,6 @@ const REQUIRED_SERVER_ENV = [
   'REFRESH_SECRET',
   'SESSION_SECRET',
   'WALLET_ENCRYPTION_KEY',
-  'EMAIL_HOST',
-  'EMAIL_PORT',
-  'EMAIL_SECURE',
-  'EMAIL_USER',
-  'EMAIL_PASS',
   'EMAIL_FROM',
   'RPC_URL',
   'CONTRACT_ADDRESS',
@@ -68,14 +63,23 @@ export function validateServerEnv() {
   // 1. Validate Mandatory Infrastructure
   REQUIRED_SERVER_ENV.forEach(requireEnv);
 
-  const port = Number(requireEnv('EMAIL_PORT'));
-  if (!Number.isInteger(port) || port <= 0) {
-    throw new Error('EMAIL_PORT must be a valid positive integer.');
-  }
+  const emailProvider = process.env.EMAIL_PROVIDER?.toLowerCase() || (process.env.RESEND_API_KEY ? 'resend' : 'smtp');
+  if (emailProvider === 'smtp') {
+    ['EMAIL_HOST', 'EMAIL_PORT', 'EMAIL_SECURE', 'EMAIL_USER', 'EMAIL_PASS'].forEach(requireEnv);
 
-  const secure = requireEnv('EMAIL_SECURE');
-  if (!['true', 'false'].includes(secure)) {
-    throw new Error('EMAIL_SECURE must be either "true" or "false".');
+    const port = Number(requireEnv('EMAIL_PORT'));
+    if (!Number.isInteger(port) || port <= 0) {
+      throw new Error('EMAIL_PORT must be a valid positive integer.');
+    }
+
+    const secure = requireEnv('EMAIL_SECURE');
+    if (!['true', 'false'].includes(secure)) {
+      throw new Error('EMAIL_SECURE must be either "true" or "false".');
+    }
+  } else if (emailProvider === 'resend') {
+    requireEnv('RESEND_API_KEY');
+  } else {
+    throw new Error(`Unsupported EMAIL_PROVIDER "${emailProvider}". Supported providers: resend, smtp.`);
   }
 
   // 2. Proactive Production Audit
