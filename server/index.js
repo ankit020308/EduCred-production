@@ -249,6 +249,7 @@ if (process.env.NODE_ENV !== 'test') {
         console.log(`[STORAGE] Storage: AUTHORITATIVE (SQL)`);
         console.log(`[LEDGER]  Ledger:  ${getBlockchainRuntimeInfo().mode === 'LIVE' ? 'SEP-LIVE' : 'OFFLINE'}`);
         console.log(`[ASSETS]  Assets:  ${isPinataConfigured() ? 'DECENTRALIZED (PINATA)' : 'LOCAL (UPLOADS)'}`);
+        console.log(`[EMAIL]  Provider: ${process.env.EMAIL_PROVIDER || (process.env.RESEND_API_KEY ? 'resend' : 'smtp')}`);
         console.log(`-------------------------------------------------\n`);
 
         // Purge expired blacklisted tokens every 6 hours to keep auth lookups fast
