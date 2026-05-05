@@ -145,6 +145,8 @@ export const setCookies = (res, accessToken, refreshToken) => {
 };
 const generateOTP = () => Math.floor(100000 + Math.random() * 900000).toString();
 const hashOTP = (otp) => crypto.createHash('sha256').update(otp).digest('hex');
+const isResendTestingLimitError = (error) =>
+  String(error?.message || '').toLowerCase().includes('you can only send testing emails');
 
 export const register = async (req, res) => {
   try {
@@ -185,7 +187,7 @@ export const register = async (req, res) => {
     const passwordHash = await bcrypt.hash(password, 12);
 
     // 🔐 TRANSACTIONAL GATE: Ensure atomicity across User and Profile nodes
-    const { requiresVerification, user: createdUser } = await Registry.transaction(async (t) => {
+    const { requiresVerification, user: createdUser, verificationCode } = await Registry.transaction(async (t) => {
       // PROACTIVE CLEANUP: Remove unverified legacy account if it exists
       const existingUnverified = await Registry.findOne('users', { email, isEmailVerified: false }, { transaction: t });
       if (existingUnverified) {
@@ -242,6 +244,10 @@ export const register = async (req, res) => {
         console.warn(`[⚠️ EMAIL_FAILURE] Could not deliver OTP to ${email}:`, error.message);
 
         if (process.env.NODE_ENV === 'production') {
+          if (isResendTestingLimitError(error)) {
+            console.warn(`[AUTH] [RESEND_TEST_MODE_BYPASS] Registration allowed for ${email}. Verify a domain in Resend for live email delivery.`);
+            return { requiresVerification: true, user, verificationCode: otp };
+          }
           // In production, email failure aborts the transaction.
           throw new Error(`EMAIL_DISPATCH_FAILED: ${error.message}`);
         } else {
@@ -257,7 +263,11 @@ export const register = async (req, res) => {
     res.status(201).json({
       message: 'Initial account created. Verify your email to activate.',
       email: createdUser.email,
-      requiresVerification
+      requiresVerification,
+      ...(verificationCode ? {
+        verificationCode,
+        emailDeliveryWarning: 'Email provider is in test mode. Use this code to continue.',
+      } : {})
     });
   } catch (err) {
     const isEmailError = err.message.includes('EMAIL_DISPATCH_FAILED') || err.message.includes('SMTP_DISPATCH_FAILED');
@@ -458,6 +468,13 @@ export const resendOTP = async (req, res) => {
     } catch (emailErr) {
       console.error('Resend OTP email failure:', emailErr);
       await logAudit(req, 'OTP_RESEND', 'FAILURE', 'Email delivery failed on resend.', { email, error: emailErr.message });
+      if (process.env.NODE_ENV === 'production' && isResendTestingLimitError(emailErr)) {
+        return res.status(200).json({
+          message: 'Email provider is in test mode. Use this code to continue.',
+          verificationCode: otp,
+          emailDeliveryWarning: 'Verify a domain in Resend for live email delivery.',
+        });
+      }
       return res.status(502).json({ error: 'Failed to deliver security key via email. Check email provider settings.' });
     }
     await logAudit(req, 'OTP_RESEND', 'SUCCESS', 'New security key dispatched.', { email });
