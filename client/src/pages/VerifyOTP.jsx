@@ -218,7 +218,7 @@ export default function VerifyOTP() {
           <form onSubmit={submitVerification} className="space-y-10 relative z-10">
             
             {/* 6-Digit Matrix Inputs */}
-            <div className="flex justify-between gap-2 sm:gap-4" onPaste={handlePaste}>
+            <div className="flex gap-2 sm:gap-3" onPaste={handlePaste}>
               {otp.map((digit, index) => (
                 <input
                   key={index}
@@ -229,7 +229,7 @@ export default function VerifyOTP() {
                   onChange={e => handleChange(e, index)}
                   onKeyDown={e => handleKeyDown(e, index)}
                   onFocus={() => setActiveInput(index)}
-                  className={`w-12 h-14 sm:w-14 sm:h-16 bg-slate-50 border shadow-sm ${
+                  className={`flex-1 min-w-0 aspect-square bg-slate-50 border shadow-sm ${
                     activeInput === index ? 'border-blue-500 bg-white ring-4 ring-blue-500/5' : 'border-slate-200'
                   } rounded-xl text-center text-2xl font-black text-slate-900 outline-none transition-all duration-300`}
                 />
