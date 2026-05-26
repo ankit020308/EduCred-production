@@ -1,4 +1,5 @@
 import crypto from 'crypto';
+import { logger } from './winstonLogger.js';
 import { ethers } from 'ethers';
 import { requireEnv } from './runtimeConfig.js';
 
@@ -44,13 +45,13 @@ export function createEncryptedWalletRecord() {
 
 export function decryptSecret(payload) {
   if (!isEncryptedSecret(payload)) {
-    console.error('[SECURITY] Legacy plaintext secret access attempt detected.');
+    logger.error('[SECURITY] Legacy plaintext secret access attempt detected.');
     throw new Error('Legacy plaintext secret detected. Re-secure the institution signer before proceeding.');
   }
 
   const [version, ivB64, authTagB64, encryptedB64] = payload.split(':');
   if (version !== WALLET_SECRET_VERSION || !ivB64 || !authTagB64 || !encryptedB64) {
-    console.error('[SECURITY] Malformed encrypted secret payload detected.');
+    logger.error('[SECURITY] Malformed encrypted secret payload detected.');
     throw new Error('Encrypted secret payload is malformed.');
   }
 

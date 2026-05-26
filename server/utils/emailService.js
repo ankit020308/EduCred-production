@@ -1,5 +1,6 @@
 import nodemailer from 'nodemailer';
 import { isProduction } from './runtimeConfig.js';
+import { logger } from './winstonLogger.js';
 
 /**
  * Render free web services block outbound SMTP ports, so production can use an
@@ -56,14 +57,14 @@ if (isProduction) {
   Promise.resolve().then(async () => {
     try {
       if (getEmailProvider() !== 'smtp') {
-        console.log(`[EMAIL] ${getEmailProvider()} configured`);
+        logger.info(`[EMAIL] ${getEmailProvider()} configured`);
         return;
       }
       const t = getTransporter();
       await t.verify();
-      console.log('[EMAIL] SMTP ready');
+      logger.info('[EMAIL] SMTP ready');
     } catch (err) {
-      console.warn('[EMAIL] SMTP verify failed — emails will fail until fixed:', err.message);
+      logger.warn('[EMAIL] SMTP verify failed — emails will fail until fixed:', err.message);
     }
   });
 }
@@ -152,7 +153,7 @@ export const sendCertificateEmail = async (to, cert) => {
   );
 
   const info = await sendMail(mailOptions);
-  if (!isProduction) console.log(`[EMAIL] Certificate sent to ${to} via ${info.provider} (${info.messageId})`);
+  if (!isProduction) logger.debug(`[EMAIL] Certificate sent to ${to} via ${info.provider} (${info.messageId})`);
 };
 
 export const sendOTP = async (to, otp) => {
@@ -170,5 +171,5 @@ export const sendOTP = async (to, otp) => {
   );
 
   const info = await sendMail(mailOptions);
-  if (!isProduction) console.log(`[OTP] Sent to ${to} via ${info.provider} (${info.messageId})`);
+  if (!isProduction) logger.debug(`[OTP] Sent to ${to} via ${info.provider} (${info.messageId})`);
 };

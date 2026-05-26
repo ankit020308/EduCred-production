@@ -1,12 +1,10 @@
 import Registry from '../services/registryService.js';
+import { logger } from '../utils/winstonLogger.js';
 import { authorizeUniversityOnChain } from '../utils/blockchain.js';
 import { createEncryptedWalletRecord } from '../utils/keyVault.js';
+import { makeServerErr } from '../utils/httpError.js';
 
-const isProd = process.env.NODE_ENV === 'production';
-const serverErr = (res, err, msg = 'Operation failed.') => {
-  console.error('[ADMIN]', err);
-  res.status(500).json({ error: msg, ...(isProd ? {} : { details: err.message }) });
-};
+const serverErr = makeServerErr('[ADMIN]');
 
 export const getPendingUniversities = async (req, res) => {
   try {
@@ -40,12 +38,12 @@ export const approveUniversity = async (req, res) => {
       encryptedPrivateKey = newWallet.encryptedPrivateKey;
     }
 
-    console.log(`[CHAIN] Blockchain call started | authorizeUniversity: ${publicWalletAddress}`);
+    logger.info(`[CHAIN] Blockchain call started | authorizeUniversity: ${publicWalletAddress}`);
     try {
       await authorizeUniversityOnChain(publicWalletAddress);
-      console.log(`[CHAIN] Blockchain call success | authorizeUniversity: ${publicWalletAddress}`);
+      logger.info(`[CHAIN] Blockchain call success | authorizeUniversity: ${publicWalletAddress}`);
     } catch (chainErr) {
-      console.error(`[CHAIN] Blockchain call failed | authorizeUniversity: ${chainErr.message} — continuing with DB approval`);
+      logger.error(`[CHAIN] Blockchain call failed | authorizeUniversity: ${chainErr.message} — continuing with DB approval`);
     }
 
     await Registry.update('universities', { id: universityId }, {

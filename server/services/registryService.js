@@ -1,4 +1,5 @@
 import sequelize from '../config/database.js';
+import { logger } from '../utils/winstonLogger.js';
 import * as Models from '../models/index.js';
 import { Op } from 'sequelize';
 
@@ -13,6 +14,7 @@ const COLLECTION_MODEL_MAP = {
   requests: Models.Request,
   fraudAlerts: Models.FraudAlert,
   verificationLogs: Models.VerificationLog,
+  otpRecords: Models.OtpRecord,
 };
 
 class RegistryService {
@@ -44,6 +46,7 @@ class RegistryService {
       'Request',
       'FraudAlert',
       'VerificationLog',
+      'OtpRecords',
     ];
 
     for (const tableName of requiredTables) {
@@ -66,28 +69,28 @@ class RegistryService {
 
   async init() {
     try {
-      console.log('[Registry] Initializing SQL storage protocol...');
-      console.log(`[Registry] [DIAGNOSTIC] Checking connectivity to: ${sequelize.options.host || 'remote node'}`);
+      logger.info('[Registry] Initializing SQL storage protocol...');
+      logger.info(`[Registry] [DIAGNOSTIC] Checking connectivity to: ${sequelize.options.host || 'remote node'}`);
       
       await sequelize.authenticate();
-      console.log('[Registry] [SUCCESS] Connection established. Verifying schema...');
+      logger.info('[Registry] [SUCCESS] Connection established. Verifying schema...');
       
       await this._verifySchema();
       this.isReady = true;
-      console.log('[Registry] [SUCCESS] SQL storage layer active and verified.');
+      logger.info('[Registry] [SUCCESS] SQL storage layer active and verified.');
       return true;
     } catch (error) {
-      console.error(`\n[Registry] [FAIL] [INIT_ERROR] Database connection failed.`);
-      console.error(`[Registry] [REASON] ${error.message}`);
+      logger.error(`\n[Registry] [FAIL] [INIT_ERROR] Database connection failed.`);
+      logger.error(`[Registry] [REASON] ${error.message}`);
       
       if (error.original) {
-        console.error(`[Registry] [OS_DETAIL] ${error.original.code} - ${error.original.address}:${error.original.port}`);
+        logger.error(`[Registry] [OS_DETAIL] ${error.original.code} - ${error.original.address}:${error.original.port}`);
       }
       
       if (error.message.includes('ECONNREFUSED')) {
-        console.error('[Registry] [HELP] The database seems unreachable. Verify your DATABASE_URL in .env and ensure your local IP is whitelisted if using a managed host like Render.');
+        logger.error('[Registry] [HELP] The database seems unreachable. Verify your DATABASE_URL in .env and ensure your local IP is whitelisted if using a managed host like Render.');
       } else if (error.message.includes('no pg_hba.conf entry')) {
-        console.error('[Registry] [HELP] Connection rejected by database server. This usually means SSL is required but not active, or the credentials are wrong.');
+        logger.error('[Registry] [HELP] Connection rejected by database server. This usually means SSL is required but not active, or the credentials are wrong.');
       }
 
       throw new Error(`Database connection failed: ${error.message}. EduCred requires an active database node to function.`);
@@ -113,7 +116,7 @@ class RegistryService {
 
   async insert(collection, document, options = {}) {
     const Model = this._getModel(collection);
-    console.log(`[Registry] [INSERT] Collection: ${collection}`);
+    logger.info(`[Registry] [INSERT] Collection: ${collection}`);
     const { _id, ...cleanDoc } = document;
     const result = await Model.create(cleanDoc, options);
     return result.get({ plain: true });

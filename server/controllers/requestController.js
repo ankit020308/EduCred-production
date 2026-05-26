@@ -1,10 +1,11 @@
 // server/controllers/requestController.js
+import { logger } from '../utils/winstonLogger.js';
 import { UniqueConstraintError } from 'sequelize';
 import Registry from '../services/registryService.js';
-import { issueCertificateOnChain } from '../utils/blockchain.js';
-import { logAudit } from '../utils/logger.js';
+import { logAudit } from '../utils/auditLogger.js';
 import { generateHash } from '../utils/hashing.js';
 import { requestFulfillmentSchema } from '../validators/joiSchemas.js';
+import { queueCertificateAnchoring } from '../services/anchoringQueueService.js';
 
 export const createRequest = async (req, res) => {
   try {
@@ -44,7 +45,7 @@ export const createRequest = async (req, res) => {
 
     res.status(201).json(newRequest);
   } catch (err) {
-    console.error(err);
+    logger.error(err);
     res.status(500).json({ error: 'Failed to create request' });
   }
 };
@@ -149,43 +150,39 @@ export const approveRequest = async (req, res) => {
       requestId: id
     });
 
-    // 3. Send to Blockchain
+    // 3. Queue blockchain anchoring through the shared async pipeline
     try {
-      const receipt = await issueCertificateOnChain(
-        newCert.id.toString(),
-        certificateHash,
-        2,
-        university.encryptedPrivateKey
-      );
-      
-      await Registry.update('certificates', { id: newCert.id }, {
-          blockchainTxHash: receipt.hash,
-          status: 'CONFIRMED',
-          workflowStatus: 'ISSUED'
+      const queueResult = await queueCertificateAnchoring({
+        certDbId: newCert.id,
+        university,
+        actorUser: req.user,
+        allowedStatuses: ['PENDING', 'PENDING_REVIEW', 'ANCHOR_FAILED', 'ANCHOR_PENDING_FUNDS'],
+        workflowStage: 'Request Approved and Queued for Anchoring',
+        markReviewed: true,
+        source: 'student-request-approval',
+        requestId: request.id,
       });
 
       await Registry.update('requests', { id }, { status: 'approved' });
 
-      await Registry.insert('ledger', {
-        type: 'ISSUE',
-        studentName: student.name,
-        universityName: university.name,
+      await logAudit(req, 'CERTIFICATE_QUEUE', 'SUCCESS', `Credential anchoring queued for ${student.name}.`, {
         certificateId: newCert.id,
-        txHash: receipt.hash,
-        status: 'SUCCESS',
-        metadata: { requestId: request.id }
+        requestId: request.id,
       });
 
-      // Standardized log
-      await logAudit(req, 'CERTIFICATE_ISSUE', 'SUCCESS', `Credential successfully anchored for ${student.name}.`, { 
-        certificateId: newCert.id,
-        txHash: receipt.hash
+      res.status(202).json({
+        message: 'Request approved and certificate anchoring queued',
+        certificate: {
+          id: newCert.id,
+          certificateId: newCert.certificateId,
+          status: queueResult.status || 'PROCESSING',
+        },
       });
-
-      res.json({ message: 'Request approved and certificate anchored', certificate: newCert });
     } catch (bcError) {
-      console.error(bcError);
-      await Registry.update('certificates', { id: newCert.id }, { status: 'FAILED' });
+      logger.error(bcError);
+      if (bcError.statusCode !== 503) {
+        await Registry.update('certificates', { id: newCert.id }, { status: 'FAILED' });
+      }
       await Registry.insert('ledger', {
         type: 'ISSUE',
         studentName: student.name,
@@ -195,11 +192,11 @@ export const approveRequest = async (req, res) => {
         metadata: { requestId: request.id, error: bcError.message }
       });
 
-      res.status(500).json({ error: 'Failed to anchor the certificate on blockchain.', certificate: newCert });
+      res.status(bcError.statusCode || 500).json({ error: 'Failed to queue certificate anchoring.', certificate: newCert });
     }
 
   } catch (err) {
-    console.error(err);
+    logger.error(err);
     res.status(500).json({ error: 'Approval failed' });
   }
 };

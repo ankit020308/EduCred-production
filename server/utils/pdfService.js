@@ -2,6 +2,7 @@ import PDFDocument from 'pdfkit';
 import QRCode from 'qrcode';
 import crypto from 'crypto';
 import fetch from 'node-fetch';
+import { logger } from './winstonLogger.js';
 
 const FRONTEND_BASE = process.env.FRONTEND_URL || 'https://educred.in';
 
@@ -113,13 +114,13 @@ export const generateCertificatePDF = async (certData) => {
               doc.rect(PX, PY, 90, 90).lineWidth(1).strokeColor(NAVY).stroke();
               doc.image(photoBuffer, PX + 1, PY + 1, { width: 88, height: 88 });
             } else {
-              console.warn('[PDF] Photo skipped — unsupported format:', contentType);
+              logger.warn('[PDF] Photo skipped — unsupported format:', contentType);
             }
           } else {
-            console.warn('[PDF] Photo fetch failed — HTTP', photoRes.status);
+            logger.warn('[PDF] Photo fetch failed — HTTP', photoRes.status);
           }
         } catch (photoErr) {
-          console.warn('[PDF] Photo embed skipped:', photoErr.message);
+          logger.warn('[PDF] Photo embed skipped:', photoErr.message);
         }
       }
 

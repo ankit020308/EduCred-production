@@ -1,4 +1,5 @@
 import express from 'express';
+import { logger } from '../utils/winstonLogger.js';
 import fs from 'fs';
 import Registry from '../services/registryService.js';
 import crypto from 'crypto';
@@ -225,7 +226,7 @@ router.get('/certificates', protect, requireRole('student'), async (req, res) =>
 
         res.json(certificates);
     } catch (err) {
-        console.error(err);
+        logger.error(err);
         res.status(500).json({ error: err.message });
     }
 });

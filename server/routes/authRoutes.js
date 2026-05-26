@@ -1,4 +1,5 @@
 import express from 'express';
+import { logger } from '../utils/winstonLogger.js';
 import { 
   register, login, getMe, verifyOTP, resendOTP, 
   refreshToken, logout, googleLogin, sendPhoneVerification, 
@@ -61,7 +62,7 @@ const processGoogleCallback = (req, res) => {
     const user = req.user;
     
     if (!user) {
-      console.error('[❌ OAUTH_ERROR] Passport authentication failed: No user object.');
+      logger.error('[❌ OAUTH_ERROR] Passport authentication failed: No user object.');
       return res.redirect(`${FRONTEND_URL}/auth/error?reason=no_user`);
     }
 
@@ -71,14 +72,14 @@ const processGoogleCallback = (req, res) => {
 
     setCookies(res, accessToken, rToken);
 
-    console.log(`[✅ OAUTH_SUCCESS] Handshake complete for identity: ${user.email}`);
+    logger.info(`[✅ OAUTH_SUCCESS] Handshake complete for identity: ${user.email}`);
     
     // Redirect with minimal UI state
     const redirectUrl = `${FRONTEND_URL}/auth/success?role=${encodeURIComponent(user.role)}&name=${encodeURIComponent(user.name)}`;
     res.redirect(redirectUrl);
     
   } catch (error) {
-    console.error(`[🔥 OAUTH_CRITICAL_FAILURE] ${error.message}`);
+    logger.error(`[🔥 OAUTH_CRITICAL_FAILURE] ${error.message}`);
     res.redirect(`${FRONTEND_URL}/auth/error?reason=internal_server_error`);
   }
 };

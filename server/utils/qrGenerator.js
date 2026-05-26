@@ -1,6 +1,7 @@
 import QRCode from 'qrcode';
 import { isProduction } from './runtimeConfig.js';
 import dotenv from 'dotenv';
+import { logger } from './winstonLogger.js';
 
 dotenv.config();
 
@@ -34,7 +35,7 @@ export const generateVerificationQR = async (certificateId) => {
 
         return qrDataUri;
     } catch (err) {
-        console.error('❌ [QR_SYNTHESIS_FAIL]: Protocol error -', err.message);
+        logger.error('❌ [QR_SYNTHESIS_FAIL]: Protocol error -', err.message);
         return null;
     }
 };

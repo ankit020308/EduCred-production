@@ -36,6 +36,6 @@ export const logAudit = async (req, action, status = 'SUCCESS', details = '', me
             console.log(`📡 [AUDIT]: ${action} | ${status} | ${details}`);
         }
     } catch (err) {
-        console.error('🛰️ Audit Logging Failure:', err.message);
+        logger.error('[AUDIT] Logging failure:', err.message);
     }
 };

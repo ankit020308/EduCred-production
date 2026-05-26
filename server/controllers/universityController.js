@@ -1,4 +1,5 @@
 // server/controllers/universityController.js
+import { logger } from '../utils/winstonLogger.js';
 import Registry from '../services/registryService.js';
 import { authorizeUniversityOnChain } from '../utils/blockchain.js';
 import { createEncryptedWalletRecord } from '../utils/keyVault.js';
@@ -72,7 +73,7 @@ export const approveUniversity = async (req, res) => {
     const updated = await Registry.findById('universities', id);
     res.json({ message: 'University approved and identity authorized.', data: updated });
   } catch (err) {
-    console.error('[APPROVE_FAILURE]', err);
+    logger.error('[APPROVE_FAILURE]', err);
     res.status(500).json({ error: 'Approval and authorization failed.', details: err.message });
   }
 };

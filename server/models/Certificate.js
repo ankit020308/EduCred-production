@@ -113,6 +113,14 @@ const Certificate = sequelize.define('Certificate', {
     workflowLog: {
         type: DataTypes.JSON,
         defaultValue: []
+    },
+    reviewedBy: {
+        type: DataTypes.STRING,
+        allowNull: true
+    },
+    reviewedAt: {
+        type: DataTypes.DATE,
+        allowNull: true
     }
 }, {
     indexes: [

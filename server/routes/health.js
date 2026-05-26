@@ -1,9 +1,11 @@
 import express from 'express';
+import { logger } from '../utils/winstonLogger.js';
 import Registry from '../services/registryService.js';
 import { getEmailProvider, getTransporter } from '../utils/emailService.js';
 import { ethers } from 'ethers';
 import { protect, requireRole } from '../middleware/authMiddleware.js';
 import { isEncryptedSecret, decryptSecret } from '../utils/keyVault.js';
+import { getRedisConnection } from '../config/redis.js';
 
 const router = express.Router();
 
@@ -12,13 +14,22 @@ router.get('/ping', (req, res) => {
   res.status(200).json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
+// Public health summary — safe for uptime monitors and CI smoke tests.
+router.get('/', (req, res) => {
+  res.status(200).json({
+    status: 'Online',
+    timestamp: new Date().toISOString(),
+    node: process.env.NODE_NAME || 'EduCred-Primary',
+  });
+});
+
 function maskValue(val) {
   if (!val) return null;
   if (val.length <= 8) return '****';
   return val.slice(0, 6) + '...' + val.slice(-4);
 }
 
-router.get('/', protect, requireRole('admin', 'super_admin'), async (req, res) => {
+router.get('/diagnostics', protect, requireRole('admin', 'super_admin'), async (req, res) => {
   const rpcUrl   = process.env.RPC_URL || process.env.SEPOLIA_RPC_URL;
   const contract = process.env.CONTRACT_ADDRESS;
   const rawPrivKey = process.env.PRIVATE_KEY;
@@ -66,7 +77,26 @@ router.get('/', protect, requireRole('admin', 'super_admin'), async (req, res) =
     diagnostic.layers.email = { status: 'FAILED', error: err.message };
   }
 
-  // 3. Blockchain
+  // 3. Background Queue (Redis)
+  try {
+    const redis = getRedisConnection();
+    if (!redis) {
+      diagnostic.layers.queue = { status: 'UNCONFIGURED', message: 'REDIS_URL is missing' };
+    } else {
+      const redisStatus = redis.status; // 'connecting', 'connect', 'ready', 'end', 'wait'
+      if (redisStatus === 'ready' || redisStatus === 'connect') {
+        diagnostic.layers.queue = { status: 'READY', provider: 'redis' };
+      } else {
+        diagnostic.status = 'DEGRADED';
+        diagnostic.layers.queue = { status: 'DEGRADED', state: redisStatus };
+      }
+    }
+  } catch (err) {
+    diagnostic.status = 'DEGRADED';
+    diagnostic.layers.queue = { status: 'FAILED', error: err.message };
+  }
+
+  // 4. Blockchain
   if (!rpcUrl || !contract) {
     diagnostic.status = 'DEGRADED';
     const missing = [!rpcUrl && 'RPC_URL', !contract && 'CONTRACT_ADDRESS'].filter(Boolean);
@@ -87,7 +117,7 @@ router.get('/', protect, requireRole('admin', 'super_admin'), async (req, res) =
         walletSufficient = parseFloat(walletEth) >= 0.01;
         if (!walletSufficient) {
           diagnostic.status = 'DEGRADED';
-          console.error(`[BLOCKCHAIN] [CRITICAL] Wallet ETH balance low: ${walletEth} ETH — anchoring will fail`);
+          logger.error(`[BLOCKCHAIN] [CRITICAL] Wallet ETH balance low: ${walletEth} ETH — anchoring will fail`);
         }
       }
       diagnostic.layers.blockchain = {
@@ -100,7 +130,7 @@ router.get('/', protect, requireRole('admin', 'super_admin'), async (req, res) =
       };
     } catch (err) {
       diagnostic.status = 'DEGRADED';
-      console.error('[BLOCKCHAIN] [ERROR] Health check failed:', err.message);
+      logger.error('[BLOCKCHAIN] [ERROR] Health check failed:', err.message);
       diagnostic.layers.blockchain = { status: 'OUT_OF_SYNC', error: err.message };
     }
   }

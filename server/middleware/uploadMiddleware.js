@@ -2,6 +2,7 @@ import multer from 'multer';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { UPLOAD_MAX_BYTES, CSV_MAX_BYTES } from '../constants/limits.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -32,7 +33,7 @@ const ALLOWED_MIME_TYPES = new Set([
 export const upload = multer({
     storage,
     limits: {
-        fileSize: 20 * 1024 * 1024, // 20MB Limit
+        fileSize: UPLOAD_MAX_BYTES,
     },
     fileFilter: (req, file, cb) => {
         if (!ALLOWED_MIME_TYPES.has(file.mimetype)) {
@@ -52,7 +53,7 @@ const CSV_MIME_TYPES = new Set([
 
 export const csvUpload = multer({
     storage,
-    limits: { fileSize: 5 * 1024 * 1024 },
+    limits: { fileSize: CSV_MAX_BYTES },
     fileFilter: (req, file, cb) => {
         if (CSV_MIME_TYPES.has(file.mimetype) || file.originalname.toLowerCase().endsWith('.csv')) {
             cb(null, true);

@@ -1,7 +1,8 @@
+import { logger } from '../utils/winstonLogger.js';
 /**
  * 🛡️ Passport Configuration Mock
  * Passport.js dependency removed for architectural stabilization.
  */
 export const configurePassport = () => {
-    console.log('⚠️ [AUTH_MOCK]: Passport.js configuration bypassed.');
+    logger.warn('[AUTH_MOCK]: Passport.js configuration bypassed.');
 };

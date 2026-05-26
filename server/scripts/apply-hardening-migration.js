@@ -210,6 +210,22 @@ async function run() {
     }
   }
 
+  for (const [columnName, columnDefinition] of Object.entries({
+    reviewedBy: { type: DataTypes.STRING, allowNull: true },
+    reviewedAt: { type: DataTypes.DATE, allowNull: true },
+  })) {
+    try {
+      await queryInterface.addColumn('Certificate', columnName, columnDefinition);
+      console.log(`[migration] [SUCCESS] Certificate.${columnName} column added`);
+    } catch (err) {
+      if (/already exists/i.test(err.message) || /duplicate column/i.test(err.message)) {
+        console.log(`[migration] [SKIP] Certificate.${columnName} already exists`);
+      } else {
+        throw err;
+      }
+    }
+  }
+
   await ensureIndex('Certificate', 'certificate_certificateId_unique_idx', ['certificateId'], { unique: true });
   await ensureIndex('Certificate', 'certificate_certificateHash_unique_idx', ['certificateHash'], { unique: true });
   await ensureIndex('University', 'university_userId_unique_idx', ['userId'], { unique: true });

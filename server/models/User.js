@@ -66,19 +66,11 @@ const User = sequelize.define('User', {
         type: DataTypes.TEXT,
         allowNull: true
     },
-    otp: {
-        type: DataTypes.STRING,
-        allowNull: true
+    isLocked: {
+        type: DataTypes.BOOLEAN,
+        defaultValue: false
     },
-    otpExpires: {
-        type: DataTypes.DATE,
-        allowNull: true
-    },
-    otpAttempts: {
-        type: DataTypes.INTEGER,
-        defaultValue: 0
-    },
-    lastOtpResend: {
+    lockedUntil: {
         type: DataTypes.DATE,
         allowNull: true
     },

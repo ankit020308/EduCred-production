@@ -9,6 +9,8 @@ import BlacklistedToken from './BlacklistedToken.js';
 import Request from './Request.js';
 import FraudAlert from './FraudAlert.js';
 import VerificationLog from './VerificationLog.js';
+import OtpRecord from './OtpRecord.js';
+import Subscription from './Subscription.js';
 
 // ─── Associations ─────────────────────────────────────────────────────────────
 
@@ -40,6 +42,10 @@ AuditLog.belongsTo(User, { foreignKey: 'userId' });
 Certificate.hasMany(Ledger, { foreignKey: 'certificateId' });
 Ledger.belongsTo(Certificate, { foreignKey: 'certificateId' });
 
+// University <-> Subscription (1:1 billing record)
+University.hasOne(Subscription, { foreignKey: 'universityId', as: 'subscription' });
+Subscription.belongsTo(University, { foreignKey: 'universityId' });
+
 export {
     User,
     University,
@@ -50,5 +56,7 @@ export {
     BlacklistedToken,
     Request,
     FraudAlert,
-    VerificationLog
+    VerificationLog,
+    OtpRecord,
+    Subscription,
 };

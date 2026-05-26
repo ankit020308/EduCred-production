@@ -4,10 +4,12 @@ import crypto from 'crypto';
 import bcrypt from 'bcryptjs';
 
 import { registrationSchema, loginSchema, onboardingSchema } from '../validators/joiSchemas.js';
+import { ROLES } from '../constants/roles.js';
+import { REFRESH_TOKEN_TTL_MS, ACCESS_TOKEN_TTL_MS, OTP_TTL_MS } from '../constants/limits.js';
 
 import { sendOTP } from '../utils/emailService.js';
 import { sendPhoneOTP } from '../utils/smsService.js';
-import { logAudit } from '../utils/logger.js';
+import { logAudit } from '../utils/auditLogger.js';
 import { jwtSecret, refreshSecret } from '../utils/runtimeConfig.js';
 import { createEncryptedWalletRecord } from '../utils/keyVault.js';
 
@@ -17,8 +19,8 @@ const REFRESH_EXPIRES = '7d';
 const buildUserPayload = async (userId) => {
   const user = await Registry.findById('users', userId);
   if (!user) return null;
-  const university = user.role === 'university' ? await Registry.findOne('universities', { userId: user.id }) : null;
-  const student = user.role === 'student' ? await Registry.findOne('students', { userId: user.id }) : null;
+  const university = user.role === ROLES.UNIVERSITY ? await Registry.findOne('universities', { userId: user.id }) : null;
+  const student = user.role === ROLES.STUDENT ? await Registry.findOne('students', { userId: user.id }) : null;
 
   // Lazy wallet allocation — generate and persist for users who registered before this was added
   let walletAddress = university
@@ -65,7 +67,7 @@ const buildCookieOptions = () => {
     httpOnly: true,
     secure: isProd,
     sameSite: isProd ? 'none' : 'lax',
-    maxAge: 7 * 24 * 60 * 60 * 1000,
+    maxAge: REFRESH_TOKEN_TTL_MS,
   };
 };
 
@@ -125,7 +127,7 @@ export const logout = async (req, res) => {
 
     res.status(200).json({ message: 'Account session terminated and token revoked.' });
   } catch (err) {
-    console.error('Logout error:', err);
+    logger.error('Logout error:', err);
     res.status(500).json({ error: 'Logout failed.' });
   }
 };
@@ -140,7 +142,7 @@ export const signRefreshToken = (id) => jwt.sign({ id }, refreshSecret, { expire
 export const setCookies = (res, accessToken, refreshToken) => {
   const cookieOptions = buildCookieOptions();
 
-  res.cookie('accessToken', accessToken, { ...cookieOptions, maxAge: 60 * 60 * 1000 });
+  res.cookie('accessToken', accessToken, { ...cookieOptions, maxAge: ACCESS_TOKEN_TTL_MS });
   res.cookie('refreshToken', refreshToken, cookieOptions);
 };
 const generateOTP = () => Math.floor(100000 + Math.random() * 900000).toString();
@@ -152,7 +154,7 @@ export const register = async (req, res) => {
   try {
     const { error } = registrationSchema.validate(req.body);
     if (error) {
-      console.warn(`[AUTH] [VALIDATION_FAILURE] Registration invalid: ${error.details[0].message}`);
+      logger.warn(`[AUTH] [VALIDATION_FAILURE] Registration invalid: ${error.details[0].message}`);
       return res.status(400).json({ error: error.details[0].message });
     }
 
@@ -176,7 +178,7 @@ export const register = async (req, res) => {
     // We now allow students to register even if a certificate hasn't been issued yet.
     // They will simply see an empty dashboard until their institution uploads credentials.
     /*
-    if (role === 'student') {
+    if (role === ROLES.STUDENT) {
       const allowedCert = await Registry.findOne('certificates', { studentEmail: email });
       if (!allowedCert) {
         return res.status(403).json({ error: 'No certificate has been issued to this email address. Contact your institution to register.' });
@@ -201,13 +203,20 @@ export const register = async (req, res) => {
         email,
         passwordHash,
         role,
-        universityName: role === 'university' ? universityName : null,
-        otp: hashedOtp,
-        otpExpires: new Date(Date.now() + 15 * 60 * 1000), // 15 min
-        isEmailVerified: false
+        universityName: role === ROLES.UNIVERSITY ? universityName : null,
+        isEmailVerified: false,
+        isLocked: false,
+        lockedUntil: null
       }, { transaction: t });
 
-      if (role === 'university') {
+      await Registry.insert('otpRecords', {
+        email,
+        otpHash: hashedOtp,
+        expiresAt: new Date(Date.now() + OTP_TTL_MS), // 15 min
+        attempts: 0
+      }, { transaction: t });
+
+      if (role === ROLES.UNIVERSITY) {
         const { documents, description, officialDomain } = req.body;
         const domainToCheck = officialDomain ? officialDomain.toLowerCase().trim() : email.split('@')[1] || '';
         const isInstitutional = domainToCheck.endsWith('.edu') || domainToCheck.endsWith('.ac.in') ||
@@ -239,13 +248,13 @@ export const register = async (req, res) => {
       // 📧 DISPATCH OTP
       try {
         await sendOTP(email, otp);
-        console.log(`[AUTH] Protocol activation code dispatched to ${email}`);
+        logger.info(`[AUTH] Protocol activation code dispatched to ${email}`);
       } catch (error) {
-        console.warn(`[⚠️ EMAIL_FAILURE] Could not deliver OTP to ${email}:`, error.message);
+        logger.warn(`[⚠️ EMAIL_FAILURE] Could not deliver OTP to ${email}:`, error.message);
 
         if (process.env.NODE_ENV === 'production') {
           if (isResendTestingLimitError(error)) {
-            console.warn(`[AUTH] [RESEND_TEST_MODE_BYPASS] Registration allowed for ${email}. Verify a domain in Resend for live email delivery.`);
+            logger.warn(`[AUTH] [RESEND_TEST_MODE_BYPASS] Registration allowed for ${email}. Verify a domain in Resend for live email delivery.`);
             return { requiresVerification: true, user, verificationCode: otp };
           }
           // In production, email failure aborts the transaction.
@@ -286,7 +295,7 @@ export const login = async (req, res) => {
   try {
     const { error } = loginSchema.validate(req.body);
     if (error) {
-      console.warn(`[AUTH] [VALIDATION_FAILURE] Login invalid: ${error.details[0].message}`);
+      logger.warn(`[AUTH] [VALIDATION_FAILURE] Login invalid: ${error.details[0].message}`);
       return res.status(400).json({ error: error.details[0].message });
     }
 
@@ -309,7 +318,7 @@ export const login = async (req, res) => {
     const user = await Registry.findOne('users', { email });
 
     if (!user || !(await bcrypt.compare(password, user.passwordHash))) {
-      console.log(`[AUTH] Login attempt: ${email}, status: INVALID_CREDENTIALS`);
+      logger.info(`[AUTH] Login attempt: ${email}, status: INVALID_CREDENTIALS`);
       return res.status(401).json({ error: 'Invalid credentials.' });
     }
 
@@ -320,10 +329,10 @@ export const login = async (req, res) => {
       });
     }
 
-    const university = user.role === 'university' ? await Registry.findOne('universities', { userId: user.id }) : null;
+    const university = user.role === ROLES.UNIVERSITY ? await Registry.findOne('universities', { userId: user.id }) : null;
 
     if (university && university.status === 'PENDING') {
-      console.log(`[AUTH] Login attempt: ${email}, status: PENDING`);
+      logger.info(`[AUTH] Login attempt: ${email}, status: PENDING`);
       return res.status(403).json({
         error: 'Institution account is pending admin approval. You will be notified once approved.',
         status: 'PENDING',
@@ -331,7 +340,7 @@ export const login = async (req, res) => {
     }
 
     if (university && university.status === 'REJECTED') {
-      console.log(`[AUTH] Login attempt: ${email}, status: REJECTED`);
+      logger.info(`[AUTH] Login attempt: ${email}, status: REJECTED`);
       return res.status(403).json({
         error: 'Institution account has been rejected. Contact support for assistance.',
         status: 'REJECTED',
@@ -348,12 +357,12 @@ export const login = async (req, res) => {
     setCookies(res, accessToken, refreshToken);
 
     await logAudit(req, 'NODE_LOGIN', 'SUCCESS', 'Identity session established.', { userId: user.id });
-    console.log(`[AUTH] Login attempt: ${email}, status: APPROVED`);
+    logger.info(`[AUTH] Login attempt: ${email}, status: APPROVED`);
 
     const payload = await buildUserPayload(user.id);
     res.json({ accessToken, user: payload });
   } catch (err) {
-    console.error('[AUTH] [ERROR] Login failure:', err);
+    logger.error('[AUTH] [ERROR] Login failure:', err);
     await logAudit(req, 'AUTH_LOGIN', 'FAILURE', 'Account session establishment failed.', { email: req.body.email });
     res.status(500).json({ error: 'Login failed.' });
   }
@@ -376,43 +385,66 @@ export const verifyOTP = async (req, res) => {
       return res.status(404).json({ error: 'Account not found.' });
     }
 
-    // 1. Check if blocked due to excessive attempts
-    if (user.otpAttempts >= 3) {
-      return res.status(403).json({ error: 'Security key blocked. Please request a new one.' });
+    // 1. Check if account is locked
+    if (user.isLocked && user.lockedUntil > Date.now()) {
+      const waitTime = Math.ceil((user.lockedUntil - Date.now()) / 60000);
+      return res.status(403).json({ error: `Account locked due to multiple failed attempts. Try again in ${waitTime} minutes.` });
+    } else if (user.isLocked && user.lockedUntil <= Date.now()) {
+      // Auto-unlock
+      await Registry.update('users', { id: user.id }, { isLocked: false, lockedUntil: null });
+      user.isLocked = false;
     }
 
-    // 2. Check expiry FIRST — before any hash comparison to prevent timing oracle
-    const otpExpiresAt = user.otpExpires instanceof Date ? user.otpExpires.getTime() : Number(user.otpExpires);
-    if (!user.otpExpires || otpExpiresAt < Date.now()) {
+    const otpRecord = await Registry.findOne('otpRecords', { email });
+    if (!otpRecord) {
+      return res.status(404).json({ error: 'No active security key session found. Request a new one.' });
+    }
+
+    // 2. Check if blocked due to excessive attempts
+    if (otpRecord.attempts >= 5) { // Strict lockout threshold
+      await Registry.update('users', { id: user.id }, { isLocked: true, lockedUntil: new Date(Date.now() + OTP_TTL_MS) });
+      return res.status(403).json({ error: 'Security key blocked due to too many failed attempts. Account locked for 15 minutes.' });
+    }
+
+    // 3. Check expiry FIRST
+    const otpExpiresAt = otpRecord.expiresAt instanceof Date ? otpRecord.expiresAt.getTime() : Number(otpRecord.expiresAt);
+    if (!otpRecord.expiresAt || otpExpiresAt < Date.now()) {
       return res.status(400).json({ error: 'Security key expired. Request a new one.' });
     }
 
-    // 3. Compare hashed OTP using constant-time comparison
+    // 4. Compare hashed OTP using constant-time comparison
     const expectedOtpHash = Buffer.from(hashOTP(otp), 'utf8');
-    const actualOtpHash = Buffer.from(user.otp, 'utf8');
+    const actualOtpHash = Buffer.from(otpRecord.otpHash, 'utf8');
 
     if (expectedOtpHash.length !== actualOtpHash.length || !crypto.timingSafeEqual(expectedOtpHash, actualOtpHash)) {
-      user.otpAttempts = (user.otpAttempts || 0) + 1;
-      await Registry.update('users', { id: user.id }, { otpAttempts: user.otpAttempts });
-      const remaining = 3 - user.otpAttempts;
-      await logAudit(req, 'OTP_VERIFICATION', 'FAILURE', `Invalid security key. Attempts: ${user.otpAttempts}`, { email, attempts: user.otpAttempts });
+      const newAttempts = otpRecord.attempts + 1;
+      await Registry.update('otpRecords', { id: otpRecord.id }, { attempts: newAttempts });
+      const remaining = 5 - newAttempts;
+      await logAudit(req, 'OTP_VERIFICATION', 'FAILURE', `Invalid security key. Attempts: ${newAttempts}`, { email, attempts: newAttempts });
+      
+      if (newAttempts >= 5) {
+        await Registry.update('users', { id: user.id }, { isLocked: true, lockedUntil: new Date(Date.now() + OTP_TTL_MS) });
+        return res.status(403).json({ error: 'Too many invalid attempts. Account locked for 15 minutes.' });
+      }
+
       return res.status(400).json({
         error: `Invalid security key. ${remaining} attempts remaining.`,
         attemptsRemaining: remaining
       });
     }
 
-    // 4. Activate node
+    // 5. Activate node
     await Registry.update('users', { id: user.id }, {
       isEmailVerified: true,
-      otp: null,
-      otpExpires: null,
-      otpAttempts: 0
+      isLocked: false,
+      lockedUntil: null
     });
+
+    await Registry.delete('otpRecords', { email });
 
     await logAudit(req, 'OTP_VERIFICATION', 'SUCCESS', 'Account activated via valid security key.', { userId: user.id });
 
-    const otpUniversity = user.role === 'university' ? await Registry.findOne('universities', { userId: user.id }) : null;
+    const otpUniversity = user.role === ROLES.UNIVERSITY ? await Registry.findOne('universities', { userId: user.id }) : null;
     const otpExtraPayload = otpUniversity
       ? { institutionId: otpUniversity.id, walletAddress: otpUniversity.publicWalletAddress || null }
       : {};
@@ -430,7 +462,7 @@ export const verifyOTP = async (req, res) => {
     });
 
   } catch (err) {
-    console.error('OTP Verification error:', err);
+    logger.error('OTP Verification error:', err);
     res.status(500).json({ error: 'Verification failed.' });
   }
 };
@@ -449,24 +481,31 @@ export const resendOTP = async (req, res) => {
     if (!user) return res.status(404).json({ error: 'User not found.' });
 
     // 1. Check cooldown (60s)
+    const otpRecord = await Registry.findOne('otpRecords', { email });
     const now = new Date();
-    if (user.lastOtpResend && (now - user.lastOtpResend) < 60 * 1000) {
-      const waitTime = Math.ceil((60 * 1000 - (now - user.lastOtpResend)) / 1000);
+    if (otpRecord && otpRecord.lastResend && (now - otpRecord.lastResend) < 60 * 1000) {
+      const waitTime = Math.ceil((60 * 1000 - (now - otpRecord.lastResend)) / 1000);
       return res.status(429).json({ error: `Cooldown active. Wait ${waitTime}s before re-syncing.` });
     }
 
     const otp = generateOTP();
-    await Registry.update('users', { id: user.id }, {
-      otp: hashOTP(otp),
-      otpExpires: new Date(Date.now() + 10 * 60 * 1000),
-      otpAttempts: 0,
-      lastOtpResend: now
-    });
+    const newOtpData = {
+      otpHash: hashOTP(otp),
+      expiresAt: new Date(Date.now() + 10 * 60 * 1000),
+      attempts: 0,
+      lastResend: now
+    };
+
+    if (otpRecord) {
+      await Registry.update('otpRecords', { id: otpRecord.id }, newOtpData);
+    } else {
+      await Registry.insert('otpRecords', { email, ...newOtpData });
+    }
 
     try {
       await sendOTP(email, otp);
     } catch (emailErr) {
-      console.error('Resend OTP email failure:', emailErr);
+      logger.error('Resend OTP email failure:', emailErr);
       await logAudit(req, 'OTP_RESEND', 'FAILURE', 'Email delivery failed on resend.', { email, error: emailErr.message });
       if (process.env.NODE_ENV === 'production' && isResendTestingLimitError(emailErr)) {
         return res.status(200).json({
@@ -482,7 +521,7 @@ export const resendOTP = async (req, res) => {
     res.status(200).json({ message: 'Security key re-synchronized and dispatched.' });
 
   } catch (err) {
-    console.error('Resend OTP error:', err);
+    logger.error('Resend OTP error:', err);
     await logAudit(req, 'OTP_RESEND', 'FAILURE', 'Failed to resend security key.', { email: req.body.email, error: err.message });
     res.status(500).json({ error: 'Failed to resend security key.' });
   }
@@ -528,7 +567,7 @@ export const refreshToken = async (req, res) => {
       return res.status(401).json({ error: 'Account inactive. Verification required.' });
     }
 
-    const refreshUniversity = user.role === 'university' ? await Registry.findOne('universities', { userId: user.id }) : null;
+    const refreshUniversity = user.role === ROLES.UNIVERSITY ? await Registry.findOne('universities', { userId: user.id }) : null;
     const refreshExtraPayload = refreshUniversity
       ? { institutionId: refreshUniversity.id, walletAddress: refreshUniversity.publicWalletAddress || null }
       : {};
@@ -566,17 +605,26 @@ export const sendPhoneVerification = async (req, res) => {
     const user = await Registry.findById('users', req.user.id);
     const otp = generateOTP();
 
-    await Registry.update('users', { id: user.id }, {
-      phoneNumber,
-      otp: hashOTP(otp),
-      otpExpires: Date.now() + 5 * 60 * 1000
-    });
+    await Registry.update('users', { id: user.id }, { phoneNumber });
+
+    const newOtpData = {
+      otpHash: hashOTP(otp),
+      expiresAt: new Date(Date.now() + 5 * 60 * 1000),
+      attempts: 0
+    };
+
+    const existingOtp = await Registry.findOne('otpRecords', { email: user.email });
+    if (existingOtp) {
+      await Registry.update('otpRecords', { id: existingOtp.id }, newOtpData);
+    } else {
+      await Registry.insert('otpRecords', { email: user.email, ...newOtpData });
+    }
 
     await sendPhoneOTP(phoneNumber, otp);
     res.status(200).json({ message: 'Security key dispatched to your mobile device.' });
 
   } catch (err) {
-    console.error('Phone OTP send error:', err);
+    logger.error('Phone OTP send error:', err);
     res.status(500).json({ error: 'Failed to dispatch mobile security key.' });
   }
 };
@@ -591,31 +639,35 @@ export const verifyPhoneOTP = async (req, res) => {
     if (!otp) return res.status(400).json({ error: 'Security key required.' });
 
     const user = await Registry.findById('users', req.user.id);
-    if (!user || !user.otp) {
+    if (!user) return res.status(404).json({ error: 'User not found.' });
+
+    const otpRecord = await Registry.findOne('otpRecords', { email: user.email });
+    if (!otpRecord) {
       return res.status(404).json({ error: 'Mobile verification challenge not found.' });
     }
 
     const expectedOtpHash = Buffer.from(hashOTP(otp), 'utf8');
-    const actualOtpHash = Buffer.from(user.otp, 'utf8');
+    const actualOtpHash = Buffer.from(otpRecord.otpHash, 'utf8');
 
     if (expectedOtpHash.length !== actualOtpHash.length || !crypto.timingSafeEqual(expectedOtpHash, actualOtpHash)) {
       return res.status(400).json({ error: 'Invalid mobile security key.' });
     }
 
-    if (user.otpExpires < Date.now()) {
+    const otpExpiresAt = otpRecord.expiresAt instanceof Date ? otpRecord.expiresAt.getTime() : Number(otpRecord.expiresAt);
+    if (otpExpiresAt < Date.now()) {
       return res.status(400).json({ error: 'Mobile security key expired.' });
     }
 
     await Registry.update('users', { id: user.id }, {
-      isPhoneVerified: true,
-      otp: null,
-      otpExpires: null
+      isPhoneVerified: true
     });
+
+    await Registry.delete('otpRecords', { email: user.email });
 
     res.status(200).json({ message: 'Mobile identity verified successfully.' });
 
   } catch (err) {
-    console.error('Phone OTP verify error:', err);
+    logger.error('Phone OTP verify error:', err);
     res.status(500).json({ error: 'Mobile verification failed.' });
   }
 };
@@ -639,7 +691,7 @@ export const getMe = async (req, res) => {
 export const createAdmin = async (req, res) => {
   try {
     // SECURITY CHECK: Only SUPER_ADMIN can create other admins
-    if (!req.user || req.user.role !== 'super_admin') {
+    if (!req.user || req.user.role !== ROLES.SUPER_ADMIN) {
       return res.status(403).json({ error: 'Forbidden: Requires SUPER_ADMIN privileges.' });
     }
 
@@ -650,7 +702,7 @@ export const createAdmin = async (req, res) => {
       return res.status(400).json({ error: 'All fields (name, email, password, role) are required.' });
     }
 
-    if (!['admin', 'super_admin', 'verifier'].includes(role)) {
+    if (![ROLES.ADMIN, ROLES.SUPER_ADMIN, ROLES.VERIFIER].includes(role)) {
       return res.status(400).json({ error: 'Invalid administrative role.' });
     }
 
@@ -674,7 +726,7 @@ export const createAdmin = async (req, res) => {
       admin: payload
     });
   } catch (err) {
-    console.error('Admin creation error:', err);
+    logger.error('Admin creation error:', err);
     res.status(500).json({ error: 'Failed to provision administrative node.' });
   }
 };
@@ -687,7 +739,7 @@ export const completeOnboarding = async (req, res) => {
   try {
     const { error } = onboardingSchema.validate(req.body);
     if (error) {
-      console.warn(`[AUTH] [ONBOARDING_VALIDATION_FAILURE]: ${error.details[0].message}`);
+      logger.warn(`[AUTH] [ONBOARDING_VALIDATION_FAILURE]: ${error.details[0].message}`);
       return res.status(400).json({ error: error.details[0].message });
     }
 
@@ -705,7 +757,7 @@ export const completeOnboarding = async (req, res) => {
 
     const updatedUser = await Registry.transaction(async (t) => {
       const update = { role };
-      if (role === 'university') {
+      if (role === ROLES.UNIVERSITY) {
         if (!resolvedUniversityName) {
           throw new Error('Onboarding failed: Missing institution name.');
         }

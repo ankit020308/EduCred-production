@@ -4,6 +4,7 @@ import dotenv from 'dotenv';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { decryptSecret, isEncryptedSecret } from './keyVault.js';
+import { logger } from './winstonLogger.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -23,7 +24,7 @@ function loadContractMetadata() {
   try {
     return JSON.parse(fs.readFileSync(metadataPath, 'utf-8'));
   } catch (error) {
-    console.error('[BLOCKCHAIN] [ERROR] Failed to read synced contract metadata -', error.message);
+    logger.error('[BLOCKCHAIN] [ERROR] Failed to read synced contract metadata -', error.message);
     return null;
   }
 }
@@ -101,6 +102,49 @@ async function waitForConfirmedReceipt(tx, operationLabel) {
   return receipt;
 }
 
+async function executeTxWithRetry(contract, methodName, args, maxRetries = 3) {
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      const feeData = await provider.getFeeData();
+      
+      // EIP-1559 Gas Pricing Strategy (with 20% buffer on maxPriorityFee)
+      const maxPriorityFeePerGas = feeData.maxPriorityFeePerGas 
+        ? (feeData.maxPriorityFeePerGas * BigInt(120)) / BigInt(100)
+        : undefined;
+      const maxFeePerGas = feeData.maxFeePerGas
+        ? (feeData.maxFeePerGas * BigInt(120)) / BigInt(100)
+        : undefined;
+
+      const txOptions = {};
+      if (maxPriorityFeePerGas && maxFeePerGas) {
+        txOptions.maxPriorityFeePerGas = maxPriorityFeePerGas;
+        txOptions.maxFeePerGas = maxFeePerGas;
+      } else if (feeData.gasPrice) {
+        // Fallback for legacy networks
+        txOptions.gasPrice = (feeData.gasPrice * BigInt(120)) / BigInt(100);
+      }
+
+      logger.info(`[BLOCKCHAIN] Executing ${methodName} (Attempt ${attempt}/${maxRetries})`);
+      const tx = await contract[methodName](...args, txOptions);
+      return await waitForConfirmedReceipt(tx, methodName);
+    } catch (error) {
+      logger.warn(`[BLOCKCHAIN] [WARN] ${methodName} attempt ${attempt} failed:`, error.message);
+      
+      // Do not retry if the error is a definitive contract revert (e.g. hash already exists)
+      if (error.message.includes('execution reverted')) {
+        throw error;
+      }
+
+      if (attempt === maxRetries) {
+        throw new Error(`Transaction failed after ${maxRetries} attempts: ${error.message}`);
+      }
+      
+      // Exponential backoff: 2s, 4s, 8s
+      await new Promise(resolve => setTimeout(resolve, Math.pow(2, attempt) * 1000));
+    }
+  }
+}
+
 async function initializeContract() {
   if (!CONTRACT_ADDRESS || !CONTRACT_ABI || !RPC_URL) {
     const missing = [];
@@ -108,7 +152,7 @@ async function initializeContract() {
     if (!CONTRACT_ABI) missing.push('CONTRACT_ABI');
     if (!RPC_URL) missing.push('RPC_URL');
 
-    console.error(`[BLOCKCHAIN] [ERROR] Missing critical configuration: ${missing.join(', ')}`);
+    logger.error(`[BLOCKCHAIN] [ERROR] Missing critical configuration: ${missing.join(', ')}`);
     runtimeMode = 'OFFLINE';
     return;
   }
@@ -132,11 +176,11 @@ async function initializeContract() {
       const resolvedKey = isEncryptedSecret(PRIVATE_KEY) ? decryptSecret(PRIVATE_KEY) : PRIVATE_KEY;
       wallet = new ethers.Wallet(resolvedKey, provider);
       serverSignerContract = new ethers.Contract(CONTRACT_ADDRESS, CONTRACT_ABI, wallet);
-      console.log('[BLOCKCHAIN] [SUCCESS] Authoritative ledger connected (RW Mode)');
+      logger.info('[BLOCKCHAIN] [SUCCESS] Authoritative ledger connected (RW Mode)');
     } else {
       wallet = null;
       serverSignerContract = null;
-      console.log('[BLOCKCHAIN] [SUCCESS] Authoritative ledger connected (Read-Only Mode)');
+      logger.info('[BLOCKCHAIN] [SUCCESS] Authoritative ledger connected (Read-Only Mode)');
     }
 
     runtimeMode = 'LIVE';
@@ -152,11 +196,15 @@ async function initializeContract() {
     readOnlyContract = null;
     serverSignerContract = null;
     runtimeMode = 'OFFLINE';
-    console.error('[BLOCKCHAIN] [SECURITY] Failed to connect to secure ledger -', error.message);
+    logger.error('[BLOCKCHAIN] [SECURITY] Failed to connect to secure ledger -', error.message);
   }
 }
 
-await initializeContract();
+if (process.env.NODE_ENV === 'test' && process.env.ENABLE_BLOCKCHAIN_IN_TEST !== 'true') {
+  runtimeMode = 'OFFLINE';
+} else {
+  await initializeContract();
+}
 
 export function getBlockchainRuntimeInfo() {
   return {
@@ -170,8 +218,7 @@ export function getBlockchainRuntimeInfo() {
 
 export async function storeHashOnChain(certificateHash) {
   const contract = requireServerSignerContract();
-  const tx = await contract.storeHash(normalizeHash(certificateHash));
-  return waitForConfirmedReceipt(tx, 'Certificate hash anchoring');
+  return executeTxWithRetry(contract, 'storeHash', [normalizeHash(certificateHash)]);
 }
 
 export async function authorizeUniversityOnChain(universityAddress) {
@@ -180,8 +227,7 @@ export async function authorizeUniversityOnChain(universityAddress) {
     throw new Error('Smart contract does not support issuer authorization.');
   }
 
-  const tx = await contract.addIssuer(universityAddress);
-  return waitForConfirmedReceipt(tx, 'University authorization');
+  return executeTxWithRetry(contract, 'addIssuer', [universityAddress]);
 }
 
 export async function issueCertificateOnChain(
@@ -195,11 +241,11 @@ export async function issueCertificateOnChain(
   const hashBytes = normalizeHash(certificateHash);
   const contract = buildUniversitySignerContract(encryptedUniversityPrivateKey);
 
-  const tx = typeof contract.storeCertificate === 'function'
-    ? await contract.storeCertificate(hashBytes, certType)
-    : await contract.storeHash(hashBytes);
-
-  return waitForConfirmedReceipt(tx, 'Certificate issuance');
+  if (typeof contract.storeCertificate === 'function') {
+    return executeTxWithRetry(contract, 'storeCertificate', [hashBytes, certType]);
+  } else {
+    return executeTxWithRetry(contract, 'storeHash', [hashBytes]);
+  }
 }
 
 export async function verifyHashOnChain(certificateHash) {

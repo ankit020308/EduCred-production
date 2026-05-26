@@ -1,30 +1,25 @@
 import crypto from 'crypto';
+import { logger } from '../utils/winstonLogger.js';
 import fs from 'fs';
 import path from 'path';
 import csvParser from 'csv-parser';
 import { fileURLToPath } from 'url';
-import { UniqueConstraintError, Op } from 'sequelize';
+import { UniqueConstraintError } from 'sequelize';
 import sequelize from '../config/database.js';
 import Registry from '../services/registryService.js';
 import { Certificate } from '../models/index.js';
-import { issueCertificateOnChain, revokeHashOnChain, verifyHashDetailsOnChain, checkUniversityWalletFunds, getServerWalletInfo } from '../utils/blockchain.js';
+import { revokeHashOnChain, verifyHashDetailsOnChain, checkUniversityWalletFunds, getServerWalletInfo } from '../utils/blockchain.js';
 import { generateBinaryHash, generateHash } from '../utils/hashing.js';
 import { emitToInstitution, emitToUser } from '../utils/socketService.js';
-import { logAudit } from '../utils/logger.js';
+import { logAudit } from '../utils/auditLogger.js';
 import { certificateIssuanceSchema } from '../validators/joiSchemas.js';
-import { isPinataConfigured, uploadFileToPinata, uploadJSONToPinata } from '../utils/ipfsService.js';
+import { isPinataConfigured, uploadFileToPinata } from '../utils/ipfsService.js';
+import { queueCertificateAnchoring } from '../services/anchoringQueueService.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-const CERTIFICATE_TYPE_CODES = {
-  'Degree Certificate': 0,
-  'Provisional Certificate': 1,
-  'Consolidated Marks Sheet': 2,
-  'Migration Certificate': 3,
-  'Transfer Certificate': 4,
-  'Character Certificate': 5,
-};
+
 
 function buildPublicCertificatePayload(cert) {
   return {
@@ -62,10 +57,6 @@ function createCertificateId(programName, prefix = 'EDUCRED') {
 
   // 4 random bytes → 8 hex chars → ~4 billion values (vs prior 90k)
   return `${prefix}-${currentYear}-${progCode}-${crypto.randomBytes(4).toString('hex').toUpperCase()}`;
-}
-
-function isLockToken(value) {
-  return typeof value === 'string' && value.startsWith('LOCK:');
 }
 
 // Strip leading formula-injection characters from CSV string fields.
@@ -139,7 +130,7 @@ async function recordVerificationAttempt(payload) {
   try {
     await Registry.insert('verificationLogs', payload);
   } catch (error) {
-    console.error('[VERIFY_LOG_FAILURE]:', error.message);
+    logger.error('[VERIFY_LOG_FAILURE]:', error.message);
   }
 }
 
@@ -147,7 +138,7 @@ async function recordFraudAlert(payload) {
   try {
     await Registry.insert('fraudAlerts', payload);
   } catch (error) {
-    console.error('[FRAUD_ALERT_FAILURE]:', error.message);
+    logger.error('[FRAUD_ALERT_FAILURE]:', error.message);
   }
 }
 
@@ -258,15 +249,12 @@ export const issueCertificate = async (req, res) => {
         existingCertificateId: err.existingCertificateId,
       });
     }
-    console.error('[ISSUANCE_CRASH]:', err);
+    logger.error('[ISSUANCE_CRASH]:', err);
     res.status(500).json({ error: 'Certificate issuance failed.', details: err.message });
   }
 };
 
 export const confirmIssuance = async (req, res) => {
-  let lockedCertificate = null;
-  let lockToken = null;
-
   try {
     const { certDbId } = req.body;
     const { university, error: signerError } = await resolveInstitutionSigner(req);
@@ -274,157 +262,48 @@ export const confirmIssuance = async (req, res) => {
       return res.status(signerError.status).json(signerError.body);
     }
 
-    const lockResult = await sequelize.transaction(async (transaction) => {
-      const certificate = await Certificate.findByPk(certDbId, {
-        transaction,
-        lock: transaction.LOCK.UPDATE,
-      });
-
-      if (!certificate) {
-        return { missing: true };
-      }
-
-      if (String(certificate.universityId) !== String(university.id)) {
-        return { forbidden: true };
-      }
-
-      if (certificate.status === 'CONFIRMED' && certificate.blockchainTxHash && !isLockToken(certificate.blockchainTxHash)) {
-        return { alreadyAnchored: certificate.get({ plain: true }) };
-      }
-
-      if (isLockToken(certificate.blockchainTxHash)) {
-        return { inProgress: true };
-      }
-
-      const nextLockToken = `LOCK:${crypto.randomUUID()}`;
-      certificate.blockchainTxHash = nextLockToken;
-      certificate.workflowLog = [
-        ...(certificate.workflowLog || []),
-        {
-          stage: 'Registrar Authorization',
-          actorId: req.user.id,
-          actorName: req.user.name,
-          timestamp: new Date(),
-        },
-      ];
-
-      await certificate.save({ transaction });
-      return {
-        certificate: certificate.get({ plain: true }),
-        lockToken: nextLockToken,
-      };
+    const queueResult = await queueCertificateAnchoring({
+      certDbId,
+      university,
+      actorUser: req.user,
+      allowedStatuses: ['PENDING_REVIEW', 'ANCHOR_FAILED', 'ANCHOR_PENDING_FUNDS'],
+      workflowStage: 'Registrar Authorization',
+      source: 'university-confirm-issuance',
     });
 
-    if (lockResult.missing) {
-      return res.status(404).json({ error: 'Certificate not found' });
+    if (queueResult.state === 'missing') return res.status(404).json({ error: 'Certificate not found' });
+    if (queueResult.state === 'forbidden') return res.status(403).json({ error: 'Unauthorized.' });
+    if (queueResult.state === 'inProgress') return res.status(409).json({ error: 'Anchoring already in progress.' });
+    if (queueResult.state === 'invalidStatus') {
+      return res.status(400).json({
+        error: `Certificate cannot be anchored from ${queueResult.status} status.`,
+      });
     }
-
-    if (lockResult.forbidden) {
-      return res.status(403).json({ error: 'You are not allowed to confirm this certificate.' });
-    }
-
-    if (lockResult.inProgress) {
-      return res.status(409).json({ error: 'Certificate anchoring is already in progress.' });
-    }
-
-    if (lockResult.alreadyAnchored) {
+    if (queueResult.state === 'alreadyAnchored') {
       return res.json({
         success: true,
-        message: 'Certificate is already anchored.',
-        certificateId: lockResult.alreadyAnchored.certificateId,
-        txHash: lockResult.alreadyAnchored.blockchainTxHash,
+        message: 'Certificate already anchored.',
+        txHash: queueResult.txHash,
       });
     }
 
-    lockedCertificate = lockResult.certificate;
-    lockToken = lockResult.lockToken;
+    const pendingPayload = {
+      certificateId: queueResult.certificateId,
+      status: queueResult.status,
+    };
+    emitToInstitution(university.id, 'anchoring:pending', pendingPayload);
+    emitToInstitution(university.id, 'anchoring:queued', pendingPayload);
 
-    // Proactive: Ensure metadata is pinned to IPFS if not already done
-    let metadataIpfsCid = lockedCertificate.metadataIpfsCid;
-    if (!metadataIpfsCid && isPinataConfigured()) {
-      try {
-        const metadataResult = await uploadJSONToPinata({
-          ...lockedCertificate,
-          institution: university.name,
-        }, `${lockedCertificate.certificateId}_metadata.json`);
-        metadataIpfsCid = metadataResult.cid;
-      } catch (ipfsError) {
-        console.error('[⚠️ IPFS_CONFIRM_FAILURE]:', ipfsError.message);
-      }
-    }
-
-    const receipt = await issueCertificateOnChain(
-      lockedCertificate.id,
-      lockedCertificate.certificateHash,
-      CERTIFICATE_TYPE_CODES[lockedCertificate.certificateType] ?? 0,
-      university.encryptedPrivateKey
-    );
-
-    const nextWorkflowLog = [
-      ...(lockedCertificate.workflowLog || []),
-      {
-        stage: 'Anchoring to Blockchain',
-        actorId: req.user.id,
-        actorName: university.name,
-        timestamp: new Date(),
-      },
-    ];
-
-    const [updatedCount] = await Certificate.update({
-      blockchainTxHash: receipt.hash,
-      metadataIpfsCid,
-      status: 'CONFIRMED',
-      workflowStatus: 'ISSUED',
-      workflowLog: nextWorkflowLog,
-    }, {
-      where: {
-        id: lockedCertificate.id,
-        blockchainTxHash: lockToken,
-      },
+    res.status(202).json({
+      success: true,
+      message: 'Anchoring request accepted. The certificate will be confirmed in the background.',
+      certificateId: queueResult.certificateId,
+      status: 'PROCESSING'
     });
 
-    if (updatedCount !== 1) {
-      throw new Error('Certificate confirmation lock was lost before the final update.');
-    }
-
-    await Registry.insert('ledger', {
-      type: 'ISSUE',
-      studentName: lockedCertificate.studentName,
-      universityName: university.name,
-      certificateId: lockedCertificate.id,
-      txHash: receipt.hash,
-      status: 'SUCCESS',
-      metadata: { certificateType: lockedCertificate.certificateType, source: 'confirmIssuance' },
-    });
-
-    res.json({ success: true, message: 'Certificate anchored successfully.', txHash: receipt.hash });
   } catch (err) {
-    if (lockedCertificate?.id && lockToken) {
-      try {
-        await Certificate.update({
-          blockchainTxHash: null,
-          status: 'FAILED',
-        }, {
-          where: {
-            id: lockedCertificate.id,
-            blockchainTxHash: lockToken,
-          },
-        });
-
-        await Registry.insert('ledger', {
-          type: 'ISSUE',
-          studentName: lockedCertificate.studentName,
-          universityName: lockedCertificate.issuer,
-          certificateId: lockedCertificate.id,
-          status: 'FAILED',
-          metadata: { error: err.message, source: 'confirmIssuance' },
-        });
-      } catch (cleanupError) {
-        console.error('[CONFIRM_ISSUANCE_CLEANUP_ERROR]:', cleanupError.message);
-      }
-    }
-
-    res.status(500).json({ error: 'Blockchain anchoring failed.', details: err.message });
+    logger.error('[CONFIRM_ISSUANCE_FAIL]:', err);
+    res.status(err.statusCode || 500).json({ error: 'Failed to initiate anchoring.', details: err.message });
   }
 };
 
@@ -574,6 +453,7 @@ export const batchIssue = async (req, res) => {
       }
     }
 
+    req.issuanceBatchCount = succeeded.length;
     res.json({ processed: rows.length, succeeded, failed });
   } finally {
     if (fs.existsSync(tempPath)) fs.unlinkSync(tempPath);
@@ -631,7 +511,7 @@ export const verifyCertificate = async (req, res) => {
     try {
       onChainDetails = await verifyHashDetailsOnChain(hashToVerify);
     } catch (ledgerErr) {
-      console.error('❌ [BLOCKCHAIN_UNREACHABLE]:', ledgerErr.message);
+      logger.error('❌ [BLOCKCHAIN_UNREACHABLE]:', ledgerErr.message);
       if (verificationMethod === 'upload') {
         // Trustless file verification cannot proceed without chain
         return res.status(503).json({
@@ -692,7 +572,7 @@ export const verifyCertificate = async (req, res) => {
           walletMismatch = true;
         }
       } catch (walletErr) {
-        console.error('[WALLET_COMPARE_ERROR]:', walletErr.message);
+        logger.error('[WALLET_COMPARE_ERROR]:', walletErr.message);
       }
     }
 
@@ -735,7 +615,7 @@ export const verifyCertificate = async (req, res) => {
         : { message: 'Anchor exists on blockchain, but local metadata is missing.' },
     });
   } catch (err) {
-    console.error('🚀 Verification Failure:', err);
+    logger.error('🚀 Verification Failure:', err);
     res.status(500).json({ error: 'Verification vector failure.' });
   } finally {
     if (tempPath && fs.existsSync(tempPath)) {
@@ -769,7 +649,7 @@ export const verifyByFileHash = async (req, res) => {
     try {
       onChainDetails = await verifyHashDetailsOnChain(hashToVerify);
     } catch (ledgerErr) {
-      console.error('❌ [TRUSTLESS_CHAIN_UNREACHABLE]:', ledgerErr.message);
+      logger.error('❌ [TRUSTLESS_CHAIN_UNREACHABLE]:', ledgerErr.message);
       return res.status(503).json({
         error: 'Verification Service Offline',
         message: 'Trustless file verification requires the blockchain ledger, which is currently unreachable.',
@@ -817,7 +697,7 @@ export const verifyByFileHash = async (req, res) => {
       metadata: metadata ? buildPublicCertificatePayload(metadata) : null,
     });
   } catch (err) {
-    console.error('[TRUSTLESS_VERIFY_ERROR]:', err);
+    logger.error('[TRUSTLESS_VERIFY_ERROR]:', err);
     res.status(500).json({ error: 'Trustless verification failed.' });
   } finally {
     if (tempPath && fs.existsSync(tempPath)) fs.unlinkSync(tempPath);
@@ -843,165 +723,42 @@ export const verifyByEnrollment = async (req, res) => {
   }
 };
 
-// ── Shared anchor helper used by approveCertificate and retryAnchor ──────────
-async function runAnchor(cert, university, actorUser) {
-  const encKey = university.encryptedPrivateKey;
-  try {
-    // Preflight: reject immediately if the institution wallet has insufficient funds
-    const fundCheck = await checkUniversityWalletFunds(encKey);
-    if (!fundCheck.sufficient) {
-      const errMsg = `Insufficient funds on institution wallet ${fundCheck.address} (${fundCheck.balanceEth} ETH). Top up at https://sepoliafaucet.com`;
-      console.warn(`[ANCHOR] [FUNDS] ${errMsg}`);
-      await Registry.update('certificates', { id: cert.id }, { status: 'ANCHOR_PENDING_FUNDS' });
-      emitToInstitution(university.id, 'anchoring:failed', { certificateId: cert.certificateId, id: cert.id, error: errMsg });
-      throw new Error(errMsg);
-    }
-
-    const receipt = await issueCertificateOnChain(
-      cert.id,
-      cert.certificateHash,
-      CERTIFICATE_TYPE_CODES[cert.certificateType] ?? 0,
-      encKey
-    );
-
-    const nextLog = [
-      ...(cert.workflowLog || []),
-      { stage: 'Anchoring to Blockchain', actorId: actorUser.id, actorName: actorUser.name || university.name, timestamp: new Date() },
-    ];
-
-    await Registry.update('certificates', { id: cert.id }, {
-      blockchainTxHash: receipt.hash,
-      status: 'CONFIRMED',
-      workflowStatus: 'ISSUED',
-      workflowLog: nextLog,
-      reviewedBy: actorUser.email,
-      reviewedAt: new Date(),
-    });
-
-    await Registry.insert('ledger', {
-      type: 'ISSUE',
-      studentName: cert.studentName,
-      universityName: cert.issuer,
-      certificateId: cert.id,
-      txHash: receipt.hash,
-      status: 'SUCCESS',
-      metadata: { certificateType: cert.certificateType, source: 'adminApprove' },
-    });
-
-    emitToInstitution(university.id, 'anchoring:success', { certificateId: cert.certificateId, id: cert.id, txHash: receipt.hash });
-
-    // Trigger PDF generation async (best-effort)
-    try {
-      // Fetch student's profile photo for PDF embedding
-      let studentProfileImageUrl = null;
-      try {
-        // Prefer studentId lookup — bypasses email case-mismatch issues
-        if (cert.studentId) {
-          const student = await Registry.findById('students', cert.studentId);
-          if (student?.userId) {
-            const studentUser = await Registry.findById('users', student.userId);
-            if (studentUser) studentProfileImageUrl = studentUser.profileImageUrl || null;
-          }
-        }
-        // Fallback: case-normalised email lookup
-        if (!studentProfileImageUrl && cert.studentEmail) {
-          const studentUser = await Registry.findOne('users', { email: cert.studentEmail.toLowerCase() });
-          if (studentUser) studentProfileImageUrl = studentUser.profileImageUrl || null;
-        }
-      } catch { /* photo lookup is optional */ }
-
-      const { generateCertificatePDF } = await import('../utils/pdfService.js');
-      const result = await generateCertificatePDF({
-        universityName: cert.issuer,
-        studentName: cert.studentName,
-        programName: cert.course,
-        branch: cert.metadata?.branch || '',
-        cgpa: cert.metadata?.finalCGPA,
-        graduationYear: cert.metadata?.graduationYear,
-        semester: cert.metadata?.semester ?? null,
-        sgpa: cert.metadata?.sgpa ?? null,
-        subjects: cert.metadata?.subjects ?? [],
-        certificateId: cert.certificateId,
-        certificateHash: cert.certificateHash,
-        txHash: receipt.hash,
-        profileImageUrl: studentProfileImageUrl,
-      });
-      const pdfBuffer = result.buffer;
-      const pdfHash = result.pdfHash;
-      const { uploadFileToPinata } = await import('../utils/ipfsService.js');
-      if (uploadFileToPinata) {
-        const r = await uploadFileToPinata(pdfBuffer, `${cert.certificateId}.pdf`, { contentType: 'application/pdf' });
-        if (r?.cid) {
-          await Registry.update('certificates', { id: cert.id }, {
-            fileUrl: `https://gateway.pinata.cloud/ipfs/${r.cid}`,
-            pdfHash,
-          });
-        }
-      } else {
-        // No IPFS — still store the pdfHash so tamper-verification works
-        await Registry.update('certificates', { id: cert.id }, { pdfHash });
-      }
-    } catch (pdfErr) {
-      console.error(`[PDF] Generation failed for ${cert.certificateId}:`, pdfErr.message);
-    }
-
-    return { success: true, txHash: receipt.hash };
-  } catch (bcErr) {
-    console.error(`[CHAIN] Anchoring failed for ${cert.certificateId}:`, bcErr.message);
-    const failStatus = bcErr.message?.includes('Insufficient funds') ? 'ANCHOR_PENDING_FUNDS' : 'ANCHOR_FAILED';
-    await Registry.update('certificates', { id: cert.id }, { status: failStatus });
-    emitToInstitution(university.id, 'anchoring:failed', { certificateId: cert.certificateId, id: cert.id, error: bcErr.message });
-    throw bcErr;
-  }
-}
-
 export const approveCertificate = async (req, res) => {
   try {
     const { id } = req.params;
 
-    // Atomic conditional update — only succeeds if cert is in an approvable state.
-    // This prevents double-firing: a concurrent second request will see 0 rows updated.
-    const [updatedCount] = await Certificate.update(
-      {
-        status: 'PROCESSING',
-        reviewedBy: req.user.email,
-        reviewedAt: new Date(),
-      },
-      {
-        where: {
-          id,
-          status: { [Op.in]: ['PENDING_REVIEW', 'ANCHOR_FAILED', 'ANCHOR_PENDING_FUNDS'] },
-        },
-      }
-    );
-
-    if (updatedCount === 0) {
-      // Either cert doesn't exist or is already processing/confirmed/rejected
-      const cert = await Registry.findById('certificates', id);
-      if (!cert) return res.status(404).json({ error: 'Certificate not found.' });
-      return res.json({ success: true, message: `Certificate is already ${cert.status}. No action taken.` });
-    }
-
-    // Re-fetch plain cert after the update to get full data for anchoring
     const cert = await Registry.findById('certificates', id);
+    if (!cert) return res.status(404).json({ error: 'Certificate not found.' });
+
     const university = await Registry.findById('universities', cert.universityId);
     if (!university) return res.status(404).json({ error: 'Issuing institution not found.' });
 
-    // Append workflow log entry (separate update — non-blocking for the response)
-    const newLog = [
-      ...(cert.workflowLog || []),
-      { stage: 'Approved by Admin', actorId: req.user.id, actorName: req.user.name, timestamp: new Date() },
-    ];
-    await Registry.update('certificates', { id }, { workflowLog: newLog });
+    const queueResult = await queueCertificateAnchoring({
+      certDbId: id,
+      university,
+      actorUser: req.user,
+      allowedStatuses: ['PENDING_REVIEW', 'ANCHOR_FAILED', 'ANCHOR_PENDING_FUNDS'],
+      workflowStage: 'Approved by Admin',
+      markReviewed: true,
+      source: 'admin-approve',
+    });
 
-    const plainCert = cert.get ? cert.get({ plain: true }) : { ...cert };
-    runAnchor({ ...plainCert, status: 'PROCESSING', workflowLog: newLog }, university, req.user)
-      .catch((e) => console.error('[APPROVE_ANCHOR_FAIL]', e.message));
+    if (queueResult.state === 'inProgress') {
+      return res.status(409).json({ error: 'Anchoring already in progress.' });
+    }
+    if (queueResult.state === 'invalidStatus') {
+      return res.json({ success: true, message: `Certificate is already ${queueResult.status}. No action taken.` });
+    }
+    if (queueResult.state === 'alreadyAnchored') {
+      return res.json({ success: true, message: 'Certificate already anchored.', txHash: queueResult.txHash });
+    }
 
-    res.json({ success: true, message: 'Certificate approved. Blockchain anchoring started.' });
+    emitToInstitution(university.id, 'anchoring:pending', { certificateId: queueResult.certificateId, id, status: 'PROCESSING' });
+    emitToInstitution(university.id, 'anchoring:queued', { certificateId: queueResult.certificateId, id, status: 'PROCESSING' });
+    res.status(202).json({ success: true, message: 'Certificate approved. Blockchain anchoring queued.' });
   } catch (err) {
-    console.error('[APPROVE_CERT_ERROR]', err);
-    res.status(500).json({ error: 'Failed to approve certificate.', details: err.message });
+    logger.error('[APPROVE_CERT_ERROR]', err);
+    res.status(err.statusCode || 500).json({ error: 'Failed to approve certificate.', details: err.message });
   }
 };
 
@@ -1017,15 +774,29 @@ export const retryAnchor = async (req, res) => {
     const university = await Registry.findById('universities', cert.universityId);
     if (!university) return res.status(404).json({ error: 'Issuing institution not found.' });
 
-    await Registry.update('certificates', { id: cert.id }, { status: 'PROCESSING' });
+    const queueResult = await queueCertificateAnchoring({
+      certDbId: id,
+      university,
+      actorUser: req.user,
+      allowedStatuses: ['ANCHOR_FAILED', 'ANCHOR_PENDING_FUNDS'],
+      workflowStage: 'Retry Blockchain Anchoring',
+      source: 'university-retry-anchor',
+    });
 
-    const plainCert = cert.get ? cert.get({ plain: true }) : { ...cert };
-    runAnchor({ ...plainCert, status: 'PROCESSING' }, university, req.user)
-      .catch((e) => console.error('[RETRY_ANCHOR_FAIL]', e.message));
+    if (queueResult.state === 'inProgress') {
+      return res.status(409).json({ error: 'Anchoring already in progress.' });
+    }
+    if (queueResult.state === 'invalidStatus') {
+      return res.status(400).json({
+        error: `Retry is only allowed for ANCHOR_FAILED or ANCHOR_PENDING_FUNDS certificates. Current status: ${queueResult.status}`,
+      });
+    }
 
-    res.json({ success: true, message: 'Retry anchoring started.' });
+    emitToInstitution(university.id, 'anchoring:pending', { certificateId: queueResult.certificateId, id, status: 'PROCESSING' });
+    emitToInstitution(university.id, 'anchoring:queued', { certificateId: queueResult.certificateId, id, status: 'PROCESSING' });
+    res.status(202).json({ success: true, message: 'Retry anchoring queued.' });
   } catch (err) {
-    res.status(500).json({ error: 'Retry failed.', details: err.message });
+    res.status(err.statusCode || 500).json({ error: 'Retry failed.', details: err.message });
   }
 };
 
@@ -1157,7 +928,7 @@ export const verifyPDFCertificate = async (req, res) => {
       const infoResult = await parser.getInfo();
       certId = infoResult.info?.Subject;
     } catch (parseErr) {
-      console.error('[PDF_VERIFY] Parse error:', parseErr.message);
+      logger.error('[PDF_VERIFY] Parse error:', parseErr.message);
     }
 
     if (!certId) {
@@ -1237,7 +1008,7 @@ export const verifyPDFCertificate = async (req, res) => {
       },
     });
   } catch (err) {
-    console.error('[PDF_VERIFY_ERROR]', err);
+    logger.error('[PDF_VERIFY_ERROR]', err);
     res.status(500).json({ verified: false, error: 'PDF verification failed.' });
   } finally {
     if (tempPath && fs.existsSync(tempPath)) fs.unlinkSync(tempPath);
@@ -1369,9 +1140,9 @@ export const downloadCertificateFile = async (req, res) => {
           return res.send(Buffer.from(arrayBuffer));
         }
 
-        console.warn(`[⚠️ DOWNLOAD_PROXY] Gateway returned ${ipfsResponse.status}.`);
+        logger.warn(`[⚠️ DOWNLOAD_PROXY] Gateway returned ${ipfsResponse.status}.`);
       } catch (proxyErr) {
-        console.error(`[❌ DOWNLOAD_PROXY_FAIL]: ${proxyErr.message}`);
+        logger.error(`[❌ DOWNLOAD_PROXY_FAIL]: ${proxyErr.message}`);
       }
       // Fallback: Redirect if proxy fails
       return res.redirect(cert.fileUrl);
@@ -1442,13 +1213,13 @@ export const downloadCertificateFile = async (req, res) => {
             await Registry.update('certificates', { id: cert.id }, { pdfHash });
           }
         } catch (ipfsErr) {
-          console.error(`[PDF_PERSIST] IPFS upload failed for ${cert.certificateId}:`, ipfsErr.message);
+          logger.error(`[PDF_PERSIST] IPFS upload failed for ${cert.certificateId}:`, ipfsErr.message);
         }
       })();
 
       return res.send(pdfBuffer);
     } catch (pdfErr) {
-      console.error(`[PDF_REGEN] Failed for ${cert.certificateId}:`, pdfErr.message);
+      logger.error(`[PDF_REGEN] Failed for ${cert.certificateId}:`, pdfErr.message);
       return res.status(500).json({ error: 'Certificate file is unavailable and could not be regenerated.' });
     }
   } catch (err) {

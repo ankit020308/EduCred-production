@@ -1,6 +1,7 @@
 import { sendCertificateEmail } from './emailService.js';
 import { isProduction } from './runtimeConfig.js';
 import dotenv from 'dotenv';
+import { logger } from './winstonLogger.js';
 
 dotenv.config();
 
@@ -26,7 +27,7 @@ if (process.env.TWILIO_ACCOUNT_SID && process.env.TWILIO_AUTH_TOKEN) {
  * @param {string} certId - Unique identifier for the certificate
  */
 export const sendCertificateNotification = async (studentName, course, universityName, studentEmail, studentPhone, certId) => {
-    console.log(`🚀 [NOTIFICATION_NODE]: Triggering alert protocol for ${studentName}...`);
+    logger.info(`🚀 [NOTIFICATION_NODE]: Triggering alert protocol for ${studentName}...`);
     
     // ⚡ Parallel Execution to minimize latency in the background thread
     await Promise.allSettled([
@@ -42,7 +43,7 @@ export const sendCertificateNotification = async (studentName, course, universit
         (async () => {
             try {
                 if (!twilioClient) {
-                    console.warn("⚠️ [WHATSAPP_NODE]: Node offline. Twilio credentials missing.");
+                    logger.warn("⚠️ [WHATSAPP_NODE]: Node offline. Twilio credentials missing.");
                     return;
                 }
 
@@ -55,9 +56,9 @@ export const sendCertificateNotification = async (studentName, course, universit
                     from: isWhatsApp ? process.env.TWILIO_WHATSAPP_FROM : process.env.TWILIO_PHONE_FROM,
                     to: studentPhone
                 });
-                console.log(`✅ [WHATSAPP_NODE]: Multi-channel alert delivered to ${studentPhone}`);
+                logger.info(`✅ [WHATSAPP_NODE]: Multi-channel alert delivered to ${studentPhone}`);
             } catch (err) {
-                console.error("❌ [WHATSAPP_FAIL]:", err.message);
+                logger.error("❌ [WHATSAPP_FAIL]:", err.message);
             }
         })()
     ]);

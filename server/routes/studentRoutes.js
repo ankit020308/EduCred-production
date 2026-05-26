@@ -3,7 +3,9 @@ import {
   getStudentCertificates, 
   getStudentCertificateById, 
   getStudentStats, 
-  connectDigilocker, 
+  getDigilockerAuthUrl, 
+  digilockerCallback, 
+  getDigilockerDocuments,
   disconnectDigilocker 
 } from '../controllers/studentController.js';
 import { protect, requireRole } from '../middleware/authMiddleware.js';
@@ -18,7 +20,9 @@ router.get('/certificates', getStudentCertificates);
 router.get('/certificate/:id', getStudentCertificateById);
 router.get('/dashboard/stats', getStudentStats);
 
-router.post('/digilocker/connect', connectDigilocker);
+router.get('/digilocker/auth-url', getDigilockerAuthUrl);
+router.post('/digilocker/callback', digilockerCallback);
+router.get('/digilocker/documents', getDigilockerDocuments);
 router.delete('/digilocker/disconnect', disconnectDigilocker);
 
 export default router;

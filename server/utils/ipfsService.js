@@ -19,6 +19,7 @@ import { PinataSDK } from 'pinata';
 import dotenv from 'dotenv';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { logger } from './winstonLogger.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -90,7 +91,7 @@ export async function uploadFileToPinata(buffer, filename, keyvalueMetadata = {}
 
   const file = new File([blob], filename, { type: 'application/pdf' });
 
-  console.log(`[📦 IPFS] Pinning "${filename}" (${buffer.length} bytes) to Pinata...`);
+  logger.info(`[IPFS] Pinning "${filename}" (${buffer.length} bytes) to Pinata...`);
 
   const uploadWithRetry = async (attempt = 0) => {
     try {
@@ -109,7 +110,7 @@ export async function uploadFileToPinata(buffer, filename, keyvalueMetadata = {}
     } catch (error) {
       if (attempt < 3) {
         const delay = Math.pow(2, attempt) * 1000;
-        console.warn(`[⚠️ IPFS] Upload failed, retrying in ${delay}ms... (${attempt + 1}/3)`);
+        logger.warn(`[IPFS] Upload failed, retrying in ${delay}ms... (${attempt + 1}/3)`);
         await new Promise(r => setTimeout(r, delay));
         return uploadWithRetry(attempt + 1);
       }
@@ -121,10 +122,10 @@ export async function uploadFileToPinata(buffer, filename, keyvalueMetadata = {}
     const result = await uploadWithRetry();
     const cid = result.cid;
     const url = getIPFSUrl(cid);
-    console.log(`[✅ IPFS] Success. CID: ${cid}`);
+    logger.info(`[IPFS] Success. CID: ${cid}`);
     return { cid, url };
   } catch (err) {
-    console.error(`[❌ IPFS] Final upload failure for "${filename}":`, err.message);
+    logger.error(`[IPFS] Final upload failure for "${filename}":`, err.message);
     throw err;
   }
 }
@@ -145,7 +146,7 @@ export async function uploadJSONToPinata(jsonData, pinName) {
     );
   }
 
-  console.log(`[📦 IPFS_JSON_UPLOAD] Pinning metadata JSON: "${pinName}"...`);
+  logger.info(`[IPFS_JSON] Pinning metadata JSON: "${pinName}"...`);
 
   const uploadWithRetry = async (attempt = 0) => {
     try {
@@ -159,7 +160,7 @@ export async function uploadJSONToPinata(jsonData, pinName) {
     } catch (error) {
       if (attempt < 3) {
         const delay = Math.pow(2, attempt) * 1000;
-        console.warn(`[⚠️ IPFS_JSON] Upload failed, retrying in ${delay}ms... (${attempt + 1}/3)`);
+        logger.warn(`[IPFS_JSON] Upload failed, retrying in ${delay}ms... (${attempt + 1}/3)`);
         await new Promise(r => setTimeout(r, delay));
         return uploadWithRetry(attempt + 1);
       }
@@ -171,10 +172,10 @@ export async function uploadJSONToPinata(jsonData, pinName) {
     const result = await uploadWithRetry();
     const cid = result.cid;
     const url = getIPFSUrl(cid);
-    console.log(`[✅ IPFS_JSON_SUCCESS] Metadata pinned. CID: ${cid}`);
+    logger.info(`[IPFS_JSON] Metadata pinned. CID: ${cid}`);
     return { cid, url };
   } catch (err) {
-    console.error(`[❌ IPFS_JSON_ERROR]: Metadata upload failed - ${err.message}`);
+    logger.error(`[IPFS_JSON]: Metadata upload failed - ${err.message}`);
     throw err;
   }
 }
@@ -188,10 +189,10 @@ export async function testPinataConnection() {
   if (!pinata) return false;
   try {
     await pinata.testAuthentication();
-    console.log('[✅ IPFS_AUTH]: Pinata authentication successful.');
+    logger.info('[IPFS_AUTH] Pinata authentication successful.');
     return true;
   } catch (err) {
-    console.error('[❌ IPFS_AUTH]: Pinata authentication failed:', err.message);
+    logger.error('[IPFS_AUTH] Pinata authentication failed:', err.message);
     return false;
   }
 }

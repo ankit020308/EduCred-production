@@ -1,4 +1,5 @@
-import { logAudit } from '../utils/logger.js';
+import { logAudit } from '../utils/auditLogger.js';
+import { logger } from '../utils/winstonLogger.js';
 import Joi from 'joi';
 
 const supportSchema = Joi.object({
@@ -42,7 +43,7 @@ export const submitContactForm = async (req, res) => {
       message: 'Support inquiry received. Our team will contact you shortly.',
     });
   } catch (err) {
-    console.error('[SUPPORT] [ERROR] Inbound support failure:', err.message);
+    logger.error('[SUPPORT] [ERROR] Inbound support failure:', err.message);
     res.status(500).json({
       success: false,
       message: 'Failed to submit inquiry. Please try again later.',

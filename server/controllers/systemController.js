@@ -1,6 +1,7 @@
 // server/controllers/systemController.js
+import { logger } from '../utils/winstonLogger.js';
 import Registry from '../services/registryService.js';
-import { logAudit } from '../utils/logger.js';
+import { logAudit } from '../utils/auditLogger.js';
 import { getBlockchainRuntimeInfo } from '../utils/blockchain.js';
 
 /**
@@ -51,7 +52,7 @@ export const getSystemStats = async (req, res) => {
         });
 
     } catch (error) {
-        console.error("[❌ SYSTEM_METRICS_FAILURE]:", error.message);
+        logger.error("[❌ SYSTEM_METRICS_FAILURE]:", error.message);
         res.status(500).json({ success: false, message: "Metrics protocol error" });
     }
 };

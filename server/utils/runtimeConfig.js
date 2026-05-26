@@ -1,6 +1,7 @@
 import dotenv from 'dotenv';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { logger } from './winstonLogger.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -45,6 +46,14 @@ const OPTIONAL_PROD_ENV = [
   'CLOUDINARY_NAME',
   'CLOUDINARY_API_KEY',
   'CLOUDINARY_API_SECRET',
+  'REDIS_URL',
+  'DIGILOCKER_CLIENT_ID',
+  'DIGILOCKER_CLIENT_SECRET',
+  'DIGILOCKER_REDIRECT_URI',
+  'SENTRY_DSN',
+  'RAZORPAY_KEY_ID',
+  'RAZORPAY_KEY_SECRET',
+  'RAZORPAY_WEBHOOK_SECRET',
 ];
 
 export const isProduction = process.env.NODE_ENV === 'production';
@@ -84,18 +93,18 @@ export function validateServerEnv() {
 
   // 2. Proactive Production Audit
   if (isProduction) {
-    console.log('\n--- 🛡️  PROACTIVE PRODUCTION AUDIT ---');
+    logger.info('--- PROACTIVE PRODUCTION AUDIT ---');
     OPTIONAL_PROD_ENV.forEach((name) => {
       if (!process.env[name]) {
-        console.warn(`[WARNING] [SECURITY]: ${name} is missing. Some features may be degraded.`);
+        logger.warn(`[WARNING] [SECURITY]: ${name} is missing. Some features may be degraded.`);
       }
     });
 
     const callbackUrl = process.env.GOOGLE_CALLBACK_URL;
     if (callbackUrl && callbackUrl.includes('localhost') && isProduction) {
-      console.warn('[CAUTION] [CONFIG]: GOOGLE_CALLBACK_URL contains "localhost" but NODE_ENV is "production". This will likely fail.');
+      logger.warn('[CAUTION] [CONFIG]: GOOGLE_CALLBACK_URL contains "localhost" but NODE_ENV is "production". This will likely fail.');
     }
-    console.log('--- AUDIT COMPLETE ---\n');
+    logger.info('--- AUDIT COMPLETE ---');
   }
 }
 
