@@ -29,6 +29,7 @@ const SystemAdmin = lazy(() => import('./pages/SystemAdmin')); // Global Admin A
 const Onboarding = lazy(() => import('./pages/Onboarding'));
 const VerifyOTP = lazy(() => import('./pages/VerifyOTP'));
 const Profile = lazy(() => import('./pages/Profile'));
+const DigilockerCallback = lazy(() => import('./pages/DigilockerCallback'));
 
 import StudentDashboard from './components/StudentDashboard';
 
@@ -167,6 +168,7 @@ const NavigationWrapper = () => {
 
               <Route path="/university-node" element={<ProtectedRoute roles={['university']}><ErrorBoundary><Admin /></ErrorBoundary></ProtectedRoute>} />
               <Route path="/student-portal" element={<ProtectedRoute roles={['student']}><ErrorBoundary><StudentDashboard /></ErrorBoundary></ProtectedRoute>} />
+              <Route path="/student/dashboard/digilocker/callback" element={<ProtectedRoute roles={['student']}><ErrorBoundary><DigilockerCallback /></ErrorBoundary></ProtectedRoute>} />
               <Route path="/profile" element={<ProtectedRoute roles={['student', 'university', 'admin', 'super_admin']}><ErrorBoundary><Profile /></ErrorBoundary></ProtectedRoute>} />
               <Route path="*" element={<NotFound />} />
             </Routes>

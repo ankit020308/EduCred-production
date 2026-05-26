@@ -1,16 +1,18 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { vt } from '../data/animationConstants';
+import { CERT_STATUS } from '../data/certStatusConfig';
 import {
   GraduationCap, ShieldCheck, Clock, Loader2,
   ExternalLink, Copy, Check, Shield, LogOut, Download,
-  ChevronRight, Info, User, AlertCircle,
+  ChevronRight, Info, User, AlertCircle, Link as LinkIcon, FileText
 } from 'lucide-react';
 import api from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
+import { useToast } from './Toast';
 import socket from '../services/socket.mjs';
 
-const vt = { initial: { opacity: 0, y: 20 }, animate: { opacity: 1, y: 0 }, transition: { duration: 0.45, ease: [0.22, 1, 0.36, 1] } };
 
 // Stepper pipeline: maps status → step index
 const PIPELINE = [
@@ -73,19 +75,11 @@ function CertStepper({ status }) {
   );
 }
 
-const STATUS_BADGE = {
-  CONFIRMED:            { bg: 'bg-[#2b9a66]',   label: 'Verified On-Chain' },
-  PENDING_REVIEW:       { bg: 'bg-amber-500',    label: 'Pending Review' },
-  PROCESSING:           { bg: 'bg-blue-500',     label: 'Under Review' },
-  ANCHOR_FAILED:        { bg: 'bg-[#ea2804]',   label: 'Anchor Failed' },
-  ANCHOR_PENDING_FUNDS: { bg: 'bg-orange-500',   label: 'Awaiting Funds' },
-  REJECTED:             { bg: 'bg-[#ea2804]',   label: 'Rejected' },
-  default:              { bg: 'bg-[#646464]',   label: 'Processing' },
-};
 
 export default function StudentDashboard() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
+  const { toast } = useToast();
 
   const [certificates, setCertificates] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -94,9 +88,13 @@ export default function StudentDashboard() {
   const [showTooltip, setShowTooltip] = useState(false);
   const [downloadingId, setDownloadingId] = useState(null);
   const [downloadError, setDownloadError] = useState(null);
+  const [studentRecord, setStudentRecord] = useState(null);
+  const [digilockerDocs, setDigilockerDocs] = useState([]);
+  const [loadingDocs, setLoadingDocs] = useState(false);
 
   useEffect(() => {
     fetchCertificates();
+    fetchStats();
     if (user?.id) {
       socket.connect();
       socket.emit('join_user_room', user.id);
@@ -113,6 +111,44 @@ export default function StudentDashboard() {
 
   const ownedOnly = (list) =>
     Array.isArray(list) ? list.filter(c => !c.studentEmail || c.studentEmail === user?.email) : [];
+
+  const fetchStats = async () => {
+    try {
+      const res = await api.get('/api/student/dashboard/stats');
+      setStudentRecord(res.data.student);
+      if (res.data.student?.digilockerConnected) {
+        fetchDigilockerDocuments();
+      }
+    } catch { /* silently fail */ }
+  };
+
+  const fetchDigilockerDocuments = async () => {
+    setLoadingDocs(true);
+    try {
+      const res = await api.get('/api/student/digilocker/documents');
+      setDigilockerDocs(res.data.documents || []);
+    } catch { /* silently fail */ }
+    finally { setLoadingDocs(false); }
+  };
+
+  const connectDigilocker = async () => {
+    try {
+      const res = await api.get('/api/student/digilocker/auth-url');
+      if (res.data.url) window.location.href = res.data.url;
+    } catch (err) {
+      toast.error('Failed to initiate DigiLocker connection.');
+    }
+  };
+
+  const disconnectDigilocker = async () => {
+    try {
+      await api.delete('/api/student/digilocker/disconnect');
+      setStudentRecord(prev => ({ ...prev, digilockerConnected: false, digilockerUsername: null }));
+      setDigilockerDocs([]);
+    } catch (err) {
+      toast.error('Failed to disconnect DigiLocker.');
+    }
+  };
 
   const fetchCertificates = async () => {
     try {
@@ -234,6 +270,64 @@ export default function StudentDashboard() {
           ))}
         </motion.div>
 
+        {/* DigiLocker Section */}
+        <motion.div {...vt} transition={{ delay: 0.15 }} className="bg-white border border-[#e0e0e0] rounded-3xl p-8">
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
+            <div className="flex items-center gap-4">
+              <div className={`w-12 h-12 rounded-2xl flex items-center justify-center border ${studentRecord?.digilockerConnected ? 'bg-[#2b9a66]/10 border-[#2b9a66]/20' : 'bg-blue-50 border-blue-100'}`}>
+                <ShieldCheck className={studentRecord?.digilockerConnected ? 'text-[#2b9a66]' : 'text-blue-500'} size={24} />
+              </div>
+              <div>
+                <h3 className="text-xl font-black text-[#202020] tracking-tight">DigiLocker Integration</h3>
+                <p className="text-[#646464] text-[10px] font-bold uppercase tracking-widest mt-1">
+                  {studentRecord?.digilockerConnected 
+                    ? `Connected as: ${studentRecord?.digilockerUsername || 'Verified User'}` 
+                    : 'Sync your issued documents with Govt. of India'}
+                </p>
+              </div>
+            </div>
+            <div>
+              {studentRecord?.digilockerConnected ? (
+                <button onClick={disconnectDigilocker} className="px-4 py-2 bg-[#f6f6f6] hover:bg-[#e0e0e0] text-[#646464] text-[10px] font-black uppercase tracking-widest rounded-xl transition-colors border border-[#e0e0e0]">
+                  Disconnect
+                </button>
+              ) : (
+                <button onClick={connectDigilocker} className="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-[10px] font-black uppercase tracking-widest rounded-xl transition-colors shadow-sm shadow-blue-600/20 flex items-center gap-2">
+                  <LinkIcon size={14} /> Connect DigiLocker
+                </button>
+              )}
+            </div>
+          </div>
+          
+          {studentRecord?.digilockerConnected && (
+            <div className="mt-8 border-t border-[#e0e0e0] pt-6">
+              <h4 className="text-[10px] font-black uppercase tracking-widest text-[#646464] mb-4">Synced Documents</h4>
+              {loadingDocs ? (
+                 <div className="flex items-center gap-2 text-[10px] font-black text-[#bbbbbb] uppercase">
+                   <Loader2 size={12} className="animate-spin" /> Fetching from DigiLocker...
+                 </div>
+              ) : digilockerDocs.length > 0 ? (
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+                  {digilockerDocs.map((doc, idx) => (
+                    <div key={idx} className="bg-[#f6f6f6] border border-[#e0e0e0] rounded-xl p-4 flex items-start gap-3">
+                      <div className="mt-0.5"><FileText size={16} className="text-[#646464]" /></div>
+                      <div>
+                        <p className="text-xs font-black text-[#202020] truncate" title={doc.name}>{doc.name}</p>
+                        <p className="text-[9px] font-bold text-[#646464] uppercase mt-1">{doc.issuer || 'Govt of India'}</p>
+                        {doc.date && <p className="text-[8px] font-bold text-[#bbbbbb] uppercase mt-0.5">{doc.date}</p>}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-[10px] font-bold uppercase tracking-widest text-[#bbbbbb]">
+                  No documents found in your DigiLocker.
+                </div>
+              )}
+            </div>
+          )}
+        </motion.div>
+
         {/* Download error banner */}
         <AnimatePresence>
           {downloadError && (
@@ -280,7 +374,7 @@ export default function StudentDashboard() {
           ) : (
             <div className="space-y-3">
               {certificates.map((cert) => {
-                const ss = STATUS_BADGE[cert.status] || STATUS_BADGE.default;
+                const { badgeBg: ssBg, label: ssLabel } = CERT_STATUS[cert.status] || CERT_STATUS.default;
                 const isOpen = selectedCert?.id === cert.id;
                 return (
                   <motion.div key={cert.id} layout initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}
@@ -301,9 +395,9 @@ export default function StudentDashboard() {
                       </div>
 
                       <div className="flex flex-col items-end gap-2">
-                        <span className={`inline-flex items-center gap-1.5 px-4 py-1.5 rounded-full text-[9px] font-black uppercase tracking-widest text-white ${ss.bg}`}>
+                        <span className={`inline-flex items-center gap-1.5 px-4 py-1.5 rounded-full text-[9px] font-black uppercase tracking-widest text-white ${ssBg}`}>
                           <div className="w-1.5 h-1.5 rounded-full bg-white/70 animate-pulse" />
-                          {ss.label}
+                          {ssLabel}
                         </span>
                         {/* Status stepper — only show for non-confirmed/non-revoked */}
                         {!['CONFIRMED', 'REVOKED'].includes(cert.status) && (

@@ -1,4 +1,5 @@
 import React, { useRef, useMemo, useState, useEffect, Suspense } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import { OrbitControls, useTexture } from '@react-three/drei';
 import * as THREE from 'three';
@@ -193,6 +194,7 @@ function MainnetGlobe({ activeUni, onPinClick }) {
 // 🏗️ MAIN EXPORT
 // ─────────────────────────────────────────────────────────────
 export default function QuantumGlobe() {
+  const navigate = useNavigate();
   const [searchQuery,   setSearchQuery]   = useState('');
   const [activeNode,    setActiveNode]    = useState(null);
   const [searchResults, setSearchResults] = useState([]);
@@ -339,7 +341,7 @@ export default function QuantumGlobe() {
                 </div>
               </div>
               <button
-                onClick={() => window.location.href = '/verify'}
+                onClick={() => navigate('/verify')}
                 className="w-full py-5 flex items-center justify-center gap-3 rounded-2xl bg-white text-black text-[11px] font-black uppercase tracking-[0.25em] hover:bg-slate-200 transition-all"
               >
                 <ShieldCheck size={18} /> Initialize Handshake

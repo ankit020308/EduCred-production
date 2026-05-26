@@ -1,6 +1,15 @@
 import React, { StrictMode, Suspense } from 'react';
 import { createRoot } from 'react-dom/client';
 import { Loader2, ShieldAlert } from 'lucide-react';
+import * as Sentry from '@sentry/react';
+
+if (import.meta.env.VITE_SENTRY_DSN) {
+  Sentry.init({
+    dsn: import.meta.env.VITE_SENTRY_DSN,
+    environment: import.meta.env.MODE,
+    tracesSampleRate: import.meta.env.PROD ? 0.1 : 0,
+  });
+}
 
 /* ── STYLES ── */
 import './index.css';
@@ -44,6 +53,7 @@ class GlobalErrorBoundary extends React.Component {
   componentDidCatch(error, errorInfo) {
     console.error("─── ❌ CRITICAL RUNTIME EXCEPTION ───");
     console.error(error, errorInfo);
+    Sentry.captureException(error, { extra: errorInfo });
   }
 
   render() {

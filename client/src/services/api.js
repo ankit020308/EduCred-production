@@ -7,7 +7,7 @@ export const storeToken = (token) => { if (token) localStorage.setItem(TOKEN_KEY
 export const clearToken = () => localStorage.removeItem(TOKEN_KEY);
 export const getToken = () => localStorage.getItem(TOKEN_KEY);
 
-const BASE_URL = import.meta.env.VITE_API_URL || (['educred.in', 'www.educred.in'].includes(window.location.hostname) ? PRODUCTION_BACKEND_URL : '');
+const BASE_URL = import.meta.env.VITE_API_URL || PRODUCTION_BACKEND_URL;
 
 const api = axios.create({
     baseURL: BASE_URL,

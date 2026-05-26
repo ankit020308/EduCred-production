@@ -18,19 +18,8 @@
   position: relative;
 }
 
-/* 2. MAIN NAVIGATION WRAPPER
-   Acts as the parent for all page routes */
-.app-viewport {
-  flex: 1 0 auto;
-  display: flex;
-  flex-direction: column;
-  position: relative;
-  z-index: 10;
-  /* Sits above the fixed background components */
-}
-
 /* ─────────────────────────────────────────────────────────
-   3. CINEMATIC ROUTE TRANSITIONS (SAPPHIRE PHYSICS)
+   2. CINEMATIC ROUTE TRANSITIONS (SAPPHIRE PHYSICS)
    Optimized for use with AnimatePresence/React Router
 ───────────────────────────────────────────────────────── */
 

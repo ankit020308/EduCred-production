@@ -13,29 +13,15 @@ import { useAuth } from '../context/AuthContext';
 import { ToastProvider, useToast } from '../components/Toast';
 import socket, { joinInstitutionalRoom } from '../services/socket.mjs';
 import { useNavigate } from 'react-router-dom';
-
-const vt = {
-  initial: { opacity: 0, y: 20 },
-  animate: { opacity: 1, y: 0 },
-  transition: { duration: 0.45, ease: [0.22, 1, 0.36, 1] },
-};
+import { vt } from '../data/animationConstants';
+import { CERT_STATUS } from '../data/certStatusConfig';
 
 const emptySubject = () => ({ code: '', name: '', marks: '' });
 const emptySemester = (n) => ({ semester: n, sgpa: '', subjects: [emptySubject()] });
 const INPUT = 'w-full h-11 bg-[#f6f6f6] border border-[#e0e0e0] rounded-xl px-4 text-sm text-[#202020] font-medium outline-none focus:bg-white focus:border-[#ea2804] transition-all placeholder:text-[#bbbbbb]';
 
-const STATUS_CONFIG = {
-  CONFIRMED: { label: 'On-Chain', bg: 'bg-[#2b9a66]/10', text: 'text-[#2b9a66]', border: 'border-[#2b9a66]/20', dot: 'bg-[#2b9a66]' },
-  PENDING_REVIEW: { label: 'Pending Review', bg: 'bg-amber-50', text: 'text-amber-600', border: 'border-amber-200', dot: 'bg-amber-500' },
-  PROCESSING: { label: 'Under Review', bg: 'bg-blue-50', text: 'text-blue-600', border: 'border-blue-200', dot: 'bg-blue-500' },
-  ANCHOR_FAILED: { label: 'Anchor Failed', bg: 'bg-[#ea2804]/10', text: 'text-[#ea2804]', border: 'border-[#ea2804]/20', dot: 'bg-[#ea2804]' },
-  ANCHOR_PENDING_FUNDS: { label: 'Pending Funds', bg: 'bg-orange-50', text: 'text-orange-600', border: 'border-orange-200', dot: 'bg-orange-500' },
-  REVOKED: { label: 'Revoked', bg: 'bg-[#202020]/5', text: 'text-[#202020]', border: 'border-[#202020]/10', dot: 'bg-[#202020]' },
-  REJECTED: { label: 'Rejected', bg: 'bg-[#ea2804]/10', text: 'text-[#ea2804]', border: 'border-[#ea2804]/20', dot: 'bg-[#ea2804]' },
-};
-
 function StatusPill({ status }) {
-  const cfg = STATUS_CONFIG[status] || { label: status, bg: 'bg-[#f6f6f6]', text: 'text-[#646464]', border: 'border-[#e0e0e0]', dot: 'bg-[#646464]' };
+  const cfg = CERT_STATUS[status] || CERT_STATUS.default;
   return (
     <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[8px] font-black uppercase tracking-widest border whitespace-nowrap shrink-0 ${cfg.bg} ${cfg.text} ${cfg.border}`}>
       <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${cfg.dot} animate-pulse`} />
