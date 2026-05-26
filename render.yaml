@@ -21,6 +21,8 @@ services:
         value: resend
       - key: RESEND_API_KEY
         sync: false
+      - key: REDIS_URL
+        sync: false
 
 databases:
   - name: educred-db

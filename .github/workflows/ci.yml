@@ -1,0 +1,81 @@
+name: EduCred CI/CD Pipeline
+
+on:
+  push:
+    branches: [ "main", "develop" ]
+  pull_request:
+    branches: [ "main", "develop" ]
+
+jobs:
+  test-and-lint:
+    runs-on: ubuntu-latest
+    
+    strategy:
+      matrix:
+        node-version: [18.x, 20.x]
+        
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Use Node.js ${{ matrix.node-version }}
+      uses: actions/setup-node@v3
+      with:
+        node-version: ${{ matrix.node-version }}
+        cache: 'npm'
+        cache-dependency-path: server/package-lock.json
+        
+    - name: Install Dependencies
+      run: |
+        cd server
+        npm ci
+        cd ../client
+        npm ci
+
+    - name: Lint Server
+      run: cd server && npx eslint . --max-warnings 50
+
+    - name: Lint Client
+      run: cd client && npx eslint . --max-warnings 50
+
+    - name: Run Tests
+      run: |
+        cd server
+        npm run test --if-present
+
+    - name: Build Client
+      run: cd client && npm run build
+
+    - name: Verify Server Imports
+      run: cd server && node --check index.js
+
+  deploy-staging:
+    needs: test-and-lint
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/develop'
+    
+    steps:
+    - name: Deploy to Render (Staging)
+      env:
+        deploy_url: ${{ secrets.RENDER_DEPLOY_HOOK_STAGING }}
+      run: |
+        if [ -z "$deploy_url" ]; then
+          echo "No deploy hook found, skipping deployment"
+        else
+          curl "$deploy_url"
+        fi
+
+  deploy-production:
+    needs: test-and-lint
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    
+    steps:
+    - name: Deploy to Render (Production)
+      env:
+        deploy_url: ${{ secrets.RENDER_DEPLOY_HOOK_PROD }}
+      run: |
+        if [ -z "$deploy_url" ]; then
+          echo "No deploy hook found, skipping deployment"
+        else
+          curl "$deploy_url"
+        fi
