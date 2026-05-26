@@ -31,6 +31,23 @@ export default {
       url: process.env.RPC_URL || "",
       accounts: process.env.PRIVATE_KEY ? [process.env.PRIVATE_KEY] : [],
       chainId: 11155111
+    },
+    amoy: {
+      url: process.env.POLYGON_RPC_URL || "",
+      accounts: process.env.PRIVATE_KEY ? [process.env.PRIVATE_KEY] : [],
+      chainId: 80002
+    },
+    polygon: {
+      url: process.env.POLYGON_RPC_URL || "",
+      accounts: process.env.PRIVATE_KEY ? [process.env.PRIVATE_KEY] : [],
+      chainId: 137
     }
   }
 };
+
+if (
+  (process.env.HARDHAT_NETWORK === 'amoy' || process.env.HARDHAT_NETWORK === 'polygon') &&
+  !process.env.POLYGON_RPC_URL
+) {
+  console.warn('[hardhat] WARNING: POLYGON_RPC_URL is not set. Polygon deployment will fail.');
+}
