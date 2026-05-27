@@ -123,7 +123,7 @@ export default function Onboarding() {
                 </div>
                 <h3 className={`text-[10px] font-black uppercase tracking-[0.2em] ${
                   role === 'student' ? 'text-slate-900' : 'text-slate-500'
-                }`}>I'm a Student</h3>
+                }`}>I&apos;m a Student</h3>
               </button>
 
               <button

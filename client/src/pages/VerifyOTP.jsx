@@ -157,7 +157,7 @@ export default function VerifyOTP() {
                     Protocol <span className="text-emerald-600">Verified.</span>
                   </h2>
                   <p className="text-[#4B5563] text-[11px] font-black uppercase tracking-[0.2em] leading-relaxed italic opacity-80">
-                    Your institutional request has been initiated successfully. You'll receive your credentials via email once the EduCred admin approves your node.
+                    Your institutional request has been initiated successfully. You&apos;ll receive your credentials via email once the EduCred admin approves your node.
                   </p>
                </div>
 

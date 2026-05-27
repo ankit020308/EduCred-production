@@ -107,6 +107,7 @@ export default function StudentDashboard() {
         if (socket.connected) { socket.emit('leave_user_room', user.id); socket.disconnect(); }
       };
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.id]);
 
   const ownedOnly = (list) =>
@@ -135,7 +136,7 @@ export default function StudentDashboard() {
     try {
       const res = await api.get('/api/student/digilocker/auth-url');
       if (res.data.url) window.location.href = res.data.url;
-    } catch (err) {
+    } catch {
       toast.error('Failed to initiate DigiLocker connection.');
     }
   };
@@ -145,7 +146,7 @@ export default function StudentDashboard() {
       await api.delete('/api/student/digilocker/disconnect');
       setStudentRecord(prev => ({ ...prev, digilockerConnected: false, digilockerUsername: null }));
       setDigilockerDocs([]);
-    } catch (err) {
+    } catch {
       toast.error('Failed to disconnect DigiLocker.');
     }
   };
@@ -364,7 +365,7 @@ export default function StudentDashboard() {
               <div className="space-y-2">
                 <p className="text-xl font-black text-[#202020] tracking-tight">No certificates yet</p>
                 <p className="text-[#646464] text-[10px] font-bold uppercase tracking-widest max-w-xs leading-relaxed">
-                  Your institution hasn't issued any records yet. They'll appear here once issued and approved.
+                  Your institution hasn&apos;t issued any records yet. They&apos;ll appear here once issued and approved.
                 </p>
               </div>
               <button onClick={() => navigate('/verify')} className="btn-primary text-xs">

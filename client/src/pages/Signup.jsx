@@ -121,7 +121,7 @@ export default function Signup() {
                 <div>
                   <h1 className="text-3xl font-black text-[#202020] tracking-tight mb-3">Account Created.</h1>
                   <p className="text-[#646464] text-sm leading-relaxed max-w-sm mx-auto">
-                    Your institution account is pending admin approval. Once verified you'll receive full certificate issuance access.
+                    Your institution account is pending admin approval. Once verified you&apos;ll receive full certificate issuance access.
                   </p>
                 </div>
                 <div className="bg-white border border-[#e0e0e0] rounded-2xl p-6 space-y-4 text-left">

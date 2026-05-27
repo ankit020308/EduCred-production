@@ -13,6 +13,7 @@ import { useAuth } from '../context/AuthContext';
 import { ToastProvider, useToast } from '../components/Toast';
 import socket, { joinInstitutionalRoom } from '../services/socket.mjs';
 import { useNavigate } from 'react-router-dom';
+import { STATUS_CONFIG } from '../data/certStatusConfig';
 import { vt } from '../data/animationConstants';
 import { CERT_STATUS } from '../data/certStatusConfig';
 
@@ -106,6 +107,7 @@ function AdminDashboard() {
       };
     }
     return undefined;
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user, fetchUniStatus, fetchCerts, fetchStats]);
 
   // Semester helpers
@@ -123,7 +125,7 @@ function AdminDashboard() {
     const semesters = p.semesters.filter((_, j) => j !== i);
     return { ...p, semesters, finalCGPA: calcCgpa(semesters) };
   });
-  const setSem = (i, field, val) => setForm(p => { const s = [...p.semesters]; s[i] = { ...s[i], [field]: val }; return { ...p, semesters: s }; });
+  const _setSem = (i, field, val) => setForm(p => { const s = [...p.semesters]; s[i] = { ...s[i], [field]: val }; return { ...p, semesters: s }; });
   const addSubject = (si) => setForm(p => { const s = [...p.semesters]; s[si] = { ...s[si], subjects: [...s[si].subjects, emptySubject()] }; return { ...p, semesters: s }; });
   const removeSubject = (si, xi) => setForm(p => {
     const s = [...p.semesters];
@@ -356,7 +358,7 @@ function AdminDashboard() {
                   Institution under <span className="text-[#ea2804]">review.</span>
                 </h1>
                 <p className="text-[#646464] text-xs font-bold uppercase tracking-widest leading-relaxed">
-                  Your application is being reviewed. You'll be notified once issuance rights are granted.
+                  Your application is being reviewed. You&apos;ll be notified once issuance rights are granted.
                 </p>
               </div>
               <div className="pt-6 border-t border-[#e0e0e0] flex flex-col items-center gap-4">

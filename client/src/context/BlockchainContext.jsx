@@ -48,4 +48,5 @@ export function BlockchainProvider({ children }) {
   );
 }
 
+// eslint-disable-next-line react-refresh/only-export-components
 export const useBlockchain = () => useContext(BlockchainContext);

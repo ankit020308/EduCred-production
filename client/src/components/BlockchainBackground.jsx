@@ -243,6 +243,7 @@ export default function BlockchainBackground({ isSurging = false }) {
       window.removeEventListener("resize", resize);
       window.removeEventListener("mousemove", handleMouseMove);
     };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
 

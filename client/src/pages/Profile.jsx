@@ -204,7 +204,7 @@ export default function Profile() {
     </div>
   );
 
-  const initials = (userProfile?.name || user?.name || 'U').charAt(0).toUpperCase();
+  const _initials = (userProfile?.name || user?.name || 'U').charAt(0).toUpperCase();
   const dashboardPath = isUniversity ? '/university-node' : isAdmin ? '/sys-admin' : '/student-portal';
   const roleLabel = isUniversity ? 'INSTITUTION' : isAdmin ? 'ADMIN' : 'STUDENT';
 

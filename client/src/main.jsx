@@ -17,9 +17,7 @@ import './index.css';
 /* ── COMPONENTS ── */
 import App from './App.jsx';
 
-/**
- * 🛰️ SYSTEM BOOT LOADER
- */
+// eslint-disable-next-line react-refresh/only-export-components
 const RootLoader = () => (
   <div className="h-screen w-screen bg-[#000000] flex flex-col items-center justify-center space-y-6 font-sans">
     <div className="relative">

@@ -36,7 +36,6 @@ function InstitutionsTab({ toast }) {
   const [processingId, setProcessingId] = useState(null);
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState('ALL');
-  const [expandedRow, setExpandedRow] = useState(null);
   const [confirm, setConfirm] = useState({ open: false, action: null, id: null, name: '' });
 
   useEffect(() => {

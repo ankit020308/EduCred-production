@@ -170,7 +170,7 @@ export default function Login() {
           </motion.div>
 
           <p className="text-center mt-8 text-[#646464] text-sm">
-            Don't have an account?{' '}
+            Don&apos;t have an account?{' '}
             <Link to="/signup" className="text-[#ea2804] font-bold"
               style={{ textDecoration: 'underline dotted #ea2804', textUnderlineOffset: '3px' }}>
               Get Started
