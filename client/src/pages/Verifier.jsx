@@ -1,13 +1,15 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   CheckCircle2,
   Copy,
+  Download,
   FileUp,
   Fingerprint,
   LayoutDashboard,
   Loader2,
   LogOut,
+  Rows3,
   Search,
   ShieldAlert,
   ShieldCheck,
@@ -37,6 +39,14 @@ export default function Verifier() {
   const [result, setResult] = useState(null);
   const [error, setError] = useState('');
   const [copied, setCopied] = useState(false);
+
+  // Bulk verification state
+  const [bulkFile, setBulkFile] = useState(null);
+  const [bulkIds, setBulkIds] = useState('');
+  const [bulkLoading, setBulkLoading] = useState(false);
+  const [bulkResults, setBulkResults] = useState(null);
+  const [bulkError, setBulkError] = useState('');
+  const bulkInputRef = useRef(null);
 
   useEffect(() => {
     if (!loading) return undefined;
@@ -109,6 +119,57 @@ export default function Verifier() {
       setCopied(true);
       window.setTimeout(() => setCopied(false), 1800);
     } catch { /* silently fail */ }
+  }
+
+  async function handleBulkVerify(event) {
+    event.preventDefault();
+    setBulkError('');
+    setBulkResults(null);
+    setBulkLoading(true);
+    try {
+      if (bulkFile) {
+        const formData = new FormData();
+        formData.append('file', bulkFile);
+        const res = await api.post('/api/certificates/verify/bulk', formData, {
+          headers: { 'Content-Type': undefined },
+        });
+        setBulkResults(res.data);
+      } else {
+        const ids = bulkIds
+          .split(/[\n,]+/)
+          .map((s) => s.trim())
+          .filter(Boolean);
+        if (!ids.length) {
+          setBulkError('Enter at least one certificate ID.');
+          setBulkLoading(false);
+          return;
+        }
+        const res = await api.post('/api/certificates/verify/bulk', { ids });
+        setBulkResults(res.data);
+      }
+    } catch (err) {
+      setBulkError(err.response?.data?.error || 'Bulk verification failed.');
+    } finally {
+      setBulkLoading(false);
+    }
+  }
+
+  function downloadBulkCSV() {
+    if (!bulkResults?.results) return;
+    const header = 'certificateId,valid,reason,studentName,degree,issuer,issuedAt,txHash';
+    const rows = bulkResults.results.map((r) =>
+      [r.id, r.valid, r.reason, r.studentName ?? '', r.degree ?? '', r.issuer ?? '',
+        r.issuedAt ? new Date(r.issuedAt).toLocaleDateString() : '', r.txHash ?? '']
+        .map((v) => `"${String(v).replace(/"/g, '""')}"`).join(',')
+    );
+    const csv = [header, ...rows].join('\n');
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `educred-bulk-verification-${Date.now()}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
   }
 
   return (
@@ -186,69 +247,141 @@ export default function Verifier() {
             >
               {/* Mode tabs */}
               <div className="flex p-1 bg-[#f6f6f6] border border-[#e0e0e0] rounded-full mb-7">
-                {['HASH', 'UPLOAD'].map((entry) => (
+                {[
+                  { key: 'HASH', label: 'By Hash' },
+                  { key: 'UPLOAD', label: 'File' },
+                  { key: 'BULK', label: 'Bulk' },
+                ].map(({ key, label }) => (
                   <button
-                    key={entry}
+                    key={key}
                     type="button"
-                    onClick={() => { setMode(entry); setError(''); setResult(null); }}
+                    onClick={() => {
+                      setMode(key);
+                      setError(''); setResult(null);
+                      setBulkError(''); setBulkResults(null);
+                    }}
                     className={`flex-1 rounded-full py-2.5 text-[10px] font-black uppercase tracking-widest transition-all ${
-                      mode === entry
+                      mode === key
                         ? 'bg-white text-[#ea2804] border border-[#e0e0e0]'
                         : 'text-[#646464] hover:text-[#202020]'
                     }`}
                   >
-                    {entry === 'UPLOAD' ? 'File Upload' : 'Verify by Hash'}
+                    {label}
                   </button>
                 ))}
               </div>
 
-              <form onSubmit={handleVerify} className="space-y-5">
-                {mode === 'UPLOAD' ? (
-                  <label className="block cursor-pointer rounded-2xl border-2 border-dashed border-[#e0e0e0] bg-[#f6f6f6] p-8 text-center transition-all hover:border-[#ea2804]/40 hover:bg-white group">
-                    <input
-                      type="file"
-                      className="hidden"
-                      accept=".pdf,application/pdf"
-                      onChange={(event) => {
-                        setFile(event.target.files?.[0] || null);
-                        setError('');
-                        setResult(null);
-                      }}
-                    />
-                    <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-white text-[#bbbbbb] border border-[#e0e0e0] group-hover:text-[#ea2804] group-hover:border-[#ea2804]/30 transition-all mb-4">
-                      <FileUp size={22} />
-                    </div>
-                    <p className="text-[11px] font-black text-[#202020] uppercase tracking-widest truncate max-w-[200px] mx-auto">
-                      {file ? file.name : 'Select Certificate'}
-                    </p>
-                    <p className="mt-1.5 text-[9px] font-black text-[#bbbbbb] uppercase tracking-widest">EduCred-issued PDF certificates only</p>
-                  </label>
-                ) : (
+              {mode === 'BULK' ? (
+                <form onSubmit={handleBulkVerify} className="space-y-5">
                   <div className="space-y-2">
                     <label className="text-[10px] font-black uppercase tracking-widest text-[#646464]">
-                      SHA-256 Hash or Certificate ID
+                      Upload CSV <span className="text-[#bbbbbb] normal-case font-medium">(column: certificateId or id)</span>
                     </label>
-                    <div className="flex items-center gap-3 rounded-xl border border-[#e0e0e0] bg-[#f6f6f6] px-4 py-3.5 focus-within:border-[#ea2804] focus-within:bg-white transition-all">
-                      <Fingerprint className="text-[#bbbbbb] shrink-0" size={18} />
+                    <label className="block cursor-pointer rounded-2xl border-2 border-dashed border-[#e0e0e0] bg-[#f6f6f6] p-6 text-center transition-all hover:border-[#ea2804]/40 hover:bg-white group">
                       <input
-                        value={certificateId}
+                        type="file"
+                        className="hidden"
+                        accept=".csv,text/csv"
+                        ref={bulkInputRef}
+                        onChange={(e) => {
+                          setBulkFile(e.target.files?.[0] || null);
+                          setBulkIds('');
+                          setBulkError('');
+                          setBulkResults(null);
+                        }}
+                      />
+                      <Rows3 size={20} className="mx-auto text-[#bbbbbb] group-hover:text-[#ea2804] mb-2 transition-colors" />
+                      <p className="text-[11px] font-black text-[#202020] uppercase tracking-widest truncate max-w-[200px] mx-auto">
+                        {bulkFile ? bulkFile.name : 'Select CSV File'}
+                      </p>
+                      <p className="mt-1 text-[9px] font-black text-[#bbbbbb] uppercase tracking-widest">Up to 100 certificates</p>
+                    </label>
+                  </div>
+
+                  <div className="flex items-center gap-3">
+                    <div className="h-px flex-1 bg-[#e0e0e0]" />
+                    <span className="text-[9px] font-black uppercase tracking-widest text-[#bbbbbb]">or paste IDs</span>
+                    <div className="h-px flex-1 bg-[#e0e0e0]" />
+                  </div>
+
+                  <div className="space-y-2">
+                    <textarea
+                      value={bulkIds}
+                      onChange={(e) => {
+                        setBulkIds(e.target.value);
+                        setBulkFile(null);
+                        if (bulkInputRef.current) bulkInputRef.current.value = '';
+                        setBulkError('');
+                        setBulkResults(null);
+                      }}
+                      rows={4}
+                      placeholder={"EC-2024-001\nEC-2024-002\nEC-2024-003"}
+                      className="w-full rounded-xl border border-[#e0e0e0] bg-[#f6f6f6] px-4 py-3 text-[11px] font-mono text-[#202020] placeholder:text-[#bbbbbb] outline-none resize-none focus:border-[#ea2804] focus:bg-white transition-all"
+                    />
+                  </div>
+
+                  {bulkError && (
+                    <p className="text-[10px] font-black text-[#ea2804] uppercase tracking-widest">{bulkError}</p>
+                  )}
+
+                  <button
+                    type="submit"
+                    disabled={bulkLoading || (!bulkFile && !bulkIds.trim())}
+                    className="btn-primary w-full"
+                  >
+                    {bulkLoading ? <Loader2 className="animate-spin" size={18} /> : <ShieldCheck size={18} />}
+                    {bulkLoading ? 'Verifying Batch...' : 'Run Bulk Verification'}
+                  </button>
+                </form>
+              ) : (
+                <form onSubmit={handleVerify} className="space-y-5">
+                  {mode === 'UPLOAD' ? (
+                    <label className="block cursor-pointer rounded-2xl border-2 border-dashed border-[#e0e0e0] bg-[#f6f6f6] p-8 text-center transition-all hover:border-[#ea2804]/40 hover:bg-white group">
+                      <input
+                        type="file"
+                        className="hidden"
+                        accept=".pdf,application/pdf"
                         onChange={(event) => {
-                          setCertificateId(event.target.value);
+                          setFile(event.target.files?.[0] || null);
                           setError('');
                           setResult(null);
                         }}
-                        placeholder="SHA-256 hash or EDUCRED-2025-..."
-                        className="w-full bg-transparent text-[11px] font-black tracking-widest text-[#202020] outline-none placeholder:text-[#bbbbbb] font-mono"
                       />
+                      <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-white text-[#bbbbbb] border border-[#e0e0e0] group-hover:text-[#ea2804] group-hover:border-[#ea2804]/30 transition-all mb-4">
+                        <FileUp size={22} />
+                      </div>
+                      <p className="text-[11px] font-black text-[#202020] uppercase tracking-widest truncate max-w-[200px] mx-auto">
+                        {file ? file.name : 'Select Certificate'}
+                      </p>
+                      <p className="mt-1.5 text-[9px] font-black text-[#bbbbbb] uppercase tracking-widest">EduCred-issued PDF certificates only</p>
+                    </label>
+                  ) : (
+                    <div className="space-y-2">
+                      <label className="text-[10px] font-black uppercase tracking-widest text-[#646464]">
+                        SHA-256 Hash or Certificate ID
+                      </label>
+                      <div className="flex items-center gap-3 rounded-xl border border-[#e0e0e0] bg-[#f6f6f6] px-4 py-3.5 focus-within:border-[#ea2804] focus-within:bg-white transition-all">
+                        <Fingerprint className="text-[#bbbbbb] shrink-0" size={18} />
+                        <input
+                          value={certificateId}
+                          onChange={(event) => {
+                            setCertificateId(event.target.value);
+                            setError('');
+                            setResult(null);
+                          }}
+                          placeholder="SHA-256 hash or EDUCRED-2025-..."
+                          className="w-full bg-transparent text-[11px] font-black tracking-widest text-[#202020] outline-none placeholder:text-[#bbbbbb] font-mono"
+                        />
+                      </div>
                     </div>
-                  </div>
-                )}
+                  )}
 
-                <button type="submit" disabled={!canSubmit} className="btn-primary w-full">
-                  {loading ? <Loader2 className="animate-spin" size={18} /> : <ShieldCheck size={18} />}
-                  {loading ? 'Verifying...' : 'Start Verification'}
-                </button>
-              </form>
+                  <button type="submit" disabled={!canSubmit} className="btn-primary w-full">
+                    {loading ? <Loader2 className="animate-spin" size={18} /> : <ShieldCheck size={18} />}
+                    {loading ? 'Verifying...' : 'Start Verification'}
+                  </button>
+                </form>
+              )}
 
               {/* Progress steps */}
               <div className="mt-7 pt-7 border-t border-[#e0e0e0]">
@@ -288,6 +421,102 @@ export default function Verifier() {
               animate={{ opacity: 1, x: 0 }}
               transition={{ ...transition, delay: 0.1 }}
             >
+              {/* Bulk results */}
+              {mode === 'BULK' && (
+                <AnimatePresence mode="wait">
+                  {!bulkResults && !bulkError && (
+                    <motion.div key="bulk-await"
+                      initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+                      className="bg-white border border-[#e0e0e0] rounded-3xl flex flex-col items-center justify-center min-h-[480px] p-12 text-center">
+                      <div className="w-20 h-20 bg-[#f6f6f6] rounded-full flex items-center justify-center mb-8 border border-[#e0e0e0]">
+                        <Rows3 size={36} className="text-[#bbbbbb]" />
+                      </div>
+                      <h2 className="text-4xl font-black text-[#202020] tracking-tight leading-none mb-4">
+                        Batch <span className="text-[#ea2804]">Verification.</span>
+                      </h2>
+                      <p className="text-[#646464] text-sm font-medium leading-relaxed max-w-xs">
+                        Upload a CSV or paste certificate IDs to verify up to 100 credentials in one request.
+                      </p>
+                    </motion.div>
+                  )}
+                  {bulkLoading && (
+                    <motion.div key="bulk-loading"
+                      initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+                      className="bg-white border border-[#e0e0e0] rounded-3xl flex flex-col items-center justify-center min-h-[480px]">
+                      <Loader2 size={40} className="animate-spin text-[#ea2804] mb-4" />
+                      <p className="text-[10px] font-black uppercase tracking-widest text-[#646464]">Running batch verification…</p>
+                    </motion.div>
+                  )}
+                  {bulkResults && (
+                    <motion.div key="bulk-results"
+                      initial={{ opacity: 0, scale: 0.97 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0 }}
+                      className="space-y-4">
+
+                      {/* Summary bar */}
+                      <div className="bg-[#202020] rounded-3xl p-6 flex items-center justify-between gap-4 flex-wrap">
+                        <div className="flex items-center gap-6">
+                          <div>
+                            <p className="text-[9px] font-black text-[#646464] uppercase tracking-widest">Total</p>
+                            <p className="text-3xl font-black text-white">{bulkResults.summary.total}</p>
+                          </div>
+                          <div>
+                            <p className="text-[9px] font-black text-[#2b9a66] uppercase tracking-widest">Valid</p>
+                            <p className="text-3xl font-black text-[#2b9a66]">{bulkResults.summary.valid}</p>
+                          </div>
+                          <div>
+                            <p className="text-[9px] font-black text-[#ea2804] uppercase tracking-widest">Invalid</p>
+                            <p className="text-3xl font-black text-[#ea2804]">{bulkResults.summary.invalid}</p>
+                          </div>
+                        </div>
+                        <button
+                          onClick={downloadBulkCSV}
+                          className="flex items-center gap-2 px-5 py-2.5 rounded-full bg-white/10 border border-white/20 text-white text-[10px] font-black uppercase tracking-widest hover:bg-white/20 transition-all"
+                        >
+                          <Download size={14} /> Export CSV
+                        </button>
+                      </div>
+
+                      {/* Results table */}
+                      <div className="bg-white border border-[#e0e0e0] rounded-3xl overflow-hidden">
+                        <div className="overflow-x-auto">
+                          <table className="w-full text-left text-[11px]">
+                            <thead>
+                              <tr className="border-b border-[#e0e0e0] bg-[#f6f6f6]">
+                                <th className="px-5 py-3 text-[9px] font-black uppercase tracking-widest text-[#646464]">ID</th>
+                                <th className="px-5 py-3 text-[9px] font-black uppercase tracking-widest text-[#646464]">Status</th>
+                                <th className="px-5 py-3 text-[9px] font-black uppercase tracking-widest text-[#646464]">Student</th>
+                                <th className="px-5 py-3 text-[9px] font-black uppercase tracking-widest text-[#646464]">Issuer</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {bulkResults.results.map((row, i) => (
+                                <tr key={i} className="border-b border-[#e0e0e0] last:border-0 hover:bg-[#f6f6f6] transition-colors">
+                                  <td className="px-5 py-3 font-mono text-[10px] text-[#646464] max-w-[140px] truncate">{row.id}</td>
+                                  <td className="px-5 py-3">
+                                    <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[9px] font-black uppercase tracking-widest ${
+                                      row.valid
+                                        ? 'bg-[#f0fdf4] text-[#15803d] border border-[#bbf7d0]'
+                                        : 'bg-[#fff1f2] text-[#be123c] border border-[#fecdd3]'
+                                    }`}>
+                                      {row.valid ? <CheckCircle2 size={10} /> : <XCircle size={10} />}
+                                      {row.valid ? 'Verified' : row.reason}
+                                    </span>
+                                  </td>
+                                  <td className="px-5 py-3 text-[#202020] font-black">{row.studentName ?? '—'}</td>
+                                  <td className="px-5 py-3 text-[#646464]">{row.issuer ?? '—'}</td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              )}
+
+              {/* Single verification results */}
+              {mode !== 'BULK' && (
               <AnimatePresence mode="wait">
 
                 {/* Awaiting state */}
@@ -464,6 +693,7 @@ export default function Verifier() {
                   </motion.div>
                 )}
               </AnimatePresence>
+              )}
             </motion.section>
           </div>
         </div>

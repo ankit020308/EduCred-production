@@ -1226,3 +1226,106 @@ export const downloadCertificateFile = async (req, res) => {
     return res.status(500).json({ error: 'Failed to download certificate file.' });
   }
 };
+
+const BULK_VERIFY_LIMIT = 100;
+
+/**
+ * POST /api/certificates/verify/bulk
+ * Body: { ids: string[] }  — certificate IDs (UUID, short ID, or SHA-256 hash)
+ * Also accepts CSV upload with a column named "certificateId" or "id".
+ *
+ * Returns an array of per-row verification results without hitting the blockchain
+ * (DB-only fast path), suitable for HR integrations and programmatic access.
+ */
+export const bulkVerify = async (req, res) => {
+  try {
+    let ids = [];
+
+    // CSV path — file uploaded via multer
+    if (req.file) {
+      const rows = [];
+      await new Promise((resolve, reject) => {
+        const stream = fs.createReadStream(req.file.path).pipe(csvParser());
+        stream.on('data', (row) => {
+          const val = row.certificateId ?? row.id ?? row['Certificate ID'] ?? row['ID'];
+          if (val && typeof val === 'string' && val.trim()) rows.push(val.trim());
+        });
+        stream.on('end', resolve);
+        stream.on('error', reject);
+      });
+      try { fs.unlinkSync(req.file.path); } catch { /* ignore */ }
+      ids = rows;
+    } else {
+      const raw = req.body.ids;
+      if (!Array.isArray(raw) || raw.length === 0) {
+        return res.status(400).json({ error: 'Provide an "ids" array or upload a CSV file.' });
+      }
+      ids = raw.map(String).map((s) => s.trim()).filter(Boolean);
+    }
+
+    if (ids.length > BULK_VERIFY_LIMIT) {
+      return res.status(400).json({ error: `Maximum ${BULK_VERIFY_LIMIT} certificates per request.` });
+    }
+
+    const results = await Promise.all(
+      ids.map(async (rawId) => {
+        try {
+          const isUUID = /^[0-9a-fA-F-]{36}$/.test(rawId);
+          const isSHA256 = /^[a-f0-9]{64}$/i.test(rawId);
+
+          let cert;
+          if (isUUID) {
+            cert = await Registry.findById('certificates', rawId);
+          } else if (isSHA256) {
+            cert = await Registry.findOne('certificates', { certificateHash: rawId });
+          } else {
+            cert = await Registry.findOne('certificates', { certificateId: rawId });
+          }
+
+          if (!cert) {
+            return { id: rawId, valid: false, reason: 'NOT_FOUND' };
+          }
+
+          if (cert.isRevoked) {
+            return { id: rawId, valid: false, reason: 'REVOKED', certificateId: cert.certificateId };
+          }
+
+          if (cert.status !== 'ANCHORED') {
+            return {
+              id: rawId,
+              valid: false,
+              reason: 'NOT_ANCHORED',
+              status: cert.status,
+              certificateId: cert.certificateId,
+            };
+          }
+
+          return {
+            id: rawId,
+            valid: true,
+            reason: 'VERIFIED',
+            certificateId: cert.certificateId,
+            studentName: cert.studentName,
+            degree: cert.degree,
+            issuer: cert.issuer,
+            issuedAt: cert.issuedAt,
+            txHash: cert.transactionHash,
+          };
+        } catch {
+          return { id: rawId, valid: false, reason: 'ERROR' };
+        }
+      })
+    );
+
+    const summary = {
+      total: results.length,
+      valid: results.filter((r) => r.valid).length,
+      invalid: results.filter((r) => !r.valid).length,
+    };
+
+    res.json({ summary, results });
+  } catch (err) {
+    logger.error('[BULK_VERIFY]', err.message);
+    res.status(500).json({ error: 'Bulk verification failed.' });
+  }
+};
