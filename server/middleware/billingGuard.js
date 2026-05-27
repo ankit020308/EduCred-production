@@ -1,6 +1,5 @@
 import Subscription from '../models/Subscription.js';
 import sequelize from '../config/database.js';
-import { Op } from 'sequelize';
 import { PLANS, DEFAULT_PLAN } from '../constants/plans.js';
 import { logger } from '../utils/winstonLogger.js';
 import { logAudit } from '../utils/auditLogger.js';
