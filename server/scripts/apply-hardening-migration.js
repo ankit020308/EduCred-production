@@ -251,13 +251,13 @@ async function run() {
   await ensureIndex('AuditLog', 'auditlog_userid_createdat_idx', ['userId', 'createdAt']);
   await ensureIndex('Certificate', 'certs_studentemail_idx', ['studentEmail']);
 
-  await changeColumnIfTableExists('ApiKeys', 'keyPrefix', {
+  await changeColumnIfTableExists('ApiKey', 'keyPrefix', {
     type: DataTypes.STRING(32),
     allowNull: false,
   });
 
   // Partial index — only active keys need fast ownerId lookups (M-10)
-  await ensureIndex('ApiKeys', 'apikeys_ownerid_active_idx', ['ownerId'], {
+  await ensureIndex('ApiKey', 'apikeys_ownerid_active_idx', ['ownerId'], {
     where: { isActive: true },
   });
 
