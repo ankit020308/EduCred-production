@@ -17,7 +17,7 @@ async function initializeDatabase() {
     // 2. Synchronize Schema
     // Using alter: true ensures missing tables/columns are created without data loss.
     console.log('[DB_INIT] [SYNC] Synchronizing schema models...');
-    await sequelize.sync({ alter: true });
+    await sequelize.sync();
     
     const tableCount = Object.keys(Models).length;
     console.log(`[DB_INIT] [SUCCESS] Schema synchronized. ${tableCount} tables verified/created.`);
