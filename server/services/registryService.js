@@ -48,7 +48,7 @@ class RegistryService {
       'Request',
       'FraudAlert',
       'VerificationLog',
-      'OtpRecords',
+      'OtpRecord',
     ];
 
     for (const tableName of requiredTables) {
