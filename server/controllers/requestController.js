@@ -65,7 +65,7 @@ export const getRequests = async (req, res) => {
       const requests = await Registry.find('requests', { studentId: student.id });
       return res.json(requests);
     }
-  } catch (err) {
+  } catch (_err) {
     res.status(500).json({ error: 'Failed to fetch requests' });
   }
 };
@@ -221,7 +221,7 @@ export const rejectRequest = async (req, res) => {
     });
 
     res.json({ message: 'Request rejected' });
-  } catch (err) {
+  } catch (_err) {
     res.status(500).json({ error: 'Rejection failed' });
   }
 };

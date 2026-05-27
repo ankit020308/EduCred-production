@@ -15,6 +15,8 @@ import { logAudit } from '../utils/auditLogger.js';
 import { certificateIssuanceSchema } from '../validators/joiSchemas.js';
 import { isPinataConfigured, uploadFileToPinata } from '../utils/ipfsService.js';
 import { queueCertificateAnchoring } from '../services/anchoringQueueService.js';
+import { resolveCertificateId, UUID_RE, SHA256_RE } from '../utils/certificateResolver.js';
+import { hashSHA256 } from '../utils/crypto.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -485,16 +487,7 @@ export const verifyCertificate = async (req, res) => {
       hashToVerify = metadata.certificateHash;
       extractedId = metadata.certificateId;
     } else if (certificateId) {
-      const isUUID = /^[0-9a-fA-F-]{36}$/.test(certificateId);
-      const isSHA256 = /^[a-f0-9]{64}$/i.test(certificateId);
-      let cert;
-      if (isUUID) {
-        cert = await Registry.findById('certificates', certificateId);
-      } else if (isSHA256) {
-        cert = await Registry.findOne('certificates', { certificateHash: certificateId });
-      } else {
-        cert = await Registry.findOne('certificates', { certificateId });
-      }
+      const cert = await resolveCertificateId(certificateId);
 
       if (!cert) {
         return res.status(404).json({ valid: false, message: 'Certificate not found on registry.' });
@@ -711,14 +704,28 @@ export const verifyByEnrollment = async (req, res) => {
       return res.status(400).json({ error: 'Enrollment number and university name are required.' });
     }
 
-    // Sequelize can't query JSONB with dot-notation keys — load by issuer, filter in JS
-    const allCerts = await Registry.find('certificates', { issuer: universityName });
-    const certs = allCerts.filter(
-      (c) => c.metadata?.studentEnrollmentNumber === enrollmentNumber
-    );
+    const page = Math.max(parseInt(req.query.page, 10) || 1, 1);
+    const limit = Math.min(Math.max(parseInt(req.query.limit, 10) || 20, 1), 50);
+    const offset = (page - 1) * limit;
 
-    res.json({ data: certs });
-  } catch (error) {
+    // Use Sequelize literal for JSONB field filtering to avoid loading all certs into memory.
+    const { rows: certs, count: total } = await Certificate.findAndCountAll({
+      where: sequelize.literal(
+        `"issuer" = ${sequelize.escape(universityName)} AND "metadata"->>'studentEnrollmentNumber' = ${sequelize.escape(enrollmentNumber)}`
+      ),
+      order: [['createdAt', 'DESC']],
+      limit,
+      offset,
+    });
+
+    // Strip phone number before returning — callers only need academic identity confirmation.
+    const safe = certs.map((c) => {
+      const payload = buildPublicCertificatePayload(c);
+      return payload;
+    });
+
+    res.json({ data: safe, total, page, pageSize: limit });
+  } catch (_error) {
     res.status(500).json({ error: 'Search failed.' });
   }
 };
@@ -845,19 +852,30 @@ export const editCertificate = async (req, res) => {
   }
 };
 
-export const getAllCertificatesForAdmin = async (_req, res) => {
+export const getAllCertificatesForAdmin = async (req, res) => {
   try {
-    const certs = await Registry.find('certificates');
-    const universities = await Registry.find('universities');
+    const page = Math.max(parseInt(req.query.page, 10) || 1, 1);
+    const limit = Math.min(Math.max(parseInt(req.query.limit, 10) || 50, 1), 200);
+    const offset = (page - 1) * limit;
+
+    const { rows: certs, count: total } = await Certificate.findAndCountAll({
+      order: [['createdAt', 'DESC']],
+      limit,
+      offset,
+    });
+
+    const universities = await Registry.find('universities', {}, { attributes: ['id', 'name'] });
     const uniMap = Object.fromEntries(universities.map(u => [String(u.id), u.name]));
+
     const enriched = certs.map(c => ({
       ...buildPublicCertificatePayload(c),
       universityName: uniMap[String(c.universityId)] || c.issuer,
       reviewedBy: c.reviewedBy || null,
       reviewedAt: c.reviewedAt || null,
     }));
-    res.json({ data: enriched });
-  } catch (err) {
+
+    res.json({ data: enriched, total, page, pageSize: limit });
+  } catch (_err) {
     res.status(500).json({ error: 'Failed to fetch certificates.' });
   }
 };
@@ -887,22 +905,45 @@ export const rejectCertificate = async (req, res) => {
 
 export const getCertificates = async (req, res) => {
   try {
-    const certs = await Registry.find('certificates', { issuedBy: req.user.id });
-    res.json({ data: certs });
-  } catch (err) {
+    const page = Math.max(parseInt(req.query.page, 10) || 1, 1);
+    const limit = Math.min(Math.max(parseInt(req.query.limit, 10) || 50, 1), 100);
+    const offset = (page - 1) * limit;
+    const universityId = req.user.institutionId ||
+      (await Registry.findOne('universities', { userId: req.user.id }))?.id;
+
+    if (!universityId) {
+      return res.status(404).json({ error: 'Institution profile not found.' });
+    }
+
+    const { rows: certs, count: total } = await Certificate.findAndCountAll({
+      where: { universityId },
+      order: [['createdAt', 'DESC']],
+      limit,
+      offset,
+    });
+
+    res.json({ data: certs, total, page, pageSize: limit });
+  } catch (_err) {
     res.status(500).json({ error: 'Failed to fetch certificates.' });
   }
 };
 
 export const getStats = async (req, res) => {
   try {
-    const total = await Registry.count('certificates', { issuedBy: req.user.id });
-    const confirmed = await Registry.count('certificates', { issuedBy: req.user.id, status: 'CONFIRMED' });
-    const pending = await Registry.count('certificates', { issuedBy: req.user.id, status: 'PENDING_REVIEW' });
-    const failed = await Registry.count('certificates', { issuedBy: req.user.id, status: 'ANCHOR_FAILED' });
+    const universityId = req.user.institutionId ||
+      (await Registry.findOne('universities', { userId: req.user.id }))?.id;
+
+    if (!universityId) {
+      return res.status(404).json({ error: 'Institution profile not found.' });
+    }
+
+    const total = await Registry.count('certificates', { universityId });
+    const confirmed = await Registry.count('certificates', { universityId, status: 'CONFIRMED' });
+    const pending = await Registry.count('certificates', { universityId, status: 'PENDING_REVIEW' });
+    const failed = await Registry.count('certificates', { universityId, status: 'ANCHOR_FAILED' });
 
     res.json({ total, confirmed, pending, failed });
-  } catch (err) {
+  } catch (_err) {
     res.status(500).json({ error: 'Failed to fetch statistics.' });
   }
 };
@@ -944,7 +985,7 @@ export const verifyPDFCertificate = async (req, res) => {
     }
 
     // Recompute SHA-256 of the uploaded PDF binary and compare with stored pdfHash
-    const uploadedHash = crypto.createHash('sha256').update(fileBuffer).digest('hex');
+    const uploadedHash = hashSHA256(fileBuffer);
     const storedHash = cert.pdfHash;
 
     const requestIp = req.ip || req.connection?.remoteAddress || '0.0.0.0';
@@ -1023,23 +1064,30 @@ export const getAdminWalletStatus = async (_req, res) => {
     const universities = await Registry.find('universities');
     const uniMap = Object.fromEntries(universities.map(u => [String(u.id), u]));
 
-    const pendingFundsItems = await Promise.all(
-      stuckCerts.map(async (c) => {
-        const uni = uniMap[String(c.universityId)];
-        let walletInfo = null;
-        if (uni?.encryptedPrivateKey) {
-          walletInfo = await checkUniversityWalletFunds(uni.encryptedPrivateKey).catch(() => null);
-        }
-        return {
-          certificateId: c.certificateId,
-          certDbId: c.id,
-          universityName: uni?.name || c.issuer,
-          walletAddress: walletInfo?.address || uni?.publicWalletAddress,
-          balanceEth: walletInfo?.balanceEth || '0',
-          sufficient: walletInfo?.sufficient || false,
-        };
-      })
-    );
+    // Cap at 20 concurrent blockchain RPC calls to avoid request timeout under load.
+    const WALLET_CHECK_CONCURRENCY = 5;
+    const pendingFundsItems = [];
+    for (let i = 0; i < stuckCerts.length; i += WALLET_CHECK_CONCURRENCY) {
+      const batch = stuckCerts.slice(i, i + WALLET_CHECK_CONCURRENCY);
+      const batchResults = await Promise.all(
+        batch.map(async (c) => {
+          const uni = uniMap[String(c.universityId)];
+          let walletInfo = null;
+          if (uni?.encryptedPrivateKey) {
+            walletInfo = await checkUniversityWalletFunds(uni.encryptedPrivateKey).catch(() => null);
+          }
+          return {
+            certificateId: c.certificateId,
+            certDbId: c.id,
+            universityName: uni?.name || c.issuer,
+            walletAddress: walletInfo?.address || uni?.publicWalletAddress,
+            balanceEth: walletInfo?.balanceEth || '0',
+            sufficient: walletInfo?.sufficient || false,
+          };
+        })
+      );
+      pendingFundsItems.push(...batchResults);
+    }
 
     res.json({
       serverWallet: serverInfo,
@@ -1077,7 +1125,7 @@ export const getPublicCertificate = async (req, res) => {
         : null,
       status: cert.status,
     });
-  } catch (err) {
+  } catch (_err) {
     res.status(500).json({ error: 'Failed to fetch certificate.' });
   }
 };
@@ -1085,17 +1133,14 @@ export const getPublicCertificate = async (req, res) => {
 export const getCertificateById = async (req, res) => {
   try {
     const { id } = req.params;
-    const isUUID = /^[0-9a-fA-F-]{36}$/.test(id);
-    const cert = isUUID
-      ? await Registry.findById('certificates', id)
-      : await Registry.findOne('certificates', { certificateId: id });
+    const cert = await resolveCertificateId(id);
 
     if (!cert) {
       return res.status(404).json({ error: 'Certificate not found.' });
     }
 
     res.json(buildPublicCertificatePayload(cert));
-  } catch (err) {
+  } catch (_err) {
     res.status(500).json({ error: 'Failed to fetch certificate.' });
   }
 };
@@ -1222,7 +1267,7 @@ export const downloadCertificateFile = async (req, res) => {
       logger.error(`[PDF_REGEN] Failed for ${cert.certificateId}:`, pdfErr.message);
       return res.status(500).json({ error: 'Certificate file is unavailable and could not be regenerated.' });
     }
-  } catch (err) {
+  } catch (_err) {
     return res.status(500).json({ error: 'Failed to download certificate file.' });
   }
 };
@@ -1253,7 +1298,6 @@ export const bulkVerify = async (req, res) => {
         stream.on('end', resolve);
         stream.on('error', reject);
       });
-      try { fs.unlinkSync(req.file.path); } catch { /* ignore */ }
       ids = rows;
     } else {
       const raw = req.body.ids;
@@ -1267,55 +1311,66 @@ export const bulkVerify = async (req, res) => {
       return res.status(400).json({ error: `Maximum ${BULK_VERIFY_LIMIT} certificates per request.` });
     }
 
-    const results = await Promise.all(
-      ids.map(async (rawId) => {
-        try {
-          const isUUID = /^[0-9a-fA-F-]{36}$/.test(rawId);
-          const isSHA256 = /^[a-f0-9]{64}$/i.test(rawId);
+    // Classify IDs by type to enable batched queries
+    const uuids = [], hashes = [], shortIds = [];
+    for (const rawId of ids) {
+      if (UUID_RE.test(rawId)) uuids.push(rawId);
+      else if (SHA256_RE.test(rawId)) hashes.push(rawId);
+      else shortIds.push(rawId);
+    }
 
-          let cert;
-          if (isUUID) {
-            cert = await Registry.findById('certificates', rawId);
-          } else if (isSHA256) {
-            cert = await Registry.findOne('certificates', { certificateHash: rawId });
-          } else {
-            cert = await Registry.findOne('certificates', { certificateId: rawId });
-          }
+    // At most 3 DB round-trips regardless of ids.length
+    const [byUuid, byHash, byShortId] = await Promise.all([
+      uuids.length    ? Registry.find('certificates', { id: { $in: uuids } })                        : [],
+      hashes.length   ? Registry.find('certificates', { certificateHash: { $in: hashes } })          : [],
+      shortIds.length ? Registry.find('certificates', { certificateId: { $in: shortIds } })          : [],
+    ]);
 
-          if (!cert) {
-            return { id: rawId, valid: false, reason: 'NOT_FOUND' };
-          }
+    const uuidMap    = new Map(byUuid.map((c) => [c.id, c]));
+    const hashMap    = new Map(byHash.map((c) => [c.certificateHash, c]));
+    const shortIdMap = new Map(byShortId.map((c) => [c.certificateId, c]));
 
-          if (cert.isRevoked) {
-            return { id: rawId, valid: false, reason: 'REVOKED', certificateId: cert.certificateId };
-          }
+    const results = ids.map((rawId) => {
+      try {
+        const isUUID   = UUID_RE.test(rawId);
+        const isSHA256 = SHA256_RE.test(rawId);
 
-          if (cert.status !== 'ANCHORED') {
-            return {
-              id: rawId,
-              valid: false,
-              reason: 'NOT_ANCHORED',
-              status: cert.status,
-              certificateId: cert.certificateId,
-            };
-          }
+        const cert = isUUID   ? uuidMap.get(rawId)
+                   : isSHA256 ? hashMap.get(rawId)
+                              : shortIdMap.get(rawId);
 
+        if (!cert) return { id: rawId, valid: false, reason: 'NOT_FOUND' };
+
+        if (cert.isRevoked) {
+          return { id: rawId, valid: false, reason: 'REVOKED', certificateId: cert.certificateId };
+        }
+
+        const ANCHORED_STATUSES = new Set(['CONFIRMED', 'COMPLETED']);
+        if (!ANCHORED_STATUSES.has(cert.status)) {
           return {
             id: rawId,
-            valid: true,
-            reason: 'VERIFIED',
+            valid: false,
+            reason: 'NOT_ANCHORED',
+            status: cert.status,
             certificateId: cert.certificateId,
-            studentName: cert.studentName,
-            degree: cert.degree,
-            issuer: cert.issuer,
-            issuedAt: cert.issuedAt,
-            txHash: cert.transactionHash,
           };
-        } catch {
-          return { id: rawId, valid: false, reason: 'ERROR' };
         }
-      })
-    );
+
+        return {
+          id: rawId,
+          valid: true,
+          reason: 'VERIFIED',
+          certificateId: cert.certificateId,
+          studentName: cert.studentName,
+          degree: cert.course,
+          issuer: cert.issuer,
+          issuedAt: cert.issuedAt,
+          txHash: cert.blockchainTxHash,
+        };
+      } catch {
+        return { id: rawId, valid: false, reason: 'ERROR' };
+      }
+    });
 
     const summary = {
       total: results.length,
@@ -1327,5 +1382,9 @@ export const bulkVerify = async (req, res) => {
   } catch (err) {
     logger.error('[BULK_VERIFY]', err.message);
     res.status(500).json({ error: 'Bulk verification failed.' });
+  } finally {
+    if (req.file?.path) {
+      try { fs.unlinkSync(req.file.path); } catch { /* ignore cleanup errors */ }
+    }
   }
 };

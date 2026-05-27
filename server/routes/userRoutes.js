@@ -3,15 +3,21 @@ import { logger } from '../utils/winstonLogger.js';
 import fs from 'fs';
 import Registry from '../services/registryService.js';
 import crypto from 'crypto';
+import sequelize from '../config/database.js';
+import Certificate from '../models/Certificate.js';
+import ApiKey from '../models/ApiKey.js';
+import AuditLog from '../models/AuditLog.js';
 import { protect, requireRole } from '../middleware/authMiddleware.js';
-import { upload } from '../middleware/uploadMiddleware.js';
+import { authLimiter } from '../middleware/rateLimiter.js';
+import { IMAGE_MIME_TYPES, upload, validateUploadedFileMagicBytes } from '../middleware/uploadMiddleware.js';
+import { invalidateApiKeyCache } from '../middleware/apiKeyMiddleware.js';
 import { uploadFileToPinata, isPinataConfigured } from '../utils/ipfsService.js';
 import { createEncryptedWalletRecord } from '../utils/keyVault.js';
 
 const router = express.Router();
 
 // ─── UPLOAD PROFILE PHOTO ─────────────────────────────
-router.post('/profile/upload-photo', protect, upload.single('photo'), async (req, res) => {
+router.post('/profile/upload-photo', protect, upload.single('photo'), validateUploadedFileMagicBytes(IMAGE_MIME_TYPES), async (req, res) => {
     let tempPath = req.file?.path;
     try {
         if (!req.file) return res.status(400).json({ error: 'No file provided.' });
@@ -73,7 +79,14 @@ router.put('/profile', protect, async (req, res) => {
         if (name !== undefined) updates.name = String(name).trim().slice(0, 100);
         if (phoneNumber !== undefined) updates.phoneNumber = String(phoneNumber).trim().slice(0, 20);
         if (bio !== undefined) updates.bio = String(bio).trim().slice(0, 500);
-        if (avatar !== undefined) updates.avatar = String(avatar).trim().slice(0, 1024);
+        if (avatar !== undefined) {
+            const avatarStr = String(avatar).trim();
+            // Only accept absolute HTTPS URLs to prevent data: / javascript: injection
+            if (avatarStr && !/^https:\/\/.{1,1000}$/.test(avatarStr)) {
+                return res.status(400).json({ error: 'avatar must be an absolute HTTPS URL.' });
+            }
+            updates.avatar = avatarStr.slice(0, 1024);
+        }
 
         if (Object.keys(updates).length === 0) {
             return res.status(400).json({ error: 'No valid fields provided to update.' });
@@ -106,27 +119,6 @@ router.put('/profile', protect, async (req, res) => {
     }
 });
 
-// ─── VERIFY PHONE ─────────────────────────────────────
-router.post('/verify-phone', protect, async (req, res) => {
-    try {
-        await Registry.update('users', { id: req.user.id }, { isPhoneVerified: true });
-        const user = await Registry.findById('users', req.user.id);
-        res.json({ message: 'Phone verified successfully', user });
-    } catch (err) {
-        res.status(500).json({ error: err.message });
-    }
-});
-
-// ─── VERIFY EMAIL ─────────────────────────────────────
-router.post('/verify-email', protect, async (req, res) => {
-    try {
-        await Registry.update('users', { id: req.user.id }, { isEmailVerified: true });
-        const user = await Registry.findById('users', req.user.id);
-        res.json({ message: 'Email verified successfully', user });
-    } catch (err) {
-        res.status(500).json({ error: err.message });
-    }
-});
 
 // ─── STUDENT PROFILE DETAILS ──────────────────────────
 router.get('/profile/student-details', protect, requireRole('student'), async (req, res) => {
@@ -143,7 +135,7 @@ router.get('/profile/student-details', protect, requireRole('student'), async (r
             } catch { /* non-fatal */ }
         }
 
-        const { id, userId, digilockerAccessToken, digilockerRefreshToken, ...safe } = student.dataValues || student;
+        const { id: _id, userId: _userId, digilockerAccessToken: _at, digilockerRefreshToken: _rt, ...safe } = student.dataValues || student;
         const userRecord = await Registry.findById('users', req.user.id).catch(() => null);
         res.json({ ...safe, profileImageUrl: userRecord?.profileImageUrl || null });
     } catch (err) {
@@ -161,7 +153,7 @@ router.put('/profile/student-details', protect, requireRole('student'), async (r
         if (Object.keys(updates).length === 0) return res.status(400).json({ error: 'No valid fields provided.' });
         await Registry.update('students', { userId: req.user.id }, updates);
         const student = await Registry.findOne('students', { userId: req.user.id });
-        const { id, userId, digilockerAccessToken, digilockerRefreshToken, ...safe } = student.dataValues || student;
+        const { id: _id2, userId: _userId2, digilockerAccessToken: _at2, digilockerRefreshToken: _rt2, ...safe } = student.dataValues || student;
         res.json(safe);
     } catch (err) {
         res.status(500).json({ error: err.message });
@@ -186,7 +178,7 @@ router.get('/profile/institution-details', protect, requireRole('university', 'U
             } catch { /* non-fatal */ }
         }
 
-        const { encryptedPrivateKey, ...safe } = uni.dataValues || uni;
+        const { encryptedPrivateKey: _pk, ...safe } = uni.dataValues || uni;
         const userRecord = await Registry.findById('users', req.user.id).catch(() => null);
         res.json({ ...safe, profileImageUrl: userRecord?.profileImageUrl || null });
     } catch (err) {
@@ -203,7 +195,7 @@ router.put('/profile/institution-details', protect, requireRole('university', 'U
         if (Object.keys(updates).length === 0) return res.status(400).json({ error: 'No valid fields provided.' });
         await Registry.update('universities', { userId: req.user.id }, updates);
         const uni = await Registry.findOne('universities', { userId: req.user.id });
-        const { encryptedPrivateKey, ...safe } = uni.dataValues || uni;
+        const { encryptedPrivateKey: _pk2, ...safe } = uni.dataValues || uni;
         res.json(safe);
     } catch (err) {
         res.status(500).json({ error: err.message });
@@ -240,14 +232,14 @@ router.post('/consent', protect, async (req, res) => {
             consentGivenAt: new Date(),
         });
         res.json({ success: true });
-    } catch (err) {
+    } catch {
         res.status(500).json({ error: 'Failed to record consent.' });
     }
 });
 
 // ─── DPDPA 2023 — DATA EXPORT ─────────────────────────
 // Returns all personal data held for the requesting user as JSON.
-router.get('/me/export', protect, async (req, res) => {
+router.get('/me/export', authLimiter, protect, async (req, res) => {
     try {
         const user = await Registry.findById('users', req.user.id);
         if (!user) return res.status(404).json({ error: 'User not found.' });
@@ -262,23 +254,50 @@ router.get('/me/export', protect, async (req, res) => {
             ? await Registry.findOne('universities', { userId: req.user.id }).catch(() => null)
             : null;
 
-        const certificates = student
-            ? await Registry.find('certificates', { studentId: student?.id }).catch(() => [])
-            : [];
+        const certificateWhere = student ? { studentId: student.id } : null;
+        const [certificates, totalCertificates, apiKeys, auditLog] = await Promise.all([
+            student
+                ? Certificate.findAll({
+                    where: certificateWhere,
+                    limit: 500,
+                    order: [['createdAt', 'DESC']],
+                  }).catch(() => [])
+                : [],
+            student
+                ? Certificate.count({ where: certificateWhere }).catch(() => 0)
+                : 0,
+            ApiKey.findAll({
+                where: { ownerId: req.user.id },
+                attributes: ['id', 'name', 'keyPrefix', 'ownerRole', 'rateLimit', 'isActive', 'expiresAt', 'lastUsedAt', 'createdAt'],
+                order: [['createdAt', 'DESC']],
+            }).catch(() => []),
+            AuditLog.findAll({
+                where: { userId: req.user.id },
+                attributes: ['action', 'status', 'detail', 'metadata', 'createdAt'],
+                order: [['createdAt', 'DESC']],
+                limit: 1000,
+            }).catch(() => []),
+        ]);
 
         const export_ = {
             exportedAt: new Date().toISOString(),
             user: userObj,
             studentProfile: student
-                ? (() => { const { digilockerAccessToken, digilockerRefreshToken, ...safe } = student.dataValues || student; return safe; })()
+                ? (() => { const { digilockerAccessToken: _a, digilockerRefreshToken: _r, ...safe } = student.dataValues || student; return safe; })()
                 : null,
             universityProfile: university
-                ? (() => { const { encryptedPrivateKey, ...safe } = university.dataValues || university; return safe; })()
+                ? (() => { const { encryptedPrivateKey: _p, ...safe } = university.dataValues || university; return safe; })()
                 : null,
             certificates: certificates.map((c) => {
-                const { pdfCid, ...safe } = c.dataValues || c;
+                const { pdfCid: _pdf, ...safe } = c.dataValues || c;
                 return safe;
             }),
+            totalCertificates,
+            apiKeys: apiKeys.map((k) => {
+                const { keyHash: _keyHash, ...safe } = k.dataValues || k;
+                return safe;
+            }),
+            auditLog: auditLog.map((entry) => entry.dataValues || entry),
         };
 
         res.setHeader('Content-Disposition', `attachment; filename="educred-export-${req.user.id}.json"`);
@@ -300,31 +319,69 @@ router.delete('/me', protect, async (req, res) => {
             });
         }
 
-        const anonymisedName = `[deleted-${crypto.randomBytes(4).toString('hex')}]`;
-        const anonymisedEmail = `deleted-${req.user.id}@erased.invalid`;
+        const apiKeysToInvalidate = [];
 
-        // Wipe PII on User record
-        await Registry.update('users', { id: req.user.id }, {
-            name: anonymisedName,
-            email: anonymisedEmail,
-            passwordHash: '[erased]',
-            phoneNumber: null,
-            bio: null,
-            avatar: null,
-            profileImageUrl: null,
-            googleId: null,
-            isLocked: true,
-            deletedAt: new Date(),
+        await sequelize.transaction(async (transaction) => {
+            const anonymisedName = `[deleted-${crypto.randomBytes(4).toString('hex')}]`;
+            const anonymisedEmail = `deleted-${req.user.id}@erased.invalid`;
+
+            // Wipe PII on User record.
+            // tokenVersion increment invalidates ALL outstanding JWTs for this user.
+            // lockedUntil far-future prevents the OTP auto-unlock branch (null <= Date.now() → true).
+            const currentUser = await Registry.findById('users', req.user.id, { transaction });
+            const keys = await ApiKey.findAll({
+                where: { ownerId: req.user.id },
+                attributes: ['id', 'keyHash'],
+                transaction,
+            });
+            apiKeysToInvalidate.push(...keys.map((key) => key.keyHash).filter(Boolean));
+
+            await Registry.update('users', { id: req.user.id }, {
+                name: anonymisedName,
+                email: anonymisedEmail,
+                passwordHash: '[erased]',
+                phoneNumber: null,
+                bio: null,
+                avatar: null,
+                profileImageUrl: null,
+                googleId: null,
+                isLocked: true,
+                lockedUntil: new Date('9999-12-31'),
+                deletedAt: new Date(),
+                tokenVersion: (currentUser?.tokenVersion ?? 0) + 1,
+            }, { transaction });
+
+            // Wipe student PII and anonymise certificates (DPDPA right-to-erasure)
+            if (req.user.role === 'student') {
+                const studentRecord = await Registry.findOne('students', { userId: req.user.id }, { transaction });
+                await Registry.update('students', { userId: req.user.id }, {
+                    name: anonymisedName,
+                    digilockerAccessToken: null,
+                    digilockerRefreshToken: null,
+                }, { transaction }).catch(() => {});
+
+                if (studentRecord) {
+                    // Anonymise personal fields on every certificate issued to this student.
+                    // The blockchain anchor (certificateHash, blockchainTxHash) is immutable and
+                    // intentionally preserved for integrity; personal identifiers are wiped here.
+                    await Certificate.update(
+                        {
+                            studentName: anonymisedName,
+                            studentEmail: anonymisedEmail,
+                            studentPhone: null,
+                        },
+                        { where: { studentId: studentRecord.id }, transaction }
+                    );
+                }
+            }
+
+            await ApiKey.update(
+                { isActive: false },
+                { where: { ownerId: req.user.id }, transaction }
+            );
         });
 
-        // Wipe student PII
-        if (req.user.role === 'student') {
-            await Registry.update('students', { userId: req.user.id }, {
-                name: anonymisedName,
-                digilockerAccessToken: null,
-                digilockerRefreshToken: null,
-            }).catch(() => {});
-        }
+        await Promise.all(apiKeysToInvalidate.map((keyHash) => invalidateApiKeyCache(keyHash)));
 
         logger.info(`[DPDPA] User ${req.user.id} erased under right-to-erasure request.`);
         res.json({ success: true, message: 'Your account data has been erased.' });

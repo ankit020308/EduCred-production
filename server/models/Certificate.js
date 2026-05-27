@@ -103,7 +103,7 @@ const Certificate = sequelize.define('Certificate', {
         defaultValue: 'Degree Certificate'
     },
     metadata: {
-        type: DataTypes.JSON,
+        type: DataTypes.JSONB,
         defaultValue: {}
     },
     pdfHash: {

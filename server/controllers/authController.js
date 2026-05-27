@@ -1,6 +1,5 @@
 import Registry from '../services/registryService.js';
 import jwt from 'jsonwebtoken';
-import crypto from 'crypto';
 import bcrypt from 'bcryptjs';
 
 import { registrationSchema, loginSchema, onboardingSchema } from '../validators/joiSchemas.js';
@@ -12,9 +11,12 @@ import { sendPhoneOTP } from '../utils/smsService.js';
 import { logAudit } from '../utils/auditLogger.js';
 import { jwtSecret, refreshSecret } from '../utils/runtimeConfig.js';
 import { createEncryptedWalletRecord } from '../utils/keyVault.js';
+import { logger } from '../utils/winstonLogger.js';
+import { hashSHA256 } from '../utils/crypto.js';
 
 const JWT_EXPIRES = '1h';
 const REFRESH_EXPIRES = '7d';
+const BCRYPT_ROUNDS = Number.parseInt(process.env.BCRYPT_ROUNDS || '12', 10);
 
 const buildUserPayload = async (userId) => {
   const user = await Registry.findById('users', userId);
@@ -83,7 +85,7 @@ const clearAuthCookies = (res) => {
   res.clearCookie('refreshToken', opts);
 };
 
-const extractRefreshToken = (req) => req.cookies?.refreshToken || req.body?.token || null;
+const extractRefreshToken = (req) => req.cookies?.refreshToken || null;
 
 const blacklistTokenIfPresent = async (token) => {
   if (!token) {
@@ -146,7 +148,14 @@ export const setCookies = (res, accessToken, refreshToken) => {
   res.cookie('refreshToken', refreshToken, cookieOptions);
 };
 const generateOTP = () => Math.floor(100000 + Math.random() * 900000).toString();
-const hashOTP = (otp) => crypto.createHash('sha256').update(otp).digest('hex');
+const hashOTP = (otp) => bcrypt.hash(String(otp), BCRYPT_ROUNDS);
+const verifyOTPHash = async (otp, storedHash) => {
+  if (!storedHash) return false;
+  if (/^[a-f0-9]{64}$/i.test(storedHash)) {
+    return hashSHA256(String(otp)) === storedHash;
+  }
+  return bcrypt.compare(String(otp), storedHash);
+};
 const isResendTestingLimitError = (error) =>
   String(error?.message || '').toLowerCase().includes('you can only send testing emails');
 
@@ -171,22 +180,10 @@ export const register = async (req, res) => {
 
     const otp = generateOTP();
     if (process.env.NODE_ENV !== 'production') {
-      console.log(`\n🔑 [DEV_AUTH]: Activation Code for ${email} is: ${otp}\n`);
+      logger.debug('[DEV_AUTH] OTP generated for registration', { requestId: req.id, emailDomain: email.split('@')[1] });
     }
-    const hashedOtp = hashOTP(otp);
-    // 🎓 STUDENT ENROLLMENT GATE: Relaxed for better onboarding.
-    // We now allow students to register even if a certificate hasn't been issued yet.
-    // They will simply see an empty dashboard until their institution uploads credentials.
-    /*
-    if (role === ROLES.STUDENT) {
-      const allowedCert = await Registry.findOne('certificates', { studentEmail: email });
-      if (!allowedCert) {
-        return res.status(403).json({ error: 'No certificate has been issued to this email address. Contact your institution to register.' });
-      }
-    }
-    */
-
-    const passwordHash = await bcrypt.hash(password, 12);
+    const hashedOtp = await hashOTP(otp);
+    const passwordHash = await bcrypt.hash(password, BCRYPT_ROUNDS);
 
     // 🔐 TRANSACTIONAL GATE: Ensure atomicity across User and Profile nodes
     const { requiresVerification, user: createdUser, verificationCode } = await Registry.transaction(async (t) => {
@@ -263,7 +260,7 @@ export const register = async (req, res) => {
           // In production, email failure aborts the transaction.
           throw new Error(`EMAIL_DISPATCH_FAILED: ${error.message}`);
         } else {
-          console.log(`[DEV_AUTH] [BYPASS] Email delivery failed but registration allowed. OTP: ${otp}`);
+          logger.debug('[DEV_AUTH] Email delivery failed but registration allowed', { requestId: req.id, emailDomain: email.split('@')[1] });
         }
       }
 
@@ -305,23 +302,15 @@ export const login = async (req, res) => {
     const { email: rawEmail, password } = req.body;
     const email = rawEmail.toLowerCase();
 
-    // Admin login via env credentials (bypasses DB)
-    const adminEmail = process.env.ADMIN_EMAIL?.toLowerCase();
-    const adminPassword = process.env.ADMIN_PASSWORD;
-    if (adminEmail && adminPassword && email === adminEmail && password === adminPassword) {
-      const accessToken = signToken('admin', 'admin');
-      const refreshToken = signRefreshToken('admin');
-      setCookies(res, accessToken, refreshToken);
-      return res.json({
-        accessToken,
-        user: { id: 'admin', name: 'Admin', email: adminEmail, role: 'admin', isVerified: true },
-      });
-    }
-
     const user = await Registry.findOne('users', { email });
 
     if (!user || !(await bcrypt.compare(password, user.passwordHash))) {
       logger.info(`[AUTH] Login attempt: ${email}, status: INVALID_CREDENTIALS`);
+      return res.status(401).json({ error: 'Invalid credentials.' });
+    }
+
+    if (user.deletedAt) {
+      logger.info(`[AUTH] Login attempt on deleted account: ${email}`);
       return res.status(401).json({ error: 'Invalid credentials.' });
     }
 
@@ -351,8 +340,8 @@ export const login = async (req, res) => {
     }
 
     const extraPayload = university
-      ? { institutionId: university.id, walletAddress: university.publicWalletAddress || null }
-      : {};
+      ? { institutionId: university.id, walletAddress: university.publicWalletAddress || null, tv: user.tokenVersion ?? 0 }
+      : { tv: user.tokenVersion ?? 0 };
 
     const accessToken = signToken(user.id, user.role, extraPayload);
     const refreshToken = signRefreshToken(user.id);
@@ -388,6 +377,11 @@ export const verifyOTP = async (req, res) => {
       return res.status(404).json({ error: 'Account not found.' });
     }
 
+    // Guard: permanently deleted accounts must never be reactivatable.
+    if (user.deletedAt) {
+      return res.status(403).json({ error: 'Account has been deleted.' });
+    }
+
     // 1. Check if account is locked
     if (user.isLocked && user.lockedUntil > Date.now()) {
       const waitTime = Math.ceil((user.lockedUntil - Date.now()) / 60000);
@@ -415,11 +409,7 @@ export const verifyOTP = async (req, res) => {
       return res.status(400).json({ error: 'Security key expired. Request a new one.' });
     }
 
-    // 4. Compare hashed OTP using constant-time comparison
-    const expectedOtpHash = Buffer.from(hashOTP(otp), 'utf8');
-    const actualOtpHash = Buffer.from(otpRecord.otpHash, 'utf8');
-
-    if (expectedOtpHash.length !== actualOtpHash.length || !crypto.timingSafeEqual(expectedOtpHash, actualOtpHash)) {
+    if (!(await verifyOTPHash(otp, otpRecord.otpHash))) {
       const newAttempts = otpRecord.attempts + 1;
       await Registry.update('otpRecords', { id: otpRecord.id }, { attempts: newAttempts });
       const remaining = 5 - newAttempts;
@@ -449,8 +439,8 @@ export const verifyOTP = async (req, res) => {
 
     const otpUniversity = user.role === ROLES.UNIVERSITY ? await Registry.findOne('universities', { userId: user.id }) : null;
     const otpExtraPayload = otpUniversity
-      ? { institutionId: otpUniversity.id, walletAddress: otpUniversity.publicWalletAddress || null }
-      : {};
+      ? { institutionId: otpUniversity.id, walletAddress: otpUniversity.publicWalletAddress || null, tv: user.tokenVersion ?? 0 }
+      : { tv: user.tokenVersion ?? 0 };
 
     const accessToken = signToken(user.id, user.role, otpExtraPayload);
     const refreshToken = signRefreshToken(user.id);
@@ -493,7 +483,7 @@ export const resendOTP = async (req, res) => {
 
     const otp = generateOTP();
     const newOtpData = {
-      otpHash: hashOTP(otp),
+      otpHash: await hashOTP(otp),
       expiresAt: new Date(Date.now() + 10 * 60 * 1000),
       attempts: 0,
       lastResend: now
@@ -547,22 +537,18 @@ export const refreshToken = async (req, res) => {
       return res.status(401).json({ error: 'Refresh token revoked. Please login again.' });
     }
 
-    const decoded = jwt.verify(token, refreshSecret);
-
-    // Admin refresh: not in DB, handle directly
-    if (decoded.id === 'admin') {
-      const accessToken = signToken('admin', 'admin');
-      const rotatedRefreshToken = signRefreshToken('admin');
-      await blacklistTokenIfPresent(token);
-      setCookies(res, accessToken, rotatedRefreshToken);
-      return res.status(200).json({ accessToken, success: true });
-    }
+    const decoded = jwt.verify(token, refreshSecret, { algorithms: ['HS256'] });
 
     const user = await Registry.findById('users', decoded.id);
 
     if (!user) {
       clearAuthCookies(res);
       return res.status(401).json({ error: 'Account no longer exists.' });
+    }
+
+    if (user.deletedAt) {
+      clearAuthCookies(res);
+      return res.status(401).json({ error: 'Account has been deleted.', code: 'ACCOUNT_DELETED' });
     }
 
     if (!user.isEmailVerified) {
@@ -572,8 +558,8 @@ export const refreshToken = async (req, res) => {
 
     const refreshUniversity = user.role === ROLES.UNIVERSITY ? await Registry.findOne('universities', { userId: user.id }) : null;
     const refreshExtraPayload = refreshUniversity
-      ? { institutionId: refreshUniversity.id, walletAddress: refreshUniversity.publicWalletAddress || null }
-      : {};
+      ? { institutionId: refreshUniversity.id, walletAddress: refreshUniversity.publicWalletAddress || null, tv: user.tokenVersion ?? 0 }
+      : { tv: user.tokenVersion ?? 0 };
 
     const accessToken = signToken(user.id, user.role, refreshExtraPayload);
     const rotatedRefreshToken = signRefreshToken(user.id);
@@ -582,7 +568,7 @@ export const refreshToken = async (req, res) => {
     setCookies(res, accessToken, rotatedRefreshToken);
 
     res.status(200).json({ accessToken, success: true });
-  } catch (err) {
+  } catch (_err) {
     clearAuthCookies(res);
     res.status(401).json({ error: 'Invalid or expired refresh token.' });
   }
@@ -611,7 +597,7 @@ export const sendPhoneVerification = async (req, res) => {
     await Registry.update('users', { id: user.id }, { phoneNumber });
 
     const newOtpData = {
-      otpHash: hashOTP(otp),
+      otpHash: await hashOTP(otp),
       expiresAt: new Date(Date.now() + 5 * 60 * 1000),
       attempts: 0
     };
@@ -649,16 +635,13 @@ export const verifyPhoneOTP = async (req, res) => {
       return res.status(404).json({ error: 'Mobile verification challenge not found.' });
     }
 
-    const expectedOtpHash = Buffer.from(hashOTP(otp), 'utf8');
-    const actualOtpHash = Buffer.from(otpRecord.otpHash, 'utf8');
-
-    if (expectedOtpHash.length !== actualOtpHash.length || !crypto.timingSafeEqual(expectedOtpHash, actualOtpHash)) {
-      return res.status(400).json({ error: 'Invalid mobile security key.' });
-    }
-
     const otpExpiresAt = otpRecord.expiresAt instanceof Date ? otpRecord.expiresAt.getTime() : Number(otpRecord.expiresAt);
     if (otpExpiresAt < Date.now()) {
       return res.status(400).json({ error: 'Mobile security key expired.' });
+    }
+
+    if (!(await verifyOTPHash(otp, otpRecord.otpHash))) {
+      return res.status(400).json({ error: 'Invalid mobile security key.' });
     }
 
     await Registry.update('users', { id: user.id }, {
@@ -677,12 +660,9 @@ export const verifyPhoneOTP = async (req, res) => {
 
 export const getMe = async (req, res) => {
   try {
-    if (req.user.id === 'admin') {
-      return res.json({ id: 'admin', name: 'Admin', email: req.user.email, role: 'admin', isVerified: true });
-    }
     const payload = await buildUserPayload(req.user.id);
     res.json(payload);
-  } catch (err) {
+  } catch (_err) {
     res.status(500).json({ error: 'Failed to retrieve user profile.' });
   }
 };
@@ -714,7 +694,7 @@ export const createAdmin = async (req, res) => {
       return res.status(400).json({ error: 'Account already exists.' });
     }
 
-    const hashedPassword = await bcrypt.hash(password, 12);
+    const hashedPassword = await bcrypt.hash(password, BCRYPT_ROUNDS);
     const admin = await Registry.insert('users', {
       name,
       email,
@@ -792,7 +772,7 @@ export const completeOnboarding = async (req, res) => {
       message: 'Identity protocol successfully established.',
       user: updatedUser
     });
-  } catch (err) {
+  } catch (_err) {
     res.status(500).json({ error: 'Onboarding failed.' });
   }
 };

@@ -7,7 +7,6 @@ import cors from 'cors';
 import helmet from 'helmet';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { Op } from 'sequelize';
 
 // ─── Enterprise Packages ──────────────────────────────
 import morgan from 'morgan';
@@ -17,6 +16,7 @@ import cookieParser from 'cookie-parser';
 
 // ─── Local Imports ────────────────────────────────────
 import certificateRoutes from './routes/certificateRoutes.js';
+import { authLimiter as redisAuthLimiter } from './middleware/rateLimiter.js';
 import authRoutes from './routes/authRoutes.js';
 import universityRoutes from './routes/universityRoutes.js';
 import userRoutes from './routes/userRoutes.js';
@@ -35,14 +35,16 @@ import Registry from './services/registryService.js';
 import { logger, stream } from './utils/winstonLogger.js';
 import { initSocket } from './utils/socketService.js';
 import { startCertificateWorker, stopCertificateWorker } from './queues/workers.js';
-import { BlacklistedToken } from './models/index.js';
+import { startCleanupWorker, stopCleanupWorker } from './queues/cleanupWorker.js';
 import fs from 'fs';
 
-import { getAllowedOrigins, isProduction, sessionSecret, validateServerEnv, requireEnv } from './utils/runtimeConfig.js';
-import { RATE_LIMIT_WINDOW_MS, TOKEN_CLEANUP_INTERVAL_MS } from './constants/limits.js';
+import { getAllowedOrigins, isProduction, validateServerEnv } from './utils/runtimeConfig.js';
+import { RATE_LIMIT_WINDOW_MS } from './constants/limits.js';
 import { isPinataConfigured, testPinataConnection } from './utils/ipfsService.js';
 import { getBlockchainRuntimeInfo } from './utils/blockchain.js';
 import { closeRedisConnection } from './config/redis.js';
+import { requestId } from './middleware/requestId.js';
+import { cleanupTempUploads } from './utils/tempUploads.js';
 
 // [SECURITY] BOOT-TIME PERMISSION GUARD
 const bootPath = path.resolve(process.cwd(), 'write_test.tmp');
@@ -66,11 +68,16 @@ const allowedOrigins = getAllowedOrigins();
 
 let server; // Assigned in startNode()
 let worker; // BullMQ worker — assigned on server start, used in graceful shutdown
+let cleanupWorker; // BullMQ maintenance worker
 
 const PORT = process.env.PORT || 5001;
+const BCRYPT_ROUNDS = Number.parseInt(process.env.BCRYPT_ROUNDS || '12', 10);
 
 // ─── CLOUD PROXY CONFIGURATION ────────────────────────
 app.set('trust proxy', 1);
+
+// Attach request correlation before all route and logging middleware.
+app.use(requestId);
 
 // ─── Security & Performance Middleware ────────────────
 app.use(helmet({
@@ -147,16 +154,12 @@ const apiLimiter = rateLimit({
   windowMs: RATE_LIMIT_WINDOW_MS,
   max: isProduction ? 100 : 1000,
   skip: (req) => !isProduction && (req.ip === '::1' || req.ip === '127.0.0.1'),
-  message: { success: false, message: 'Too many requests from this IP.' },
+  message: { error: 'Too many requests from this IP.' },
   standardHeaders: true,
   legacyHeaders: false,
 });
 
-const authLimiter = rateLimit({
-  windowMs: RATE_LIMIT_WINDOW_MS,
-  max: 20,
-  message: { success: false, message: 'Too many authentication attempts. Please try again in 15 minutes.' },
-});
+// Auth rate limiter is imported from rateLimiter.js (Redis-backed) as redisAuthLimiter.
 
 app.use(express.json({
   limit: '50kb',
@@ -176,22 +179,26 @@ if (!isProduction) {
 }
 
 // ─── Routes ───────────────────────────────────────────
-app.use('/api', apiLimiter);
-app.use('/api/auth', authLimiter, authRoutes); // Apply strict auth limits
+function mountApiRoutes(prefix) {
+  app.use(`${prefix}/auth`, redisAuthLimiter, authRoutes); // Redis-backed auth rate limiter
+  app.use(`${prefix}/certificates`, certificateRoutes);
+  app.use(`${prefix}/universities`, universityRoutes);
+  app.use(`${prefix}/user`, userRoutes);
+  app.use(`${prefix}/student`, studentRoutes);
+  app.use(`${prefix}/system`, systemRoutes);
+  app.use(`${prefix}/admin`, adminRoutes);
+  app.use(`${prefix}/requests`, requestRoutes);
+  app.use(`${prefix}/ledger`, ledgerRoutes);
+  app.use(`${prefix}/support`, supportRoutes);
+  app.use(`${prefix}/billing`, billingRoutes);
+  app.use(`${prefix}/api-keys`, apiKeyRoutes);
+  app.use(`${prefix}/widget`, widgetRoutes);
+  app.use(`${prefix}/health`, healthRoutes);
+}
 
-app.use('/api/certificates', certificateRoutes);
-app.use('/api/universities', universityRoutes);
-app.use('/api/user', userRoutes);
-app.use('/api/student', studentRoutes);
-app.use('/api/system', systemRoutes);
-app.use('/api/admin', adminRoutes);
-app.use('/api/requests', requestRoutes);
-app.use('/api/ledger', ledgerRoutes);
-app.use('/api/support', supportRoutes);
-app.use('/api/billing', billingRoutes);
-app.use('/api/api-keys', apiKeyRoutes);
-app.use('/api/widget', widgetRoutes);
-app.use('/api/health', healthRoutes);
+app.use('/api', apiLimiter);
+mountApiRoutes('/api/v1');
+mountApiRoutes('/api');
 app.use('/metrics', metricsRoutes);
 
 app.get('/', (req, res) => {
@@ -215,12 +222,11 @@ if (process.env.SENTRY_DSN) {
 }
 
 // ─── GLOBAL ERROR HANDLER ─────────────────────────────
-app.use((err, req, res, next) => {
+app.use((err, req, res, _next) => {
   logger.error(`[ERROR] [PROTOCOL_ERROR] ${err.message}${!isProduction ? `\n${err.stack}` : ''}`);
 
   res.status(err.status || 500).json({
-    success: false,
-    message: isProduction ? 'Internal Server Error' : err.message,
+    error: isProduction ? 'Internal Server Error' : err.message,
     ...(isProduction ? {} : { stack: err.stack })
   });
 });
@@ -247,7 +253,7 @@ async function seedSystem() {
       return;
     }
 
-    const salt = await bcrypt.genSalt(10);
+    const salt = await bcrypt.genSalt(BCRYPT_ROUNDS);
     const hash = await bcrypt.hash(adminPassword, salt);
 
     await Registry.insert('users', {
@@ -268,6 +274,11 @@ if (process.env.NODE_ENV !== 'test') {
   (async () => {
     try {
       // Step 1: Initialize Registry
+      const removedTempUploads = cleanupTempUploads(path.join(__dirname, '../uploads/temp'));
+      if (removedTempUploads > 0) {
+        logger.info(`[STARTUP] Removed ${removedTempUploads} orphaned temporary upload files.`);
+      }
+
       await Registry.init();
       logger.info(`[REGISTRY] Storage layer initialized.`);
 
@@ -283,9 +294,10 @@ if (process.env.NODE_ENV !== 'test') {
 
       // Step 3: Launch Node
       server = app.listen(PORT, '0.0.0.0', async () => {
-        initSocket(server);
-        worker = startCertificateWorker(); // Returns null gracefully if Redis unavailable
-        logger.info(`\n[STARTUP] [EDUCRED NODE] Startup Complete`);
+	        initSocket(server);
+	        worker = startCertificateWorker(); // Returns null gracefully if Redis unavailable
+	        cleanupWorker = await startCleanupWorker();
+	        logger.info(`\n[STARTUP] [EDUCRED NODE] Startup Complete`);
         logger.info(`[NETWORK] Network: http://localhost:${PORT}`);
         logger.info(`[STORAGE] Storage: AUTHORITATIVE (SQL)`);
         logger.info(`[LEDGER]  Ledger:  ${getBlockchainRuntimeInfo().mode === 'LIVE' ? 'SEP-LIVE' : 'OFFLINE'}`);
@@ -293,21 +305,14 @@ if (process.env.NODE_ENV !== 'test') {
         logger.info(`[EMAIL]  Provider: ${process.env.EMAIL_PROVIDER || (process.env.RESEND_API_KEY ? 'resend' : 'smtp')}`);
         logger.info(`-------------------------------------------------\n`);
 
-        // Purge expired blacklisted tokens every 6 hours to keep auth lookups fast
-        setInterval(async () => {
-          try {
-            await BlacklistedToken.destroy({ where: { expiresAt: { [Op.lt]: new Date() } } });
-          } catch { /* non-fatal */ }
-        }, TOKEN_CLEANUP_INTERVAL_MS);
-
-        // Background Connectivity Check
+	        // Background Connectivity Check
         if (isPinataConfigured()) {
           try {
             const isIpfsReady = await testPinataConnection();
             if (isIpfsReady) {
               logger.info(`[SUCCESS] IPFS: Decentralized storage layer active.`);
             }
-          } catch (ipfsError) {
+          } catch (_ipfsError) {
             logger.warn(`[IPFS] [WARNING] Connectivity failed. Continuing without decentralized storage.`);
           }
         }
@@ -327,6 +332,7 @@ const shutdown = async (signal) => {
 
   // 2. Drain in-flight queue jobs before closing worker
   await stopCertificateWorker(worker);
+  await stopCleanupWorker(cleanupWorker);
 
   // 3. Release Redis connection
   await closeRedisConnection();

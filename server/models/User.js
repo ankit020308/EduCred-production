@@ -78,6 +78,13 @@ const User = sequelize.define('User', {
         type: DataTypes.BOOLEAN,
         defaultValue: false
     },
+    // Incremented on erasure/force-logout to invalidate all outstanding JWTs.
+    // Embedded as `tv` in every access token; middleware rejects mismatches.
+    tokenVersion: {
+        type: DataTypes.INTEGER,
+        defaultValue: 0,
+        allowNull: false,
+    },
     // DPDPA 2023 — explicit consent capture
     consentGiven: {
         type: DataTypes.BOOLEAN,

@@ -7,7 +7,7 @@ router.get('/', async (req, res) => {
   try {
     const events = (await Registry.find('ledger')).slice(-100).reverse();
     res.json(events);
-  } catch (err) {
+  } catch (_err) {
     res.status(500).json({ error: 'Failed to fetch ledger' });
   }
 });

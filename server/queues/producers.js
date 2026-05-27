@@ -1,5 +1,4 @@
 /**
-import { logger } from '../utils/winstonLogger.js';
  * @module queues/producers
  * @description BullMQ queue factory for certificate anchoring jobs.
  *
@@ -13,11 +12,17 @@ import { logger } from '../utils/winstonLogger.js';
 
 import { Queue } from 'bullmq';
 import { getRedisConnection } from '../config/redis.js';
+import { logger } from '../utils/winstonLogger.js';
 
-const connection = getRedisConnection();
+export let certificateQueue = null;
 
-export const certificateQueue = connection
-  ? new Queue('certificate-anchoring', {
+export function getCertificateQueue() {
+  if (certificateQueue) return certificateQueue;
+
+  const connection = getRedisConnection();
+  if (!connection) return null;
+
+  certificateQueue = new Queue('certificate-anchoring', {
       connection,
       defaultJobOptions: {
         attempts: 3,
@@ -25,13 +30,13 @@ export const certificateQueue = connection
         removeOnComplete: { count: 100 }, // Keep last 100 completed jobs for audit
         removeOnFail:     { count: 500 }, // Keep last 500 failed jobs for debugging
       },
-    })
-  : null;
+    });
 
-if (certificateQueue) {
   certificateQueue.on('error', (err) => {
     logger.error('[QUEUE] Certificate queue error:', err.message);
   });
+
+  return certificateQueue;
 }
 
 /**
@@ -42,14 +47,15 @@ if (certificateQueue) {
  * @returns {Promise<import('bullmq').Job>}
  */
 export async function enqueueCertificateJob(data) {
-  if (!certificateQueue) {
+  const queue = getCertificateQueue();
+  if (!queue) {
     throw new Error(
       'Certificate queue unavailable — REDIS_URL is not configured. ' +
       'Set REDIS_URL in environment variables to enable async anchoring.'
     );
   }
 
-  const job = await certificateQueue.add('anchor-certificate', data, {
+  const job = await queue.add('anchor-certificate', data, {
     jobId: `anchor:${data.certDbId}`, // Idempotency — prevents duplicate jobs for same cert
   });
 

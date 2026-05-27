@@ -1,4 +1,5 @@
 import Registry from '../services/registryService.js';
+import { logger } from './winstonLogger.js';
 
 /**
  * 🛰️ Protocol Audit Logger
@@ -33,7 +34,7 @@ export const logAudit = async (req, action, status = 'SUCCESS', details = '', me
         await Registry.insert('auditLogs', auditEntry);
         
         if (process.env.NODE_ENV !== 'production') {
-            console.log(`📡 [AUDIT]: ${action} | ${status} | ${details}`);
+            logger.debug('[AUDIT] Event persisted', { action, status, details });
         }
     } catch (err) {
         logger.error('[AUDIT] Logging failure:', err.message);

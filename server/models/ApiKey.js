@@ -18,9 +18,9 @@ const ApiKey = sequelize.define('ApiKey', {
     allowNull: false,
     unique: true,
   },
-  // First 8 chars of raw key for display (e.g. "ek_live_abcd1234…")
+  // Safe display prefix only (e.g. "ek_live_…abcd")
   keyPrefix: {
-    type: DataTypes.STRING(20),
+    type: DataTypes.STRING(32),
     allowNull: false,
   },
   // Owner user ID

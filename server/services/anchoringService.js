@@ -1,5 +1,4 @@
 /**
-import { logger } from '../utils/winstonLogger.js';
  * @module services/anchoringService
  * @description Encapsulates the full lifecycle of anchoring a certificate to the
  *   blockchain and updating all downstream systems (IPFS, DB, Ledger, Socket.io).
@@ -22,6 +21,7 @@ import { isPinataConfigured, uploadFileToPinata, uploadJSONToPinata } from '../u
 import { emitToInstitution } from '../utils/socketService.js';
 import { CERTIFICATE_TYPE_CODES } from '../constants/certificateTypes.js';
 import { generateCertificatePDF } from '../utils/pdfService.js';
+import { logger } from '../utils/winstonLogger.js';
 
 /**
  * @typedef {Object} AnchoringJobData

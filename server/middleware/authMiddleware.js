@@ -2,6 +2,7 @@
 import Registry from '../services/registryService.js';
 import jwt from 'jsonwebtoken';
 import { jwtSecret } from '../utils/runtimeConfig.js';
+import { logger } from '../utils/winstonLogger.js';
 
 /**
  * 🛡️ Security Protocol: JWT Authentication
@@ -18,19 +19,8 @@ export const protect = async (req, res, next) => {
       return res.status(401).json({ error: 'Identity proof required. No token provided.' });
     }
 
-    const decoded = jwt.verify(token, jwtSecret);
+    const decoded = jwt.verify(token, jwtSecret, { algorithms: ['HS256'] });
     const userId = decoded.userId || decoded.id;
-
-    // Admin token: not in DB, but still check the blacklist so revoked admin
-    // sessions cannot be reused.
-    if (userId === 'admin' && decoded.role === 'admin') {
-      const isBlacklisted = await Registry.findOne('blacklistedTokens', { token });
-      if (isBlacklisted) {
-        return res.status(401).json({ error: 'Security token revoked. Please login again.' });
-      }
-      req.user = { id: 'admin', role: 'admin', email: process.env.ADMIN_EMAIL || 'admin', isEmailVerified: true };
-      return next();
-    }
 
     const [isBlacklisted, user] = await Promise.all([
       Registry.findOne('blacklistedTokens', { token }),
@@ -42,6 +32,17 @@ export const protect = async (req, res, next) => {
     }
     if (!user) {
       return res.status(401).json({ error: 'Identity node no longer exists.' });
+    }
+
+    // Reject tokens issued before an erasure or forced-logout (tokenVersion mismatch).
+    // `tv` may be absent on tokens issued before this field was introduced — treat as 0.
+    if ((decoded.tv ?? 0) !== (user.tokenVersion ?? 0)) {
+      return res.status(401).json({ error: 'Security token invalidated. Please login again.', code: 'TOKEN_REVOKED' });
+    }
+
+    // Block permanently deleted accounts from using stale tokens.
+    if (user.deletedAt) {
+      return res.status(401).json({ error: 'Account has been deleted.', code: 'ACCOUNT_DELETED' });
     }
 
     if (!user.isEmailVerified) {
@@ -72,10 +73,8 @@ export const requireRole = (...roles) => (req, res, next) => {
   const allowedRoles = roles.map(r => r.toLowerCase());
   
   if (!allowedRoles.includes(userRole)) {
-    return res.status(403).json({ 
-      error: `Access denied. Requires role: ${roles.join(' or ')}.`,
-      yourRole: req.user.role
-    });
+    logger.warn('[AUTH] Role check failed', { requestId: req.id, required: allowedRoles, actual: userRole });
+    return res.status(403).json({ error: 'Access denied. Insufficient permissions.' });
   }
   next();
 };

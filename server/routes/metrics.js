@@ -1,5 +1,6 @@
 import express from 'express';
 import client from 'prom-client';
+import { protect, requireRole } from '../middleware/authMiddleware.js';
 
 const router = express.Router();
 
@@ -25,8 +26,8 @@ export const activeConnectionsGauge = new client.Gauge({
   help: 'Number of active Socket.io connections',
 });
 
-// Expose the metrics endpoint
-router.get('/', async (req, res) => {
+// Expose the metrics endpoint — restricted to admins only
+router.get('/', protect, requireRole('admin', 'super_admin'), async (req, res) => {
   try {
     res.set('Content-Type', client.register.contentType);
     res.end(await client.register.metrics());

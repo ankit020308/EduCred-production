@@ -1,8 +1,8 @@
 import PDFDocument from 'pdfkit';
 import QRCode from 'qrcode';
-import crypto from 'crypto';
 import fetch from 'node-fetch';
 import { logger } from './winstonLogger.js';
+import { hashSHA256 } from './crypto.js';
 
 const FRONTEND_BASE = process.env.FRONTEND_URL || 'https://educred.in';
 
@@ -25,7 +25,8 @@ function gradeFromMarks(marks) {
 }
 
 export const generateCertificatePDF = async (certData) => {
-  return new Promise(async (resolve, reject) => {
+  return new Promise((resolve, reject) => {
+    (async () => {
     try {
       const verifyUrl = `${FRONTEND_BASE}/verify/${certData.certificateId}`;
 
@@ -50,7 +51,7 @@ export const generateCertificatePDF = async (certData) => {
       doc.on('data', buffers.push.bind(buffers));
       doc.on('end', () => {
         const pdfBuffer = Buffer.concat(buffers);
-        const pdfHash = crypto.createHash('sha256').update(pdfBuffer).digest('hex');
+        const pdfHash = hashSHA256(pdfBuffer);
         resolve({ buffer: pdfBuffer, pdfHash });
       });
 
@@ -285,5 +286,6 @@ export const generateCertificatePDF = async (certData) => {
     } catch (err) {
       reject(err);
     }
+    })();
   });
 };

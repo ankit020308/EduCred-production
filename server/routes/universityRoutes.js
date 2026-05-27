@@ -21,7 +21,7 @@ router.get('/public', async (req, res) => {
       id: u.id
     }));
     res.json(universities);
-  } catch (err) {
+  } catch (_err) {
     res.status(500).json({ error: 'Failed to fetch universities.' });
   }
 });

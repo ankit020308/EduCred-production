@@ -16,7 +16,7 @@ export const getPendingUniversities = async (req, res) => {
   try {
     const pending = await Registry.find('universities', { status: 'PENDING' });
     res.json({ data: pending });
-  } catch (err) {
+  } catch (_err) {
     res.status(500).json({ error: 'Failed to fetch pending applications.' });
   }
 };
@@ -28,7 +28,7 @@ export const getAllUniversities = async (req, res) => {
     try {
       const universities = await Registry.find('universities');
       res.json({ data: universities });
-    } catch (err) {
+    } catch (_err) {
       res.status(500).json({ error: 'Failed to fetch universities.' });
     }
   };
@@ -96,7 +96,7 @@ export const rejectUniversity = async (req, res) => {
     });
 
     res.json({ message: 'University application rejected.', data: university });
-  } catch (err) {
+  } catch (_err) {
     res.status(500).json({ error: 'Rejection failed.' });
   }
 };

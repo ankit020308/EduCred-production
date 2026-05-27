@@ -20,6 +20,8 @@ import { useAuth } from '../context/AuthContext';
 export default function ApiKeys() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
+  const docsApiBase = (import.meta.env.VITE_API_URL || 'https://educred-backend.onrender.com').replace(/\/$/, '');
+  const widgetBuildHash = import.meta.env.VITE_BUILD_HASH || 'dev';
   const [keys, setKeys] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -33,8 +35,8 @@ export default function ApiKeys() {
   const [keyVisible, setKeyVisible] = useState(false);
   const [copied, setCopied] = useState(false);
 
-  // Revoke confirmation
   const [revoking, setRevoking] = useState(null);
+  const [confirmRevokeId, setConfirmRevokeId] = useState(null);
 
   useEffect(() => {
     if (!user || !['university', 'verifier'].includes(user.role)) {
@@ -73,7 +75,16 @@ export default function ApiKeys() {
     }
   }
 
+  function requestRevoke(id) {
+    setConfirmRevokeId(id);
+  }
+
+  function cancelRevoke() {
+    setConfirmRevokeId(null);
+  }
+
   async function handleRevoke(id) {
+    setConfirmRevokeId(null);
     setRevoking(id);
     try {
       await api.delete(`/api/api-keys/${id}`);
@@ -163,7 +174,7 @@ export default function ApiKeys() {
           <div className="bg-[#202020] rounded-3xl p-6 mb-8">
             <p className="text-[9px] font-black text-[#646464] uppercase tracking-widest mb-3">Example — Bulk Verify</p>
             <pre className="text-[11px] font-mono text-[#ea2804] leading-relaxed overflow-x-auto whitespace-pre-wrap break-all">
-{`curl -X POST https://educred-backend.onrender.com/api/certificates/verify/bulk \\
+{`curl -X POST ${docsApiBase}/api/certificates/verify/bulk \\
   -H "Authorization: Bearer ek_live_YOUR_KEY_HERE" \\
   -H "Content-Type: application/json" \\
   -d '{"ids":["EC-2024-001","EC-2024-002"]}'`}
@@ -210,14 +221,32 @@ export default function ApiKeys() {
                       {k.rateLimit} req/min
                     </span>
                   </div>
-                  <button
-                    onClick={() => handleRevoke(k.id)}
-                    disabled={revoking === k.id}
-                    className="shrink-0 w-9 h-9 rounded-full border border-[#e0e0e0] flex items-center justify-center text-[#bbbbbb] hover:border-[#ea2804] hover:text-[#ea2804] transition-all disabled:opacity-40"
-                    title="Revoke key"
-                  >
-                    {revoking === k.id ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />}
-                  </button>
+                  {confirmRevokeId === k.id ? (
+                    <div className="flex items-center gap-2 shrink-0">
+                      <span className="text-[9px] font-black uppercase tracking-widest text-[#ea2804]">Revoke?</span>
+                      <button
+                        onClick={() => handleRevoke(k.id)}
+                        className="px-3 py-1.5 rounded-full bg-[#ea2804] text-white text-[9px] font-black uppercase tracking-widest hover:bg-[#c02000] transition-colors"
+                      >
+                        Yes
+                      </button>
+                      <button
+                        onClick={cancelRevoke}
+                        className="px-3 py-1.5 rounded-full border border-[#e0e0e0] text-[9px] font-black uppercase tracking-widest text-[#646464] hover:text-[#202020] hover:border-[#202020] transition-colors"
+                      >
+                        No
+                      </button>
+                    </div>
+                  ) : (
+                    <button
+                      onClick={() => requestRevoke(k.id)}
+                      disabled={revoking === k.id}
+                      className="shrink-0 w-9 h-9 rounded-full border border-[#e0e0e0] flex items-center justify-center text-[#bbbbbb] hover:border-[#ea2804] hover:text-[#ea2804] transition-all disabled:opacity-40"
+                      title="Revoke key"
+                    >
+                      {revoking === k.id ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />}
+                    </button>
+                  )}
                 </div>
               ))}
             </div>
@@ -230,7 +259,7 @@ export default function ApiKeys() {
             <p className="text-[#646464] text-sm mb-5">Drop this snippet into any HR portal, LinkedIn profile, or university page to show a real-time EduCred verification badge.</p>
             <div className="bg-[#202020] rounded-2xl p-5 overflow-x-auto">
               <pre className="text-[11px] font-mono text-[#ea2804] leading-relaxed whitespace-pre-wrap break-all">
-{`<script src="https://educred-backend.onrender.com/api/widget/verify.js"
+{`<script src="${docsApiBase}/api/widget/verify.js?v=${widgetBuildHash}"
         data-cert="EC-2024-XXXXXX">
 </script>`}
               </pre>

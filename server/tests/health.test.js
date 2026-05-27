@@ -12,4 +12,10 @@ describe('GET /api/health', () => {
         expect(res.statusCode).toBe(200);
         expect(res.body.status).toBe('Online');
     });
+
+    test('should also be available through the /api/v1 versioned prefix', async () => {
+        const res = await request(app).get('/api/v1/health');
+        expect(res.statusCode).toBe(200);
+        expect(res.body.status).toBe('Online');
+    });
 });

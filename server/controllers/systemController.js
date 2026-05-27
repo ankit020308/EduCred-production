@@ -86,7 +86,7 @@ export const getTickerData = async (req, res) => {
         }
 
         res.status(200).json({ success: true, ticker: events });
-    } catch (error) {
+    } catch (_error) {
         res.status(500).json({ success: false, ticker: ["PROTOCOL_SYNC_ERROR"] });
     }
 };
@@ -112,7 +112,7 @@ export const getNetworkMap = async (req, res) => {
             nodeCount: networkMap.length,
             network: networkMap
         });
-    } catch (error) {
+    } catch (_error) {
         res.status(500).json({ success: false, message: "Network map offline" });
     }
 };

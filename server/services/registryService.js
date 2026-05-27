@@ -15,6 +15,8 @@ const COLLECTION_MODEL_MAP = {
   fraudAlerts: Models.FraudAlert,
   verificationLogs: Models.VerificationLog,
   otpRecords: Models.OtpRecord,
+  apiKeys: Models.ApiKey,
+  subscriptions: Models.Subscription,
 };
 
 class RegistryService {

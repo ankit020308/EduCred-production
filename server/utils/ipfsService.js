@@ -26,7 +26,6 @@ const __dirname = path.dirname(__filename);
 
 // 🛡️ Ensure root .env is loaded
 dotenv.config({ path: path.join(__dirname, '../../.env') });
-const isProduction = process.env.NODE_ENV === 'production';
 
 const PINATA_JWT = process.env.PINATA_JWT;
 const PINATA_GATEWAY = process.env.PINATA_GATEWAY || 'gateway.pinata.cloud';
@@ -83,7 +82,7 @@ export async function uploadFileToPinata(buffer, filename, keyvalueMetadata = {}
   let blob;
   try {
     blob = new Blob([buffer], { type: 'application/pdf' });
-  } catch (err) {
+  } catch (_err) {
     // Fallback if Blob constructor is not globally available in older Node
     const { Blob: NodeBlob } = await import('buffer');
     blob = new NodeBlob([buffer], { type: 'application/pdf' });

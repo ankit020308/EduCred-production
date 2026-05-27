@@ -32,10 +32,10 @@ jobs:
         npm ci
 
     - name: Lint Server
-      run: cd server && npx eslint . --max-warnings 50
+      run: cd server && npx eslint . --max-warnings 0
 
     - name: Lint Client
-      run: cd client && npx eslint . --max-warnings 50
+      run: cd client && npx eslint . --max-warnings 0
 
     - name: Run Tests
       run: |

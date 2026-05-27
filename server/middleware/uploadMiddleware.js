@@ -2,6 +2,7 @@ import multer from 'multer';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { fileTypeFromFile } from 'file-type';
 import { UPLOAD_MAX_BYTES, CSV_MAX_BYTES } from '../constants/limits.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -30,6 +31,12 @@ const ALLOWED_MIME_TYPES = new Set([
     'image/jpg',
 ]);
 
+export const IMAGE_MIME_TYPES = new Set([
+    'image/png',
+    'image/jpeg',
+    'image/jpg',
+]);
+
 export const upload = multer({
     storage,
     limits: {
@@ -43,6 +50,23 @@ export const upload = multer({
         cb(null, true);
     }
 });
+
+export const validateUploadedFileMagicBytes = (allowedMimeTypes = ALLOWED_MIME_TYPES) => async (req, res, next) => {
+    if (!req.file?.path) return next();
+
+    try {
+        const detected = await fileTypeFromFile(req.file.path);
+        if (!detected || !allowedMimeTypes.has(detected.mime)) {
+            try { fs.unlinkSync(req.file.path); } catch { /* ignore cleanup failure */ }
+            return res.status(400).json({ error: 'Invalid file type.' });
+        }
+        req.file.detectedMimeType = detected.mime;
+        return next();
+    } catch {
+        try { fs.unlinkSync(req.file.path); } catch { /* ignore cleanup failure */ }
+        return res.status(400).json({ error: 'Invalid file type.' });
+    }
+};
 
 const CSV_MIME_TYPES = new Set([
     'text/csv',

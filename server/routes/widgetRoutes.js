@@ -2,7 +2,7 @@
  * Embeddable Verification Widget
  *
  * Serve a self-contained JS snippet that any third-party page can include:
- *   <script src="https://educred.in/api/widget/verify.js"
+ *   <script src="https://educred.in/api/widget/verify.js?v=<BUILD_HASH>"
  *           data-cert="EC-2024-XXXXXX"></script>
  *
  * The script injects a trust badge into the page that shows real-time
@@ -24,28 +24,30 @@ const BADGE_STYLES = `
 
 // Served with long-term cache + immutable since content is versioned via query string
 router.get('/verify.js', (req, res) => {
-  const certId = String(req.query['data-cert'] || '');
-  const baseUrl = process.env.CLIENT_URL || 'https://educred.in';
-  const apiBase = process.env.SERVER_URL || 'https://educred-backend.onrender.com';
+  const baseUrl = JSON.stringify(process.env.CLIENT_URL || 'https://educred.in');
+  const apiBase = JSON.stringify(process.env.SERVER_URL || 'https://educred-backend.onrender.com');
+  const buildHash = process.env.BUILD_HASH || process.env.npm_package_version || 'dev';
 
   const script = `
 (function(){
   var styles="${BADGE_STYLES}";
   var styleEl=document.createElement('style');styleEl.textContent=styles;document.head.appendChild(styleEl);
 
+  var BASE_URL=${baseUrl};
+  var API_BASE=${apiBase};
   var scripts=document.querySelectorAll('script[data-cert]');
   scripts.forEach(function(s){
     var certId=s.getAttribute('data-cert');
     if(!certId)return;
 
     var badge=document.createElement('a');
-    badge.href="${baseUrl}/verify?id="+encodeURIComponent(certId);
+    badge.href=BASE_URL+"/verify?id="+encodeURIComponent(certId);
     badge.target="_blank";badge.rel="noopener noreferrer";
     badge.className="educred-badge loading";
     badge.innerHTML='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>Verifying…';
     s.parentNode.insertBefore(badge,s.nextSibling);
 
-    fetch("${apiBase}/api/certificates/verify/id",{
+    fetch(API_BASE+"/api/certificates/verify/id",{
       method:"POST",
       headers:{"Content-Type":"application/json"},
       body:JSON.stringify({certificateId:certId})
@@ -69,7 +71,8 @@ router.get('/verify.js', (req, res) => {
 `.trim();
 
   res.setHeader('Content-Type', 'application/javascript; charset=utf-8');
-  res.setHeader('Cache-Control', 'public, max-age=3600');
+  res.setHeader('Cache-Control', req.query.v ? 'public, max-age=31536000, immutable' : 'no-cache');
+  res.setHeader('X-EduCred-Widget-Version', buildHash);
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.send(script);
 });

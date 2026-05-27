@@ -18,6 +18,7 @@ import {
 import { Link, useNavigate } from 'react-router-dom';
 import api from '../services/api';
 import { useAuth } from '../context/AuthContext';
+import { quoteCSVCell } from '../utils/csv';
 
 const steps = [
   'Analyzing syntax payload',
@@ -160,7 +161,7 @@ export default function Verifier() {
     const rows = bulkResults.results.map((r) =>
       [r.id, r.valid, r.reason, r.studentName ?? '', r.degree ?? '', r.issuer ?? '',
         r.issuedAt ? new Date(r.issuedAt).toLocaleDateString() : '', r.txHash ?? '']
-        .map((v) => `"${String(v).replace(/"/g, '""')}"`).join(',')
+        .map(quoteCSVCell).join(',')
     );
     const csv = [header, ...rows].join('\n');
     const blob = new Blob([csv], { type: 'text/csv' });
@@ -169,7 +170,7 @@ export default function Verifier() {
     a.href = url;
     a.download = `educred-bulk-verification-${Date.now()}.csv`;
     a.click();
-    URL.revokeObjectURL(url);
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
   }
 
   return (

@@ -54,6 +54,7 @@ const OPTIONAL_PROD_ENV = [
   'RAZORPAY_KEY_ID',
   'RAZORPAY_KEY_SECRET',
   'RAZORPAY_WEBHOOK_SECRET',
+  'BCRYPT_ROUNDS',
 ];
 
 export const isProduction = process.env.NODE_ENV === 'production';
@@ -89,6 +90,11 @@ export function validateServerEnv() {
     requireEnv('RESEND_API_KEY');
   } else {
     throw new Error(`Unsupported EMAIL_PROVIDER "${emailProvider}". Supported providers: resend, smtp.`);
+  }
+
+  const bcryptRounds = Number(process.env.BCRYPT_ROUNDS || '12');
+  if (!Number.isInteger(bcryptRounds) || bcryptRounds < 10 || bcryptRounds > 15) {
+    throw new Error('BCRYPT_ROUNDS must be an integer between 10 and 15.');
   }
 
   // 2. Proactive Production Audit

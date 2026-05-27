@@ -22,7 +22,7 @@ import {
     bulkVerify,
 } from '../controllers/certificateController.js';
 import { protect, requireRole } from '../middleware/authMiddleware.js';
-import { upload, csvUpload } from '../middleware/uploadMiddleware.js';
+import { upload, csvUpload, validateUploadedFileMagicBytes } from '../middleware/uploadMiddleware.js';
 import { billingGuard } from '../middleware/billingGuard.js';
 import { authLimiter } from '../middleware/rateLimiter.js';
 import { jwtOrApiKey } from '../middleware/apiKeyMiddleware.js';
@@ -55,24 +55,31 @@ router.post('/admin/:id/reject', protect, requireRole('admin', 'super_admin'), r
  * 🛡️ Public Verification Portal
  * Keep /verify for existing frontend backward compatibility
  */
-router.post('/verify', authLimiter, upload.single('file'), verifyCertificate);
-router.post('/verify/upload', authLimiter, upload.single('file'), verifyCertificate);
+router.post('/verify', authLimiter, upload.single('file'), validateUploadedFileMagicBytes(), verifyCertificate);
+router.post('/verify/upload', authLimiter, upload.single('file'), validateUploadedFileMagicBytes(), verifyCertificate);
 router.post('/verify/id', authLimiter, verifyCertificate);
-router.post('/verify/enrollment', authLimiter, verifyByEnrollment);
-router.post('/verify/file', authLimiter, upload.single('certificate'), verifyByFileHash);
-router.post('/verify/pdf', authLimiter, upload.single('certificate'), verifyPDFCertificate);
+router.post('/verify/enrollment', authLimiter, jwtOrApiKey(protect), requireRole('university', 'verifier', 'admin', 'super_admin'), verifyByEnrollment);
+router.post('/verify/file', authLimiter, upload.single('certificate'), validateUploadedFileMagicBytes(), verifyByFileHash);
+router.post('/verify/pdf', authLimiter, upload.single('certificate'), validateUploadedFileMagicBytes(), verifyPDFCertificate);
 
 /**
  * 🔑 Bulk Verification (JWT session OR API key)
  * Accepts JSON body { ids: [...] } or a CSV file upload.
  * Rate-limited to 100 certs per call.
  */
-router.post('/verify/bulk', authLimiter, jwtOrApiKey(protect), csvUpload.single('file'), bulkVerify);
+router.post(
+  '/verify/bulk',
+  authLimiter,
+  jwtOrApiKey(protect),
+  requireRole('university', 'verifier', 'admin', 'super_admin'),
+  csvUpload.single('file'),
+  bulkVerify
+);
 
 /**
  * 🎓 Public Certificate Lookup
  */
-router.get('/public/:certId', getPublicCertificate);
+router.get('/public/:certId', authLimiter, getPublicCertificate);
 router.get('/:id', getCertificateById);
 
 export default router;

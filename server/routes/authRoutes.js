@@ -1,17 +1,13 @@
 import express from 'express';
-import { logger } from '../utils/winstonLogger.js';
 import { 
   register, login, getMe, verifyOTP, resendOTP, 
   refreshToken, logout, googleLogin, sendPhoneVerification, 
-  verifyPhoneOTP, createAdmin, completeOnboarding, setCookies,
-  signToken, signRefreshToken
+  verifyPhoneOTP, createAdmin, completeOnboarding
 } from '../controllers/authController.js';
 import { protect, requireRole } from '../middleware/authMiddleware.js';
 import { authLimiter, otpLimiter } from '../middleware/rateLimiter.js';
 import Registry from '../services/registryService.js';
 
-
-import { isProduction } from '../utils/runtimeConfig.js';
 
 const router = express.Router();
 
@@ -49,40 +45,10 @@ router.get('/profile', protect, async (req, res) => {
         name: university.name
       } : null
     });
-  } catch (err) {
+  } catch (_err) {
     res.status(500).json({ error: 'Failed to fetch profile.' });
   }
 });
-
-// ─── Passport OAuth Callback Handshake ───────────────────────────────────────
-const processGoogleCallback = (req, res) => {
-  const FRONTEND_URL = process.env.CLIENT_URL || (isProduction ? 'https://educred.in' : 'http://localhost:3000');
-  
-  try {
-    const user = req.user;
-    
-    if (!user) {
-      logger.error('[❌ OAUTH_ERROR] Passport authentication failed: No user object.');
-      return res.redirect(`${FRONTEND_URL}/auth/error?reason=no_user`);
-    }
-
-    // 🚀 TOKEN PROVISIONING: Use the standard 'id' from the SQL node
-    const accessToken = signToken(user.id, user.role);
-    const rToken = signRefreshToken(user.id);
-
-    setCookies(res, accessToken, rToken);
-
-    logger.info(`[✅ OAUTH_SUCCESS] Handshake complete for identity: ${user.email}`);
-    
-    // Redirect with minimal UI state
-    const redirectUrl = `${FRONTEND_URL}/auth/success?role=${encodeURIComponent(user.role)}&name=${encodeURIComponent(user.name)}`;
-    res.redirect(redirectUrl);
-    
-  } catch (error) {
-    logger.error(`[🔥 OAUTH_CRITICAL_FAILURE] ${error.message}`);
-    res.redirect(`${FRONTEND_URL}/auth/error?reason=internal_server_error`);
-  }
-};
 
 // Removed Passport OAuth routes; we will now handle authentication strictly through JWT credentials.
 

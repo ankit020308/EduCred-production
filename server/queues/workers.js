@@ -1,5 +1,4 @@
 /**
-import { logger } from '../utils/winstonLogger.js';
  * @module queues/workers
  * @description BullMQ worker that processes certificate anchoring jobs.
  *
@@ -18,6 +17,7 @@ import { Worker } from 'bullmq';
 import { getRedisConnection } from '../config/redis.js';
 import { processAnchoringJob, revertAnchoringLock } from '../services/anchoringService.js';
 import { emitToInstitution } from '../utils/socketService.js';
+import { logger } from '../utils/winstonLogger.js';
 
 const CONCURRENCY = parseInt(process.env.WORKER_CONCURRENCY || '2', 10);
 

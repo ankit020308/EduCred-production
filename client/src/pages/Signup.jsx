@@ -29,9 +29,12 @@ export default function Signup() {
   const handleNext = (e) => {
     e.preventDefault();
     setError('');
-    if (step === 0) { setStep(1); return; }
-    if (!consentGiven) {
-      setError('Please accept the Privacy Policy and Terms of Service to continue.');
+    if (step === 0) {
+      if (!consentGiven) {
+        setError('Please accept the Privacy Policy and Terms of Service to continue.');
+        return;
+      }
+      setStep(1);
       return;
     }
     executeRegistration();
@@ -231,9 +234,41 @@ export default function Signup() {
                           </div>
                         </div>
 
-                        <button type="submit" className="btn-primary w-full">
+                        {/* DPDPA 2023 — Consent captured at step 0 before any data leaves the browser */}
+                        <label className="flex items-start gap-3 cursor-pointer group">
+                          <div className="relative mt-0.5 flex-shrink-0">
+                            <input
+                              type="checkbox"
+                              checked={consentGiven}
+                              onChange={(e) => setConsentGiven(e.target.checked)}
+                              className="sr-only peer"
+                            />
+                            <div className="w-5 h-5 rounded-md border-2 border-[#e0e0e0] bg-white peer-checked:bg-[#ea2804] peer-checked:border-[#ea2804] transition-all flex items-center justify-center">
+                              {consentGiven && (
+                                <svg width="10" height="8" viewBox="0 0 10 8" fill="none">
+                                  <path d="M1 4L3.5 6.5L9 1" stroke="white" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
+                                </svg>
+                              )}
+                            </div>
+                          </div>
+                          <span className="text-[11px] text-[#646464] leading-relaxed">
+                            I agree to the{' '}
+                            <Link to="/privacy" className="text-[#ea2804] hover:underline font-semibold">Privacy Policy</Link>
+                            {' '}and{' '}
+                            <Link to="/terms" className="text-[#ea2804] hover:underline font-semibold">Terms of Service</Link>.
+                            EduCred will process your personal data to issue and verify credentials. You can export or delete your data at any time.
+                          </span>
+                        </label>
+
+                        <button type="submit" disabled={!consentGiven} className="btn-primary w-full">
                           Continue <ArrowRight size={14} />
                         </button>
+
+                        {error && (
+                          <p className="text-[#ea2804] text-[9px] font-bold uppercase tracking-widest text-center border border-[#ea2804]/20 bg-[#ea2804]/5 rounded-xl px-4 py-2.5">
+                            {error}
+                          </p>
+                        )}
                       </>
                     )}
 
@@ -289,33 +324,7 @@ export default function Signup() {
                           </div>
                         )}
 
-                        {/* DPDPA 2023 — Consent */}
-                        <label className="flex items-start gap-3 cursor-pointer group">
-                          <div className="relative mt-0.5 flex-shrink-0">
-                            <input
-                              type="checkbox"
-                              checked={consentGiven}
-                              onChange={(e) => setConsentGiven(e.target.checked)}
-                              className="sr-only peer"
-                            />
-                            <div className="w-5 h-5 rounded-md border-2 border-[#e0e0e0] bg-white peer-checked:bg-[#ea2804] peer-checked:border-[#ea2804] transition-all flex items-center justify-center">
-                              {consentGiven && (
-                                <svg width="10" height="8" viewBox="0 0 10 8" fill="none">
-                                  <path d="M1 4L3.5 6.5L9 1" stroke="white" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
-                                </svg>
-                              )}
-                            </div>
-                          </div>
-                          <span className="text-[11px] text-[#646464] leading-relaxed">
-                            I agree to the{' '}
-                            <Link to="/privacy" className="text-[#ea2804] hover:underline font-semibold">Privacy Policy</Link>
-                            {' '}and{' '}
-                            <Link to="/terms" className="text-[#ea2804] hover:underline font-semibold">Terms of Service</Link>.
-                            EduCred will process your personal data to issue and verify credentials. You can export or delete your data at any time.
-                          </span>
-                        </label>
-
-                        <button type="submit" disabled={loading || !consentGiven} className="btn-primary w-full">
+                        <button type="submit" disabled={loading} className="btn-primary w-full">
                           {loading ? <Loader2 className="animate-spin" size={16} /> : 'Complete Setup'}
                         </button>
 

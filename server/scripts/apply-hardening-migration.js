@@ -39,6 +39,16 @@ async function ensureIndex(tableName, indexName, fields, options = {}) {
   console.log(`[migration] [SUCCESS] Created index: ${indexName} on ${tableName}`);
 }
 
+async function changeColumnIfTableExists(tableName, columnName, columnDefinition) {
+  if (!(await tableExists(tableName))) {
+    console.log(`[migration] [SKIP] Table missing for column change: ${tableName}`);
+    return;
+  }
+
+  await queryInterface.changeColumn(tableName, columnName, columnDefinition);
+  console.log(`[migration] [SUCCESS] Ensured ${tableName}.${columnName} column definition`);
+}
+
 async function run() {
   console.log('\n--- 🛠️  EduCred Master Hardening Migration ---');
   console.log('--- Initializing secure schema protocol ---\n');
@@ -237,6 +247,31 @@ async function run() {
   await ensureIndex('FraudAlert', 'fraud_alert_isReviewed_idx', ['isReviewed']);
   await ensureIndex('VerificationLog', 'verification_log_certificateId_idx', ['certificateId']);
   await ensureIndex('VerificationLog', 'verification_log_result_idx', ['result']);
+  await ensureIndex('blacklistedTokens', 'blacklistedtokens_expiresat_idx', ['expiresAt']);
+  await ensureIndex('AuditLog', 'auditlog_userid_createdat_idx', ['userId', 'createdAt']);
+  await ensureIndex('Certificate', 'certs_studentemail_idx', ['studentEmail']);
+
+  await changeColumnIfTableExists('ApiKeys', 'keyPrefix', {
+    type: DataTypes.STRING(32),
+    allowNull: false,
+  });
+
+  // Partial index — only active keys need fast ownerId lookups (M-10)
+  await ensureIndex('ApiKeys', 'apikeys_ownerid_active_idx', ['ownerId'], {
+    where: { isActive: true },
+  });
+
+  // GIN index on Certificate.metadata (JSONB) for fast JSON path queries
+  const certIndexes = await queryInterface.showIndex('Certificate');
+  const hasGin = certIndexes.some((idx) => idx.name === 'certificate_metadata_gin_idx');
+  if (!hasGin) {
+    await queryInterface.sequelize.query(
+      'CREATE INDEX CONCURRENTLY IF NOT EXISTS certificate_metadata_gin_idx ON "Certificate" USING GIN (metadata);'
+    );
+    console.log('[migration] [SUCCESS] Created GIN index: certificate_metadata_gin_idx');
+  } else {
+    console.log('[migration] [SKIP] GIN index already exists: certificate_metadata_gin_idx');
+  }
 
   console.log('\n[migration] [SUCCESS] Hardening schema checks completed successfully.');
 }

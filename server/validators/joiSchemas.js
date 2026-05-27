@@ -86,7 +86,12 @@ export const registrationSchema = Joi.object({
   officialDomain: Joi.string().optional().allow('', null),
   adminName: Joi.string().optional().allow('', null),
   // legacy alias — keep both so old clients don't break
-  adminContactName: Joi.string().optional().allow('', null)
+  adminContactName: Joi.string().optional().allow('', null),
+  // DPDPA 2023 — consent is required and must be explicitly true; false/absent is rejected
+  consentGiven: Joi.boolean().valid(true).required().messages({
+    'any.only': 'You must accept the Terms of Service and Privacy Policy to register.',
+    'any.required': 'Consent is required to create an account.',
+  }),
 });
 
 
