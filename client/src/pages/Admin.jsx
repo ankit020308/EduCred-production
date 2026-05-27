@@ -13,7 +13,6 @@ import { useAuth } from '../context/AuthContext';
 import { ToastProvider, useToast } from '../components/Toast';
 import socket, { joinInstitutionalRoom } from '../services/socket.mjs';
 import { useNavigate } from 'react-router-dom';
-import { STATUS_CONFIG } from '../data/certStatusConfig';
 import { vt } from '../data/animationConstants';
 import { CERT_STATUS } from '../data/certStatusConfig';
 
@@ -409,10 +408,10 @@ function AdminDashboard() {
             {/* Stats */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               {[
-                { icon: FileText, label: 'Total Issued', val: stats.total, cfg: STATUS_CONFIG.CONFIRMED },
-                { icon: CheckCircle2, label: 'On-Chain', val: stats.confirmed, cfg: STATUS_CONFIG.CONFIRMED },
-                { icon: Clock, label: 'Processing', val: stats.pending, cfg: STATUS_CONFIG.PROCESSING },
-                { icon: ShieldAlert, label: 'Revoked', val: stats.failed, cfg: STATUS_CONFIG.REVOKED },
+                { icon: FileText, label: 'Total Issued', val: stats.total, cfg: CERT_STATUS.CONFIRMED },
+                { icon: CheckCircle2, label: 'On-Chain', val: stats.confirmed, cfg: CERT_STATUS.CONFIRMED },
+                { icon: Clock, label: 'Processing', val: stats.pending, cfg: CERT_STATUS.PROCESSING },
+                { icon: ShieldAlert, label: 'Revoked', val: stats.failed, cfg: CERT_STATUS.REVOKED },
               ].map((s, i) => (
                 <motion.div key={i} {...vt} transition={{ delay: i * 0.06 }}
                   className="bg-white border border-[#202020] rounded-3xl p-6 hover:-translate-y-0.5 transition-all duration-300 group">
