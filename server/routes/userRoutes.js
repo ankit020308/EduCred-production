@@ -231,4 +231,107 @@ router.get('/certificates', protect, requireRole('student'), async (req, res) =>
     }
 });
 
+// ─── DPDPA 2023 — CONSENT UPDATE ─────────────────────
+// Called after the user ticks the consent checkbox; stored with timestamp.
+router.post('/consent', protect, async (req, res) => {
+    try {
+        await Registry.update('users', { id: req.user.id }, {
+            consentGiven: true,
+            consentGivenAt: new Date(),
+        });
+        res.json({ success: true });
+    } catch (err) {
+        res.status(500).json({ error: 'Failed to record consent.' });
+    }
+});
+
+// ─── DPDPA 2023 — DATA EXPORT ─────────────────────────
+// Returns all personal data held for the requesting user as JSON.
+router.get('/me/export', protect, async (req, res) => {
+    try {
+        const user = await Registry.findById('users', req.user.id);
+        if (!user) return res.status(404).json({ error: 'User not found.' });
+
+        const userObj = user.get ? user.get({ plain: true }) : { ...user };
+        delete userObj.passwordHash;
+
+        const student = req.user.role === 'student'
+            ? await Registry.findOne('students', { userId: req.user.id }).catch(() => null)
+            : null;
+        const university = req.user.role === 'university'
+            ? await Registry.findOne('universities', { userId: req.user.id }).catch(() => null)
+            : null;
+
+        const certificates = student
+            ? await Registry.find('certificates', { studentId: student?.id }).catch(() => [])
+            : [];
+
+        const export_ = {
+            exportedAt: new Date().toISOString(),
+            user: userObj,
+            studentProfile: student
+                ? (() => { const { digilockerAccessToken, digilockerRefreshToken, ...safe } = student.dataValues || student; return safe; })()
+                : null,
+            universityProfile: university
+                ? (() => { const { encryptedPrivateKey, ...safe } = university.dataValues || university; return safe; })()
+                : null,
+            certificates: certificates.map((c) => {
+                const { pdfCid, ...safe } = c.dataValues || c;
+                return safe;
+            }),
+        };
+
+        res.setHeader('Content-Disposition', `attachment; filename="educred-export-${req.user.id}.json"`);
+        res.json(export_);
+    } catch (err) {
+        logger.error(`[DPDPA] export error: ${err.message}`);
+        res.status(500).json({ error: 'Data export failed.' });
+    }
+});
+
+// ─── DPDPA 2023 — ERASURE (RIGHT TO BE FORGOTTEN) ────
+// Wipes all PII fields. Anonymised audit entries are preserved.
+// Requires explicit confirmation body: { confirm: "DELETE MY ACCOUNT" }
+router.delete('/me', protect, async (req, res) => {
+    try {
+        if (req.body.confirm !== 'DELETE MY ACCOUNT') {
+            return res.status(400).json({
+                error: 'Send { "confirm": "DELETE MY ACCOUNT" } to confirm erasure.',
+            });
+        }
+
+        const anonymisedName = `[deleted-${crypto.randomBytes(4).toString('hex')}]`;
+        const anonymisedEmail = `deleted-${req.user.id}@erased.invalid`;
+
+        // Wipe PII on User record
+        await Registry.update('users', { id: req.user.id }, {
+            name: anonymisedName,
+            email: anonymisedEmail,
+            passwordHash: '[erased]',
+            phoneNumber: null,
+            bio: null,
+            avatar: null,
+            profileImageUrl: null,
+            googleId: null,
+            isLocked: true,
+            deletedAt: new Date(),
+        });
+
+        // Wipe student PII
+        if (req.user.role === 'student') {
+            await Registry.update('students', { userId: req.user.id }, {
+                name: anonymisedName,
+                digilockerAccessToken: null,
+                digilockerRefreshToken: null,
+            }).catch(() => {});
+        }
+
+        logger.info(`[DPDPA] User ${req.user.id} erased under right-to-erasure request.`);
+        res.json({ success: true, message: 'Your account data has been erased.' });
+    } catch (err) {
+        logger.error(`[DPDPA] erasure error: ${err.message}`);
+        res.status(500).json({ error: 'Erasure failed. Contact support@educred.in.' });
+    }
+});
+
 export default router;

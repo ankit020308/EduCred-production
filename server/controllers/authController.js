@@ -198,6 +198,7 @@ export const register = async (req, res) => {
         await Registry.delete('users', { id: existingUnverified.id }, { transaction: t });
       }
 
+      const userConsent = req.body.consentGiven === true;
       const user = await Registry.insert('users', {
         name,
         email,
@@ -206,7 +207,9 @@ export const register = async (req, res) => {
         universityName: role === ROLES.UNIVERSITY ? universityName : null,
         isEmailVerified: false,
         isLocked: false,
-        lockedUntil: null
+        lockedUntil: null,
+        consentGiven: userConsent,
+        consentGivenAt: userConsent ? new Date() : null,
       }, { transaction: t });
 
       await Registry.insert('otpRecords', {

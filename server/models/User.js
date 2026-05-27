@@ -77,12 +77,28 @@ const User = sequelize.define('User', {
     isSuperAdmin: {
         type: DataTypes.BOOLEAN,
         defaultValue: false
-    }
+    },
+    // DPDPA 2023 — explicit consent capture
+    consentGiven: {
+        type: DataTypes.BOOLEAN,
+        defaultValue: false,
+        allowNull: false,
+    },
+    consentGivenAt: {
+        type: DataTypes.DATE,
+        allowNull: true,
+    },
+    // DPDPA — soft-delete: PII wiped, anonymised audit trail preserved
+    deletedAt: {
+        type: DataTypes.DATE,
+        allowNull: true,
+    },
 }, {
     indexes: [
         { unique: true, fields: ['email'] },
         { fields: ['role'] }
-    ]
+    ],
+    // paranoid: false — we handle deletion manually to control what's wiped
 });
 
 export default User;
