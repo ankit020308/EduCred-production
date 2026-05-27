@@ -12,7 +12,7 @@ const Subscription = sequelize.define('Subscription', {
     type: DataTypes.UUID,
     allowNull: false,
     unique: true,
-    references: { model: 'Universities', key: 'id' },
+    references: { model: 'University', key: 'id' },
   },
   plan: {
     type: DataTypes.ENUM(...Object.keys(PLANS)),
