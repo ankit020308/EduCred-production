@@ -27,7 +27,7 @@ const ApiKey = sequelize.define('ApiKey', {
   ownerId: {
     type: DataTypes.UUID,
     allowNull: false,
-    references: { model: 'Users', key: 'id' },
+    references: { model: 'User', key: 'id' },
   },
   // Role of the owner at key creation time
   ownerRole: {
