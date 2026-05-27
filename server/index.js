@@ -27,6 +27,8 @@ import requestRoutes from './routes/requestRoutes.js';
 import ledgerRoutes from './routes/ledgerRoutes.js';
 import supportRoutes from './routes/supportRoutes.js';
 import billingRoutes from './routes/billingRoutes.js';
+import apiKeyRoutes from './routes/apiKeyRoutes.js';
+import widgetRoutes from './routes/widgetRoutes.js';
 import healthRoutes from './routes/health.js';
 import metricsRoutes, { httpRequestsTotal, httpRequestDurationMicroseconds } from './routes/metrics.js';
 import Registry from './services/registryService.js';
@@ -187,6 +189,8 @@ app.use('/api/requests', requestRoutes);
 app.use('/api/ledger', ledgerRoutes);
 app.use('/api/support', supportRoutes);
 app.use('/api/billing', billingRoutes);
+app.use('/api/api-keys', apiKeyRoutes);
+app.use('/api/widget', widgetRoutes);
 app.use('/api/health', healthRoutes);
 app.use('/metrics', metricsRoutes);
 

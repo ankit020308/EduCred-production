@@ -11,6 +11,7 @@ import FraudAlert from './FraudAlert.js';
 import VerificationLog from './VerificationLog.js';
 import OtpRecord from './OtpRecord.js';
 import Subscription from './Subscription.js';
+import ApiKey from './ApiKey.js';
 
 // ─── Associations ─────────────────────────────────────────────────────────────
 
@@ -46,6 +47,10 @@ Ledger.belongsTo(Certificate, { foreignKey: 'certificateId' });
 University.hasOne(Subscription, { foreignKey: 'universityId', as: 'subscription' });
 Subscription.belongsTo(University, { foreignKey: 'universityId' });
 
+// User <-> ApiKey (one user can have many API keys)
+User.hasMany(ApiKey, { foreignKey: 'ownerId', as: 'apiKeys' });
+ApiKey.belongsTo(User, { foreignKey: 'ownerId', as: 'owner' });
+
 export {
     User,
     University,
@@ -59,4 +64,5 @@ export {
     VerificationLog,
     OtpRecord,
     Subscription,
+    ApiKey,
 };

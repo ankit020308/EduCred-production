@@ -30,6 +30,7 @@ const Onboarding = lazy(() => import('./pages/Onboarding'));
 const VerifyOTP = lazy(() => import('./pages/VerifyOTP'));
 const Profile = lazy(() => import('./pages/Profile'));
 const DigilockerCallback = lazy(() => import('./pages/DigilockerCallback'));
+const ApiKeys = lazy(() => import('./pages/ApiKeys'));
 
 import StudentDashboard from './components/StudentDashboard';
 
@@ -170,6 +171,7 @@ const NavigationWrapper = () => {
               <Route path="/student-portal" element={<ProtectedRoute roles={['student']}><ErrorBoundary><StudentDashboard /></ErrorBoundary></ProtectedRoute>} />
               <Route path="/student/dashboard/digilocker/callback" element={<ProtectedRoute roles={['student']}><ErrorBoundary><DigilockerCallback /></ErrorBoundary></ProtectedRoute>} />
               <Route path="/profile" element={<ProtectedRoute roles={['student', 'university', 'admin', 'super_admin']}><ErrorBoundary><Profile /></ErrorBoundary></ProtectedRoute>} />
+              <Route path="/api-keys" element={<ProtectedRoute roles={['university', 'verifier']}><ErrorBoundary><ApiKeys /></ErrorBoundary></ProtectedRoute>} />
               <Route path="*" element={<NotFound />} />
             </Routes>
           </Suspense>
