@@ -4,7 +4,7 @@ import fs from 'fs';
 import path from 'path';
 import csvParser from 'csv-parser';
 import { fileURLToPath } from 'url';
-import { UniqueConstraintError } from 'sequelize';
+import { UniqueConstraintError, Op } from 'sequelize';
 import sequelize from '../config/database.js';
 import Registry from '../services/registryService.js';
 import { Certificate } from '../models/index.js';
@@ -20,6 +20,29 @@ import { hashSHA256 } from '../utils/crypto.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+
+// SSRF guard for certificate file proxy downloads.
+// Only fetch cert files from these trusted CDN/IPFS hostnames.
+const TRUSTED_CERT_FILE_HOSTS = new Set([
+  'res.cloudinary.com',
+  'gateway.pinata.cloud',
+  'ipfs.io',
+]);
+
+function isCertFileUrlTrusted(rawUrl) {
+  try {
+    const { protocol, hostname } = new URL(rawUrl);
+    if (protocol !== 'https:') return false;
+    return [...TRUSTED_CERT_FILE_HOSTS].some(
+      (trusted) => hostname === trusted || hostname.endsWith(`.${trusted}`)
+    );
+  } catch {
+    return false;
+  }
+}
+
+// Base directory for locally-stored cert files — used to block path traversal.
+const LOCAL_CERT_BASE = path.resolve(__dirname, '../..');
 
 
 
@@ -708,11 +731,16 @@ export const verifyByEnrollment = async (req, res) => {
     const limit = Math.min(Math.max(parseInt(req.query.limit, 10) || 20, 1), 50);
     const offset = (page - 1) * limit;
 
-    // Use Sequelize literal for JSONB field filtering to avoid loading all certs into memory.
+    // Use Sequelize parameterized where clause — avoids sequelize.literal() with user input.
     const { rows: certs, count: total } = await Certificate.findAndCountAll({
-      where: sequelize.literal(
-        `"issuer" = ${sequelize.escape(universityName)} AND "metadata"->>'studentEnrollmentNumber' = ${sequelize.escape(enrollmentNumber)}`
-      ),
+      where: {
+        issuer: { [Op.eq]: universityName },
+        // JSONB cast: filter on the nested enrollment number field
+        [Op.and]: sequelize.where(
+          sequelize.cast(sequelize.json('metadata.studentEnrollmentNumber'), 'text'),
+          { [Op.eq]: enrollmentNumber }
+        ),
+      },
       order: [['createdAt', 'DESC']],
       limit,
       offset,
@@ -1169,8 +1197,14 @@ export const downloadCertificateFile = async (req, res) => {
     res.setHeader('X-Certificate-ID', cert.certificateId);
     if (cert.certificateHash) res.setHeader('X-Certificate-Hash', cert.certificateHash);
 
-    // Remote IPFS URL — Proxy (bypasses CSP and CORS issues)
+    // Remote IPFS / CDN URL — Proxy (bypasses CSP and CORS issues)
     if (cert.fileUrl?.startsWith('http://') || cert.fileUrl?.startsWith('https://')) {
+      // SSRF guard: only proxy from trusted CDN/IPFS hostnames.
+      if (!isCertFileUrlTrusted(cert.fileUrl)) {
+        logger.warn(`[DOWNLOAD] Untrusted fileUrl hostname blocked: ${cert.fileUrl}`);
+        return res.status(400).json({ error: 'Certificate file URL is not from a trusted source.' });
+      }
+
       try {
         const { default: fetch } = await import('node-fetch');
         const ipfsResponse = await fetch(cert.fileUrl, {
@@ -1189,13 +1223,17 @@ export const downloadCertificateFile = async (req, res) => {
       } catch (proxyErr) {
         logger.error(`[❌ DOWNLOAD_PROXY_FAIL]: ${proxyErr.message}`);
       }
-      // Fallback: Redirect if proxy fails
+      // Fallback: Redirect if proxy fails (hostname already validated above)
       return res.redirect(cert.fileUrl);
     }
 
-    // Local file path
+    // Local file path — guard against path traversal via cert.fileUrl.
     if (cert.fileUrl) {
-      const localPath = path.join(__dirname, '../..', cert.fileUrl.replace(/^\//, ''));
+      const localPath = path.resolve(LOCAL_CERT_BASE, cert.fileUrl.replace(/^\//, ''));
+      if (!localPath.startsWith(LOCAL_CERT_BASE + path.sep) && localPath !== LOCAL_CERT_BASE) {
+        logger.warn(`[DOWNLOAD] Path traversal attempt blocked: ${cert.fileUrl}`);
+        return res.status(400).json({ error: 'Invalid certificate file path.' });
+      }
       return res.sendFile(localPath);
     }
 

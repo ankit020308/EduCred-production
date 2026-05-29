@@ -3,67 +3,67 @@ import api, { storeToken, clearToken } from '../services/api';
 
 const AuthContext = createContext(null);
 
+// Non-sensitive user profile: name, email, role, id. We keep this in
+// localStorage ONLY as a display cache so the UI can show a user's name
+// before the /api/auth/me call resolves. No access token is ever stored here.
+const USER_CACHE_KEY = 'educred_user_profile';
+
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  // 🔹 Rehydrate session from server on refresh
+  // Rehydrate session on page load.
+  // The access token was in memory and is now gone — rely on the httpOnly
+  // refresh cookie to silently obtain a new one via the 401 interceptor.
   useEffect(() => {
-    const saved = localStorage.getItem('user');
+    const cached = localStorage.getItem(USER_CACHE_KEY);
 
-    if (saved) {
-      try {
-        setUser(JSON.parse(saved));
-        // Hydrate full profile from cookie-authenticated session
-        api.get('/api/auth/me').then(res => {
-          const fullUser = res.data;
-          localStorage.setItem('user', JSON.stringify(fullUser));
-          setUser(fullUser);
-        }).catch(() => {
-          // Cookie may be expired/invalid
-          localStorage.removeItem('user');
-          setUser(null);
-        });
-      } catch {
-        localStorage.removeItem('user');
-      }
+    // Optimistically show cached profile so the UI doesn't flicker.
+    if (cached) {
+      try { setUser(JSON.parse(cached)); } catch { localStorage.removeItem(USER_CACHE_KEY); }
     }
 
-    setLoading(false);
+    // Validate the session against the server. The /me call will trigger the
+    // 401 → refresh → retry cycle automatically if the access token is gone.
+    api.get('/api/auth/me')
+      .then((res) => {
+        const fullUser = res.data;
+        localStorage.setItem(USER_CACHE_KEY, JSON.stringify(fullUser));
+        setUser(fullUser);
+      })
+      .catch(() => {
+        // Refresh cookie also expired — fully signed out.
+        localStorage.removeItem(USER_CACHE_KEY);
+        setUser(null);
+      })
+      .finally(() => setLoading(false));
+
+    if (!cached) setLoading(false);
   }, []);
 
-  // 🔹 Persist user state (Tokens are handled by cookies automatically)
   const persistSession = useCallback((u) => {
-    localStorage.setItem('user', JSON.stringify(u));
+    localStorage.setItem(USER_CACHE_KEY, JSON.stringify(u));
     setUser(u);
   }, []);
 
-  // 🔹 SET SESSION FROM OAuth REDIRECT
-  const setSessionFromOAuth = useCallback(async (accessToken, refreshToken, partialUser) => {
-    // Note: We don't necessarily NEED accessToken/refreshToken here anymore
-    // because the backend already sets them as httpOnly cookies.
-    
-    // Proactive cleanup
-    localStorage.removeItem('user');
+  // SET SESSION FROM OAuth REDIRECT
+  const setSessionFromOAuth = useCallback(async (accessToken, _refreshToken, partialUser) => {
+    if (accessToken) storeToken(accessToken);
+    localStorage.removeItem(USER_CACHE_KEY);
 
-    // Optimistic set (allows and immediate redirect to a loading state or partial dashboard)
-    const optimisticUser = { 
-      ...partialUser, 
-      isEmailVerified: true 
-    };
-    
-    localStorage.setItem('user', JSON.stringify(optimisticUser));
+    const optimisticUser = { ...partialUser, isEmailVerified: true };
+    localStorage.setItem(USER_CACHE_KEY, JSON.stringify(optimisticUser));
     setUser(optimisticUser);
 
     try {
       const res = await api.get('/api/auth/me');
       const fullUser = res.data;
-      localStorage.setItem('user', JSON.stringify(fullUser));
+      localStorage.setItem(USER_CACHE_KEY, JSON.stringify(fullUser));
       setUser(fullUser);
-    } catch { /* fall back to optimistic profile already set */ }
+    } catch { /* fall back to optimistic profile */ }
   }, []);
 
-  // 🔹 LOGIN
+  // LOGIN
   const login = useCallback(async (email, password) => {
     try {
       const res = await api.post('/api/auth/login', { email, password });
@@ -79,7 +79,7 @@ export function AuthProvider({ children }) {
     }
   }, [persistSession]);
 
-  // 🔹 REGISTER
+  // REGISTER
   const register = useCallback(async (data) => {
     const res = await api.post('/api/auth/register', data);
     if (res.data.requiresVerification) return { requiresVerification: true, email: data.email };
@@ -88,7 +88,7 @@ export function AuthProvider({ children }) {
     return u;
   }, [persistSession]);
 
-  // 🔹 VERIFY OTP
+  // VERIFY OTP
   const verifyOTP = useCallback(async (email, otp) => {
     try {
       const res = await api.post('/api/auth/verify-otp', { email, otp });
@@ -106,44 +106,42 @@ export function AuthProvider({ children }) {
     }
   }, [persistSession]);
 
-  // 🔹 RESEND OTP
+  // RESEND OTP
   const resendOTP = useCallback(async (email) => {
     await api.post('/api/auth/resend-otp', { email });
   }, []);
 
-  // 🔹 GOOGLE LOGIN (DISABLED)
+  // GOOGLE LOGIN (DISABLED)
   const googleLogin = useCallback(async () => {
     throw new Error('Google authentication is currently disabled for architectural stability.');
   }, []);
 
-  // 🔹 COMPLETE ONBOARDING
+  // COMPLETE ONBOARDING
   const completeOnboarding = useCallback(async (data) => {
     try {
       const res = await api.post('/api/auth/complete-onboarding', data);
       const { user: u } = res.data;
-      localStorage.setItem('user', JSON.stringify(u));
-      setUser(u);
+      persistSession(u);
       return u;
     } catch (err) {
       throw err.response?.data?.error || 'Onboarding failed';
     }
-  }, []);
+  }, [persistSession]);
 
-  // 🔹 LOGOUT
+  // LOGOUT
   const logout = useCallback(async () => {
-    try { await api.post('/api/auth/logout'); } catch { /* ignore */ }
+    try { await api.post('/api/auth/logout'); } catch { /* ignore network errors */ }
     clearToken();
-    localStorage.removeItem('user');
+    localStorage.removeItem(USER_CACHE_KEY);
     setUser(null);
   }, []);
 
-  // 🔹 UPDATE USER (for profile updates)
+  // UPDATE USER (for profile updates)
   const updateUser = useCallback((u) => {
-    localStorage.setItem('user', JSON.stringify(u));
+    localStorage.setItem(USER_CACHE_KEY, JSON.stringify(u));
     setUser(u);
   }, []);
 
-  // 🔹 Stabilize the Context Value to prevent cascading re-renders
   const contextValue = useMemo(() => ({
     user,
     login,
@@ -155,11 +153,11 @@ export function AuthProvider({ children }) {
     logout,
     updateUser,
     setSessionFromOAuth,
-    loading
+    loading,
   }), [
-    user, loading, login, register, verifyOTP, resendOTP, 
-    googleLogin, completeOnboarding, logout, updateUser, 
-    setSessionFromOAuth
+    user, loading, login, register, verifyOTP, resendOTP,
+    googleLogin, completeOnboarding, logout, updateUser,
+    setSessionFromOAuth,
   ]);
 
   return (

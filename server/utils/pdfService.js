@@ -6,6 +6,27 @@ import { hashSHA256 } from './crypto.js';
 
 const FRONTEND_BASE = process.env.FRONTEND_URL || 'https://educred.in';
 
+// SSRF guard: only fetch profile photos from these trusted hostnames.
+// Add new hosts here when a new CDN/storage provider is integrated.
+const TRUSTED_PHOTO_HOSTS = new Set([
+  'res.cloudinary.com',
+  'gateway.pinata.cloud',
+  'ipfs.io',
+]);
+
+function isPhotoUrlTrusted(rawUrl) {
+  try {
+    const { protocol, hostname } = new URL(rawUrl);
+    if (protocol !== 'https:') return false;
+    // Accept exact match or any subdomain of a trusted host.
+    return [...TRUSTED_PHOTO_HOSTS].some(
+      (trusted) => hostname === trusted || hostname.endsWith(`.${trusted}`)
+    );
+  } catch {
+    return false;
+  }
+}
+
 const NAVY  = '#1a1a2e';
 const GOLD  = '#c9a227';
 const WHITE = '#ffffff';
@@ -90,6 +111,12 @@ export const generateCertificatePDF = async (certData) => {
       // ── 4. STUDENT PHOTO (top-right, if available) ──────────────────────────
       if (certData.profileImageUrl) {
         try {
+          // SSRF guard: reject any URL not on the trusted CDN allowlist.
+          if (!isPhotoUrlTrusted(certData.profileImageUrl)) {
+            logger.warn('[PDF] Profile photo skipped — URL host not in trusted allowlist:', certData.profileImageUrl);
+            throw new Error('Untrusted photo host');
+          }
+
           // Force Cloudinary to serve JPEG — pdfkit cannot handle WebP
           let photoUrl = certData.profileImageUrl;
           if (photoUrl.includes('res.cloudinary.com') && photoUrl.includes('/upload/')) {

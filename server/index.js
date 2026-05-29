@@ -239,34 +239,44 @@ async function seedSystem() {
     const shouldSeedAdmin = process.env.SEED_DEFAULT_ADMIN === 'true';
     if (!shouldSeedAdmin) return;
 
-    const adminEmail = process.env.ADMIN_EMAIL;
+    const adminEmail    = process.env.ADMIN_EMAIL;
     const adminPassword = process.env.ADMIN_PASSWORD;
 
     if (!adminEmail || !adminPassword) {
-      logger.warn('[WARNING] [SEED]: Skipping administrative seeding - ADMIN_EMAIL or ADMIN_PASSWORD missing in .env');
+      logger.warn('[WARNING] [SEED]: Skipping administrative seeding — ADMIN_EMAIL or ADMIN_PASSWORD missing in .env');
       return;
     }
 
     const adminExists = await Registry.findOne('users', { email: adminEmail });
+
     if (adminExists) {
-      logger.info(`[NETWORK] ROOT AUTHORITY: Node verified (${adminEmail}). Bypassing seeding cycle.`);
+      // Verify the stored hash still matches ADMIN_PASSWORD.
+      // If the env var was rotated without running reset-admin-password.js,
+      // the admin would be locked out. Sync the hash automatically on startup.
+      const passwordMatches = await bcrypt.compare(adminPassword, adminExists.passwordHash);
+      if (!passwordMatches) {
+        const newHash = await bcrypt.hash(adminPassword, BCRYPT_ROUNDS);
+        await Registry.update('users', { email: adminEmail }, { passwordHash: newHash });
+        logger.info(`[NETWORK] ROOT AUTHORITY: Password hash synced for (${adminEmail}).`);
+      } else {
+        logger.info(`[NETWORK] ROOT AUTHORITY: Node verified (${adminEmail}). Bypassing seeding cycle.`);
+      }
       return;
     }
 
-    const salt = await bcrypt.genSalt(BCRYPT_ROUNDS);
-    const hash = await bcrypt.hash(adminPassword, salt);
+    const hash = await bcrypt.hash(adminPassword, BCRYPT_ROUNDS);
 
     await Registry.insert('users', {
-      name: 'System Controller',
-      email: adminEmail,
-      passwordHash: hash,
-      role: 'super_admin',
-      isSuperAdmin: true,
-      isEmailVerified: true
+      name:           'System Controller',
+      email:          adminEmail,
+      passwordHash:   hash,
+      role:           'super_admin',
+      isSuperAdmin:   true,
+      isEmailVerified: true,
     });
     logger.info(`[SUCCESS] ROOT AUTHORITY: Global Admin established (${adminEmail})`);
   } catch (error) {
-    logger.error(' Error seeding system:', error);
+    logger.error('[SEED] Error seeding system:', error);
   }
 }
 

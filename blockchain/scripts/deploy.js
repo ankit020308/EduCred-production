@@ -10,7 +10,21 @@ const __dirname = path.dirname(__filename);
 dotenv.config({ path: path.resolve(__dirname, "../../.env") });
 
 const DEFAULT_RPC_URL = process.env.RPC_URL || 'http://127.0.0.1:8545';
-// Hardhat local node deterministic account 0 private key
+
+// The well-known Hardhat account #0 key is safe ONLY for local dev nodes.
+// Refuse to deploy to any non-local network without an explicit PRIVATE_KEY env var.
+const isLocalNetwork =
+  DEFAULT_RPC_URL.includes('localhost') || DEFAULT_RPC_URL.includes('127.0.0.1');
+
+if (!isLocalNetwork && !process.env.PRIVATE_KEY) {
+  console.error(
+    '[deploy] ❌ PRIVATE_KEY must be set in environment when deploying to a non-local network.\n' +
+    '[deploy]    Refusing to deploy with the Hardhat deterministic dev key on a real network.'
+  );
+  process.exit(1);
+}
+
+// Hardhat local node deterministic account 0 private key — local dev only.
 const DEFAULT_DEV_PRIVATE_KEY =
   process.env.PRIVATE_KEY ||
   '0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80';

@@ -151,10 +151,10 @@ export default function Login() {
               </div>
 
               <div className="flex justify-end">
-                <button type="button" className="text-[9px] font-bold text-[#ea2804] uppercase tracking-widest"
+                <Link to="/forgot-password" className="text-[9px] font-bold text-[#ea2804] uppercase tracking-widest"
                   style={{ textDecoration: 'underline dotted #ea2804', textUnderlineOffset: '3px' }}>
                   Forgot password?
-                </button>
+                </Link>
               </div>
 
               <button type="submit" disabled={loading} className="btn-primary w-full">

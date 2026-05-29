@@ -1,6 +1,7 @@
 import Registry from '../services/registryService.js';
 import jwt from 'jsonwebtoken';
 import bcrypt from 'bcryptjs';
+import crypto from 'crypto';
 
 import { registrationSchema, loginSchema, onboardingSchema } from '../validators/joiSchemas.js';
 import { ROLES } from '../constants/roles.js';
@@ -147,7 +148,7 @@ export const setCookies = (res, accessToken, refreshToken) => {
   res.cookie('accessToken', accessToken, { ...cookieOptions, maxAge: ACCESS_TOKEN_TTL_MS });
   res.cookie('refreshToken', refreshToken, cookieOptions);
 };
-const generateOTP = () => Math.floor(100000 + Math.random() * 900000).toString();
+const generateOTP = () => crypto.randomInt(100000, 1000000).toString();
 const hashOTP = (otp) => bcrypt.hash(String(otp), BCRYPT_ROUNDS);
 const verifyOTPHash = async (otp, storedHash) => {
   if (!storedHash) return false;
@@ -655,6 +656,126 @@ export const verifyPhoneOTP = async (req, res) => {
   } catch (err) {
     logger.error('Phone OTP verify error:', err);
     res.status(500).json({ error: 'Mobile verification failed.' });
+  }
+};
+
+/**
+ * 🔑 Forgot Password — Step 1
+ * Generates an OTP and emails it to the registered address.
+ * Always returns 200 so we don't leak whether an email exists.
+ */
+export const forgotPassword = async (req, res) => {
+  try {
+    const { email: rawEmail } = req.body;
+    if (!rawEmail) return res.status(400).json({ error: 'Email is required.' });
+    const email = rawEmail.toLowerCase().trim();
+
+    const user = await Registry.findOne('users', { email });
+    if (!user || user.deletedAt) {
+      // Silent success — do not reveal whether the account exists
+      return res.status(200).json({ message: 'If that email is registered, a reset code has been sent.' });
+    }
+
+    // Cooldown: prevent repeated requests within 60 s
+    const existingOtp = await Registry.findOne('otpRecords', { email });
+    if (existingOtp?.lastResend && (Date.now() - new Date(existingOtp.lastResend).getTime()) < 60_000) {
+      return res.status(429).json({ error: 'Please wait 60 seconds before requesting another code.' });
+    }
+
+    const otp = generateOTP();
+    const hashedOtp = await hashOTP(otp);
+    const now = new Date();
+    const otpData = {
+      otpHash: hashedOtp,
+      expiresAt: new Date(Date.now() + OTP_TTL_MS),
+      attempts: 0,
+      lastResend: now,
+    };
+
+    if (existingOtp) {
+      await Registry.update('otpRecords', { id: existingOtp.id }, otpData);
+    } else {
+      await Registry.insert('otpRecords', { email, ...otpData });
+    }
+
+    try {
+      const { sendPasswordResetOTP } = await import('../utils/emailService.js');
+      await sendPasswordResetOTP(email, otp);
+    } catch (emailErr) {
+      logger.error('[AUTH] [FORGOT_PASSWORD] Email send failure:', emailErr.message);
+      if (process.env.NODE_ENV === 'production') {
+        return res.status(502).json({ error: 'Failed to send reset code. Try again shortly.' });
+      }
+    }
+
+    await logAudit(req, 'PASSWORD_RESET_REQUESTED', 'SUCCESS', 'Reset OTP dispatched.', { email });
+    res.status(200).json({ message: 'If that email is registered, a reset code has been sent.' });
+  } catch (err) {
+    logger.error('[AUTH] forgotPassword error:', err);
+    res.status(500).json({ error: 'Failed to process password reset request.' });
+  }
+};
+
+/**
+ * 🔑 Reset Password — Step 2
+ * Validates the OTP and sets a new password.
+ */
+export const resetPassword = async (req, res) => {
+  try {
+    const { email: rawEmail, otp, newPassword } = req.body;
+    if (!rawEmail || !otp || !newPassword) {
+      return res.status(400).json({ error: 'email, otp, and newPassword are all required.' });
+    }
+    if (typeof newPassword !== 'string' || newPassword.length < 8 || newPassword.length > 128) {
+      return res.status(400).json({ error: 'newPassword must be 8–128 characters.' });
+    }
+    const email = rawEmail.toLowerCase().trim();
+
+    const user = await Registry.findOne('users', { email });
+    if (!user || user.deletedAt) {
+      return res.status(404).json({ error: 'Account not found.' });
+    }
+
+    const otpRecord = await Registry.findOne('otpRecords', { email });
+    if (!otpRecord) {
+      return res.status(400).json({ error: 'No active reset code found. Request a new one.' });
+    }
+
+    if (otpRecord.attempts >= 5) {
+      return res.status(403).json({ error: 'Too many invalid attempts. Request a new reset code.' });
+    }
+
+    const expiresAt = otpRecord.expiresAt instanceof Date
+      ? otpRecord.expiresAt.getTime()
+      : Number(otpRecord.expiresAt);
+    if (expiresAt < Date.now()) {
+      return res.status(400).json({ error: 'Reset code has expired. Request a new one.' });
+    }
+
+    if (!(await verifyOTPHash(otp, otpRecord.otpHash))) {
+      await Registry.update('otpRecords', { id: otpRecord.id }, { attempts: otpRecord.attempts + 1 });
+      const remaining = 5 - (otpRecord.attempts + 1);
+      return res.status(400).json({
+        error: `Invalid reset code. ${remaining} attempt(s) remaining.`,
+        attemptsRemaining: remaining,
+      });
+    }
+
+    const newHash = await bcrypt.hash(newPassword, BCRYPT_ROUNDS);
+
+    // Increment tokenVersion to invalidate ALL outstanding sessions on password reset
+    await Registry.update('users', { id: user.id }, {
+      passwordHash: newHash,
+      tokenVersion: (user.tokenVersion ?? 0) + 1,
+    });
+
+    await Registry.delete('otpRecords', { email });
+
+    await logAudit(req, 'PASSWORD_RESET', 'SUCCESS', 'Password reset successfully.', { userId: user.id });
+    res.status(200).json({ message: 'Password reset successfully. Please log in with your new password.' });
+  } catch (err) {
+    logger.error('[AUTH] resetPassword error:', err);
+    res.status(500).json({ error: 'Password reset failed.' });
   }
 };
 

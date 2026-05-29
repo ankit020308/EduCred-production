@@ -318,6 +318,5 @@ export async function revokeHashOnChain(certificateHash, reasonCode = 0, encrypt
     throw new Error('Blockchain revocation is not supported by the deployed contract.');
   }
 
-  const tx = await contract.revokeHash(normalizeHash(certificateHash), reasonCode);
-  return waitForConfirmedReceipt(tx, 'Certificate revocation');
+  return executeTxWithRetry(contract, 'revokeHash', [normalizeHash(certificateHash), reasonCode]);
 }

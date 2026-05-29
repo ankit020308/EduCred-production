@@ -31,6 +31,8 @@ const VerifyOTP = lazy(() => import('./pages/VerifyOTP'));
 const Profile = lazy(() => import('./pages/Profile'));
 const DigilockerCallback = lazy(() => import('./pages/DigilockerCallback'));
 const ApiKeys = lazy(() => import('./pages/ApiKeys'));
+const ForgotPassword = lazy(() => import('./pages/ForgotPassword'));
+const ResetPassword = lazy(() => import('./pages/ResetPassword'));
 
 import StudentDashboard from './components/StudentDashboard';
 
@@ -133,7 +135,7 @@ const NavigationWrapper = () => {
   const location = useLocation();
   const path = location.pathname.toLowerCase().replace(/\/$/, '') || '/';
   const isLandingPage = path === '/';
-  const isAuthPage = ['/login', '/signup', '/verify-otp', '/onboarding', '/auth/success', '/auth/error'].includes(path);
+  const isAuthPage = ['/login', '/signup', '/verify-otp', '/onboarding', '/auth/success', '/auth/error', '/forgot-password', '/reset-password'].includes(path);
   const isDashboard = ['/university-node', '/sys-admin', '/student-portal', '/profile'].some(d => path.startsWith(d));
   const isSelfHeadered = path.startsWith('/verify') || path.startsWith('/student/');
 
@@ -154,6 +156,8 @@ const NavigationWrapper = () => {
               <Route path="/login" element={<Login />} />
               <Route path="/signup" element={<Signup />} />
               <Route path="/verify-otp" element={<VerifyOTP />} />
+              <Route path="/forgot-password" element={<ForgotPassword />} />
+              <Route path="/reset-password" element={<ResetPassword />} />
               <Route path="/auth/success" element={<OAuthSuccess />} />
               <Route path="/auth/error" element={<AuthError />} />
               <Route path="/verify" element={<ErrorBoundary><Verifier /></ErrorBoundary>} />

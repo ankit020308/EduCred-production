@@ -121,6 +121,10 @@ const Certificate = sequelize.define('Certificate', {
     reviewedAt: {
         type: DataTypes.DATE,
         allowNull: true
+    },
+    issuedAt: {
+        type: DataTypes.DATE,
+        allowNull: true
     }
 }, {
     indexes: [

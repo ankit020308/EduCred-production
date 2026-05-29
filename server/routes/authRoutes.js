@@ -1,8 +1,9 @@
 import express from 'express';
-import { 
-  register, login, getMe, verifyOTP, resendOTP, 
-  refreshToken, logout, googleLogin, sendPhoneVerification, 
-  verifyPhoneOTP, createAdmin, completeOnboarding
+import {
+  register, login, getMe, verifyOTP, resendOTP,
+  refreshToken, logout, googleLogin, sendPhoneVerification,
+  verifyPhoneOTP, createAdmin, completeOnboarding,
+  forgotPassword, resetPassword
 } from '../controllers/authController.js';
 import { protect, requireRole } from '../middleware/authMiddleware.js';
 import { authLimiter, otpLimiter } from '../middleware/rateLimiter.js';
@@ -19,6 +20,8 @@ router.post('/verify-otp', otpLimiter, verifyOTP);
 router.post('/resend-otp', otpLimiter, resendOTP);
 router.post('/verify-phone', protect, otpLimiter, verifyPhoneOTP);
 router.post('/send-phone-otp', protect, otpLimiter, sendPhoneVerification);
+router.post('/forgot-password', authLimiter, forgotPassword);
+router.post('/reset-password', authLimiter, resetPassword);
 router.post('/refresh', refreshToken);
 router.post('/logout', logout);
 router.get('/me', protect, getMe);

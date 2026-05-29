@@ -7,20 +7,27 @@ const mockSubscription = {
 };
 const mockLogAudit = jest.fn();
 
-// Mock sequelize transaction so the guard doesn't need a live DB connection.
-// The callback is executed immediately with a stub transaction object.
+// Stub transaction: callback invoked immediately with a stub transaction object.
 const mockT = {
   LOCK: { UPDATE: 'UPDATE' },
-  commit: jest.fn().mockResolvedValue(undefined),
+  commit:   jest.fn().mockResolvedValue(undefined),
   rollback: jest.fn().mockResolvedValue(undefined),
 };
-const mockTransaction = jest.fn(async (cb) => {
-  if (cb) return cb(mockT);
+const mockTransaction = jest.fn(async (_, cb) => {
+  // billingGuard calls sequelize.transaction({ isolationLevel }, callback)
+  // Some callers pass only a callback; handle both forms.
+  const fn = typeof _ === 'function' ? _ : cb;
+  if (fn) return fn(mockT);
   return mockT;
 });
 
 jest.unstable_mockModule('../config/database.js', () => ({
-  default: { transaction: mockTransaction, escape: jest.fn((v) => `'${v}'`) },
+  default: {
+    transaction: mockTransaction,
+    escape:      jest.fn((v) => `'${v}'`),
+    constructor: { Transaction: { ISOLATION_LEVELS: { SERIALIZABLE: 'SERIALIZABLE' } } },
+    literal:     jest.fn((s) => ({ val: s })),
+  },
   Op: {},
 }));
 
@@ -44,7 +51,7 @@ describe('billingGuard', () => {
     mockLogAudit.mockResolvedValue(undefined);
   });
 
-  it('audits fail-open billing bypasses when the billing lookup fails', async () => {
+  it('returns 503 (fail-closed) when the billing subsystem is unavailable', async () => {
     mockSubscription.findOne.mockRejectedValue(new Error('database unavailable'));
 
     const req = {
@@ -53,21 +60,30 @@ describe('billingGuard', () => {
       originalUrl: '/api/certificates/issue',
       headers: {},
     };
-    const res = { on: jest.fn() };
-    const next = jest.fn();
+    const jsonFn   = jest.fn();
+    const statusFn = jest.fn().mockReturnValue({ json: jsonFn });
+    const res      = { status: statusFn, on: jest.fn() };
+    const next     = jest.fn();
 
     billingGuard(req, res, next);
     await new Promise(setImmediate);
 
-    expect(next).toHaveBeenCalled();
+    // FAIL CLOSED: next() must NOT be called; caller receives 503.
+    expect(next).not.toHaveBeenCalled();
+    expect(statusFn).toHaveBeenCalledWith(503);
+    expect(jsonFn).toHaveBeenCalledWith(
+      expect.objectContaining({ error: expect.stringContaining('Billing service') })
+    );
+
+    // Audit entry records the failure.
     expect(mockLogAudit).toHaveBeenCalledWith(
       req,
-      'BILLING_BYPASS',
+      'BILLING_GUARD_FAILURE',
       'FAILURE',
-      'Billing guard failed open.',
+      'Billing guard failed closed.',
       expect.objectContaining({
-        reason: 'database unavailable',
-        userId: 'user-1',
+        reason:       'database unavailable',
+        userId:       'user-1',
         universityId: 'uni-1',
       })
     );

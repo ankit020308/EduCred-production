@@ -33,13 +33,16 @@ export function getTransporter() {
     throw new Error('SMTP email service not configured. Set EMAIL_HOST, EMAIL_PORT, EMAIL_SECURE, EMAIL_USER, EMAIL_PASS, EMAIL_FROM.');
   }
 
-  _transporter = nodemailer.createTransport({ 
-    host, 
-    port, 
-    secure, 
+  _transporter = nodemailer.createTransport({
+    host,
+    port,
+    secure,
     auth: { user, pass },
     tls: {
-      rejectUnauthorized: false
+      // Only bypass TLS certificate verification in local dev (e.g., self-signed certs).
+      // In production, a valid certificate chain is required to prevent MITM interception
+      // of OTP emails and sensitive transactional messages.
+      rejectUnauthorized: isProduction,
     },
     // Prefer IPv4 where available to avoid IPv6-only route failures.
     family: 4,
@@ -133,8 +136,14 @@ async function sendMail(mailOptions) {
   return { provider, messageId: info.messageId };
 }
 
+function getPrimaryClientUrl() {
+  const raw = process.env.CLIENT_URL || 'https://educred.in';
+  // CLIENT_URL may be a comma-separated list of allowed origins; use only the first one.
+  return raw.split(',')[0].trim().replace(/\/$/, '');
+}
+
 export const sendCertificateEmail = async (to, cert) => {
-  const verifyUrl = `${process.env.CLIENT_URL}/verify?id=${cert.id}`;
+  const verifyUrl = `${getPrimaryClientUrl()}/verify?id=${cert.id}`;
   const mailOptions = baseMailOptions(
     to,
     `Certificate issued: ${cert.course}`,
@@ -154,6 +163,24 @@ export const sendCertificateEmail = async (to, cert) => {
 
   const info = await sendMail(mailOptions);
   if (!isProduction) logger.debug(`[EMAIL] Certificate sent to ${to} via ${info.provider} (${info.messageId})`);
+};
+
+export const sendPasswordResetOTP = async (to, otp) => {
+  const mailOptions = baseMailOptions(
+    to,
+    'EduCred — Password reset code',
+    `
+      <div style="font-family:sans-serif;max-width:520px;margin:auto;border:1px solid #e5e7eb;padding:24px;border-radius:16px;text-align:center;">
+        <h2 style="margin:0 0 12px;color:#111827;">Reset your password</h2>
+        <p style="color:#4b5563;">Use this code to reset your EduCred password. If you did not request this, ignore this email.</p>
+        <div style="margin:20px 0;padding:16px;background:#f3f4f6;border-radius:12px;font-size:30px;font-weight:700;letter-spacing:10px;color:#111827;">${otp}</div>
+        <p style="color:#6b7280;font-size:14px;">This code expires in 15 minutes. Do not share it.</p>
+      </div>
+    `,
+  );
+
+  const info = await sendMail(mailOptions);
+  if (!isProduction) logger.debug(`[OTP] Password reset code sent to ${to} via ${info.provider} (${info.messageId})`);
 };
 
 export const sendOTP = async (to, otp) => {

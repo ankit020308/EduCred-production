@@ -191,6 +191,7 @@ export async function processAnchoringJob(jobData) {
       status:          'CONFIRMED',
       workflowStatus:  'ISSUED',
       workflowLog,
+      issuedAt:        new Date(),
     },
     { where: { id: certificate.id } }
   );
