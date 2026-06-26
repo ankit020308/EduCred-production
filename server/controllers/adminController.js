@@ -1,4 +1,4 @@
-import { University, FraudAlert, Certificate } from '../models/index.js';
+import { University, FraudAlert } from '../models/index.js';
 import Registry from '../services/registryService.js';
 import { logger } from '../utils/winstonLogger.js';
 import { authorizeUniversityOnChain } from '../utils/blockchain.js';

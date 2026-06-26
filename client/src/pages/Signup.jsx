@@ -229,7 +229,16 @@ export default function Signup() {
                           <label className="text-[9px] font-black text-[#646464] uppercase tracking-widest block">Password</label>
                           <div className="relative group">
                             <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-[#bbbbbb] group-focus-within:text-[#ea2804] transition-colors" size={16} />
-                            <input type="password" placeholder="At least 8 characters" required minLength={6} value={form.password}
+                            <input
+                              type="password"
+                              placeholder="At least 8 characters"
+                              required
+                              minLength={8}
+                              maxLength={128}
+                              pattern="(?=.*[a-z])(?=.*[A-Z])(?=.*[0-9])(?=.*[!@#$%^&*]).{8,128}"
+                              title="Use at least 8 characters with uppercase, lowercase, number, and special character."
+                              autoComplete="new-password"
+                              value={form.password}
                               onChange={e => setForm({ ...form, password: e.target.value })} className="ds-input pl-11" />
                           </div>
                         </div>
