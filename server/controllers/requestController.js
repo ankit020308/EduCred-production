@@ -62,6 +62,9 @@ export const getRequests = async (req, res) => {
       return res.json(requests);
     } else {
       const student = await Registry.findOne('students', { userId: id });
+      if (!student) {
+        return res.status(404).json({ error: 'Student profile not found.' });
+      }
       const requests = await Registry.find('requests', { studentId: student.id });
       return res.json(requests);
     }
@@ -86,6 +89,9 @@ export const approveRequest = async (req, res) => {
     }
 
     const student = await Registry.findById('students', request.studentId);
+    if (!student) {
+      return res.status(404).json({ error: 'Student profile not found.' });
+    }
     const studentUser = await Registry.findById('users', student.userId);
 
     // 1. Generate a deterministic transcript hash
@@ -216,7 +222,7 @@ export const rejectRequest = async (req, res) => {
     
     const student = await Registry.findById('students', request.studentId);
 
-    await logAudit(req, 'CERTIFICATE_REJECT', 'SUCCESS', `Credential request rejected for ${student.name}.`, { 
+    await logAudit(req, 'CERTIFICATE_REJECT', 'SUCCESS', `Credential request rejected for ${student?.name || 'unknown student'}.`, { 
       requestId: request.id 
     });
 

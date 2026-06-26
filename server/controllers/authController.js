@@ -150,6 +150,13 @@ export const setCookies = (res, accessToken, refreshToken) => {
 };
 const generateOTP = () => crypto.randomInt(100000, 1000000).toString();
 const hashOTP = (otp) => bcrypt.hash(String(otp), BCRYPT_ROUNDS);
+const toTime = (value) => {
+  if (!value) return NaN;
+  return value instanceof Date ? value.getTime() : new Date(value).getTime();
+};
+const isUuid = (value) =>
+  typeof value === 'string' &&
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
 const verifyOTPHash = async (otp, storedHash) => {
   if (!storedHash) return false;
   if (/^[a-f0-9]{64}$/i.test(storedHash)) {
@@ -369,8 +376,8 @@ export const verifyOTP = async (req, res) => {
   try {
     // Basic validation for OTP
     const { email: rawEmail, otp } = req.body;
+    if (!rawEmail || !otp) return res.status(400).json({ error: 'Email and security key are required.' });
     const email = rawEmail.toLowerCase();
-    if (!email || !otp) return res.status(400).json({ error: 'Email and security key are required.' });
 
     const user = await Registry.findOne('users', { email });
 
@@ -384,10 +391,11 @@ export const verifyOTP = async (req, res) => {
     }
 
     // 1. Check if account is locked
-    if (user.isLocked && user.lockedUntil > Date.now()) {
-      const waitTime = Math.ceil((user.lockedUntil - Date.now()) / 60000);
+    const lockedUntil = toTime(user.lockedUntil);
+    if (user.isLocked && lockedUntil > Date.now()) {
+      const waitTime = Math.ceil((lockedUntil - Date.now()) / 60000);
       return res.status(403).json({ error: `Account locked due to multiple failed attempts. Try again in ${waitTime} minutes.` });
-    } else if (user.isLocked && user.lockedUntil <= Date.now()) {
+    } else if (user.isLocked && lockedUntil <= Date.now()) {
       // Auto-unlock
       await Registry.update('users', { id: user.id }, { isLocked: false, lockedUntil: null });
       user.isLocked = false;
@@ -405,8 +413,8 @@ export const verifyOTP = async (req, res) => {
     }
 
     // 3. Check expiry FIRST
-    const otpExpiresAt = otpRecord.expiresAt instanceof Date ? otpRecord.expiresAt.getTime() : Number(otpRecord.expiresAt);
-    if (!otpRecord.expiresAt || otpExpiresAt < Date.now()) {
+    const otpExpiresAt = toTime(otpRecord.expiresAt);
+    if (!Number.isFinite(otpExpiresAt) || otpExpiresAt < Date.now()) {
       return res.status(400).json({ error: 'Security key expired. Request a new one.' });
     }
 
@@ -468,8 +476,8 @@ export const verifyOTP = async (req, res) => {
 export const resendOTP = async (req, res) => {
   try {
     const { email: rawEmail } = req.body;
+    if (!rawEmail) return res.status(400).json({ error: 'Email is required.' });
     const email = rawEmail.toLowerCase();
-    if (!email) return res.status(400).json({ error: 'Email is required.' });
 
     const user = await Registry.findOne('users', { email });
     if (!user) return res.status(404).json({ error: 'User not found.' });
@@ -477,8 +485,9 @@ export const resendOTP = async (req, res) => {
     // 1. Check cooldown (60s)
     const otpRecord = await Registry.findOne('otpRecords', { email });
     const now = new Date();
-    if (otpRecord && otpRecord.lastResend && (now - otpRecord.lastResend) < 60 * 1000) {
-      const waitTime = Math.ceil((60 * 1000 - (now - otpRecord.lastResend)) / 1000);
+    const lastResend = toTime(otpRecord?.lastResend);
+    if (otpRecord && Number.isFinite(lastResend) && (now.getTime() - lastResend) < 60 * 1000) {
+      const waitTime = Math.ceil((60 * 1000 - (now.getTime() - lastResend)) / 1000);
       return res.status(429).json({ error: `Cooldown active. Wait ${waitTime}s before re-syncing.` });
     }
 
@@ -539,6 +548,10 @@ export const refreshToken = async (req, res) => {
     }
 
     const decoded = jwt.verify(token, refreshSecret, { algorithms: ['HS256'] });
+    if (!isUuid(decoded.id)) {
+      clearAuthCookies(res);
+      return res.status(401).json({ error: 'Invalid or expired refresh token.' });
+    }
 
     const user = await Registry.findById('users', decoded.id);
 
@@ -636,8 +649,8 @@ export const verifyPhoneOTP = async (req, res) => {
       return res.status(404).json({ error: 'Mobile verification challenge not found.' });
     }
 
-    const otpExpiresAt = otpRecord.expiresAt instanceof Date ? otpRecord.expiresAt.getTime() : Number(otpRecord.expiresAt);
-    if (otpExpiresAt < Date.now()) {
+    const otpExpiresAt = toTime(otpRecord.expiresAt);
+    if (!Number.isFinite(otpExpiresAt) || otpExpiresAt < Date.now()) {
       return res.status(400).json({ error: 'Mobile security key expired.' });
     }
 
@@ -745,10 +758,8 @@ export const resetPassword = async (req, res) => {
       return res.status(403).json({ error: 'Too many invalid attempts. Request a new reset code.' });
     }
 
-    const expiresAt = otpRecord.expiresAt instanceof Date
-      ? otpRecord.expiresAt.getTime()
-      : Number(otpRecord.expiresAt);
-    if (expiresAt < Date.now()) {
+    const expiresAt = toTime(otpRecord.expiresAt);
+    if (!Number.isFinite(expiresAt) || expiresAt < Date.now()) {
       return res.status(400).json({ error: 'Reset code has expired. Request a new one.' });
     }
 
@@ -800,11 +811,11 @@ export const createAdmin = async (req, res) => {
     }
 
     const { name, email: rawEmail, password, role } = req.body;
-    const email = rawEmail.toLowerCase();
 
-    if (!name || !email || !password || !role) {
+    if (!name || !rawEmail || !password || !role) {
       return res.status(400).json({ error: 'All fields (name, email, password, role) are required.' });
     }
+    const email = rawEmail.toLowerCase();
 
     if (![ROLES.ADMIN, ROLES.SUPER_ADMIN, ROLES.VERIFIER].includes(role)) {
       return res.status(400).json({ error: 'Invalid administrative role.' });

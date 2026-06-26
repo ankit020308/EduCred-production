@@ -43,8 +43,12 @@ router.post('/', protect, requireRole('university', 'verifier'), async (req, res
       return res.status(400).json({ error: 'Key name is required.' });
     }
 
-    if (expiresAt && new Date(expiresAt) <= new Date()) {
-      return res.status(400).json({ error: 'expiresAt must be a future date.' });
+    let normalizedExpiresAt = null;
+    if (expiresAt) {
+      normalizedExpiresAt = new Date(expiresAt);
+      if (Number.isNaN(normalizedExpiresAt.getTime()) || normalizedExpiresAt <= new Date()) {
+        return res.status(400).json({ error: 'expiresAt must be a valid future date.' });
+      }
     }
 
     let normalizedRateLimit = 60;
@@ -75,7 +79,7 @@ router.post('/', protect, requireRole('university', 'verifier'), async (req, res
       ownerRole: req.user.role,
       institutionId,
       rateLimit: normalizedRateLimit,
-      expiresAt: expiresAt ? new Date(expiresAt) : null,
+      expiresAt: normalizedExpiresAt,
     });
 
     logger.info(`[API_KEYS] Created key "${key.name}" for user ${req.user.id}`);

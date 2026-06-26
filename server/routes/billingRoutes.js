@@ -100,7 +100,9 @@ router.post('/webhook', async (req, res) => {
     .update(rawBody)
     .digest('hex');
 
-  if (!crypto.timingSafeEqual(Buffer.from(signature), Buffer.from(expectedSig))) {
+  const signatureBuffer = Buffer.from(signature);
+  const expectedBuffer = Buffer.from(expectedSig);
+  if (signatureBuffer.length !== expectedBuffer.length || !crypto.timingSafeEqual(signatureBuffer, expectedBuffer)) {
     logger.warn('[BILLING] Webhook signature mismatch — rejected.');
     return res.sendStatus(400);
   }
@@ -112,6 +114,10 @@ router.post('/webhook', async (req, res) => {
 
   const rzpSubId = payload.id;
   const universityId = payload.notes?.universityId;
+  if (!universityId) {
+    logger.warn(`[BILLING] Webhook ${event.event} missing subscription notes.universityId — ignored.`);
+    return res.sendStatus(200);
+  }
 
   try {
     switch (event.event) {
