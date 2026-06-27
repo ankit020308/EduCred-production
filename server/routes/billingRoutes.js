@@ -5,6 +5,7 @@ import Subscription from '../models/Subscription.js';
 import { protect, requireRole } from '../middleware/authMiddleware.js';
 import { PLANS, DEFAULT_PLAN } from '../constants/plans.js';
 import { logger } from '../utils/winstonLogger.js';
+import Registry from '../services/registryService.js';
 
 const router = express.Router();
 
@@ -15,10 +16,18 @@ function getRazorpay() {
   return new Razorpay({ key_id: keyId, key_secret: keySecret });
 }
 
+async function resolveUniversityId(user) {
+  if (user?.institutionId) return user.institutionId;
+  if (user?.role !== 'university') return null;
+  const university = await Registry.findOne('universities', { userId: user.id });
+  return university?.id || null;
+}
+
 // GET /api/billing/status — returns current plan + usage for the university
 router.get('/status', protect, requireRole('university'), async (req, res) => {
   try {
-    const universityId = req.user.institutionId;
+    const universityId = await resolveUniversityId(req.user);
+    if (!universityId) return res.status(403).json({ error: 'Institution profile not found.' });
     let sub = await Subscription.findOne({ where: { universityId } });
     if (!sub) {
       const plan = PLANS[DEFAULT_PLAN];
@@ -62,7 +71,8 @@ router.post('/create-subscription', protect, requireRole('university'), async (r
   }
 
   try {
-    const universityId = req.user.institutionId;
+    const universityId = await resolveUniversityId(req.user);
+    if (!universityId) return res.status(403).json({ error: 'Institution profile not found.' });
     const existing = await Subscription.findOne({ where: { universityId } });
     if (existing?.razorpaySubscriptionId && existing.status === 'active' && existing.plan === plan) {
       return res.status(409).json({ error: 'Already subscribed to this plan.' });
